@@ -14,4 +14,92 @@ DynaLoader::bootstrap CBitcoin::CBHD $CBitcoin::CBHD::VERSION;
 
 sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
+
+# Preloaded methods go here.
+
+
+sub new {
+	my $package = shift;
+	return bless({}, $package);
+}
+# newMasterKey deriveChildPrivate exportWIFFromCBHDKey exportAddressFromCBHDKey publickeyFromWIF
+# generate a key (parent)
+sub generate {
+	my $this = shift;
+	eval{
+		my $key = CBitcoin::CBHD::newMasterKey(1);
+		$this->load($key) || die "Cannot load the key.";		
+	};
+	if($@){
+		return 0;
+	}
+	return 1;
+}
+# load
+sub load {
+	my $this = shift;
+	my $serializedkey = shift;
+	
+	eval{
+		# TODO:we need to do some eval here to see if this is a legit master key
+		# .. test(key) || die "key is bad";
+		$this->{serializedkey} = $serializedkey;
+	};
+	if($@){
+		return 0;
+	}
+	return 1;
+}
+
+
+sub deriveChild {
+	my $this = shift;
+	my $hardbool = shift;
+	my $childid = shift;
+	my $childkey = new CBitcoin;
+	eval{
+		if($hardbool){
+			$hardbool = 1;
+		}
+		else{
+			$hardbool = 0;
+		}
+		unless($childid > 0 && $childid < 2**31){
+			die "The child id is not in the correct range.\n";
+		}
+		$childkey->load(CBitcoin::CBHD::deriveChildPrivate($hardbool,$childid));
+		
+	};
+	if($@){
+		return undef;
+	}
+	return $childkey;
+	
+}
+
+sub WIF {
+	my $this = shift;
+	my $wif = '';
+	eval{
+		die "no internal key" unless $this->{serializedkey} ;
+		$wif = CBitcoin::CBHD::exportWIFFromCBHDKey($this->{serializedkey});
+	};
+	if($@){
+		return undef;
+	}
+	return $wif;
+}
+
+sub address {
+	my $this = shift;
+	my $address = '';
+	eval{
+		$address = CBitcoin::CBHD::exportAddressFromCBHDKey
+	};
+	if($@){
+		return undef;
+	}
+}
+
+
 1;
