@@ -14,8 +14,8 @@ my %options = %{
 '-lcrypto',
 '-lcbitcoin.2.0',
 '-lcbitcoin-file-ec.2.0',
-'-lcbitcoin-rand.2.0']
-  'VERSION' => '0.01'
+'-lcbitcoin-rand.2.0'],
+  'VERSION' => '0.02'
 }
 };
 WriteMakefile(%options);
