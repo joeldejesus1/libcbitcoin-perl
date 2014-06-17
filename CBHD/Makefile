@@ -13,8 +13,9 @@
 
 #     BUILD_REQUIRES => {  }
 #     CONFIGURE_REQUIRES => {  }
-#     INC => q[/usr/local/include]
+#     INC => q[/home/joeldejesus/Workspace/cbitcoin/library/include]
 #     LIBS => [q[-lcbitcoin.2.0], q[-lcbitcoin-network.2.0], q[-lcbitcoin-storage.2.0], q[-lcbitcoin-threads.2.0], q[-lpthread], q[-lcbitcoin-logging.2.0], q[-lcbitcoin-crypto.2.0], q[-lcrypto], q[-lcbitcoin.2.0], q[-lcbitcoin-file-ec.2.0], q[-lcbitcoin-rand.2.0]]
+#     MYEXTLIB => q[/usr/local/lib/libcbitcoin.2.0.so /usr/local/lib/libcbitcoin-file-no-ec.2.0.so /usr/local/lib/libcbitcoin-rand.2.0.so /usr/local/lib/perl/5.14.2/auto/File/Map/Map.so /usr/local/lib/perl/5.14.2/auto/Crypt/PBC/PBC.so  /usr/local/lib/perl/5.14.2/auto/Math/BigInt/GMP/GMP.so /usr/local/lib/perl/5.14.2/auto/BerkeleyDB/BerkeleyDB.so /usr/local/lib/perl/5.14.2/auto/PerlIO/Layers/Layers.so /usr/local/lib/libcbitcoin-threads.2.0.so /usr/local/lib/libcbitcoin-network.2.0.so /usr/local/lib/libcbitcoin-file-ec.2.0.so /usr/local/lib/libcbitcoin-storage.2.0.so /usr/local/lib/libcbitcoin-crypto.2.0.so /usr/local/lib/libcbitcoin-logging.2.0.so ]
 #     NAME => q[CBitcoin::CBHD]
 #     PREREQ_PM => {  }
 #     TEST_REQUIRES => {  }
@@ -118,6 +119,7 @@ DESTINSTALLVENDORMAN3DIR = $(DESTDIR)$(INSTALLVENDORMAN3DIR)
 PERL_LIB = /usr/share/perl/5.14
 PERL_ARCHLIB = /usr/lib/perl/5.14
 LIBPERL_A = libperl.a
+MYEXTLIB = /usr/local/lib/libcbitcoin.2.0.so /usr/local/lib/libcbitcoin-file-no-ec.2.0.so /usr/local/lib/libcbitcoin-rand.2.0.so /usr/local/lib/perl/5.14.2/auto/File/Map/Map.so /usr/local/lib/perl/5.14.2/auto/Crypt/PBC/PBC.so  /usr/local/lib/perl/5.14.2/auto/Math/BigInt/GMP/GMP.so /usr/local/lib/perl/5.14.2/auto/BerkeleyDB/BerkeleyDB.so /usr/local/lib/perl/5.14.2/auto/PerlIO/Layers/Layers.so /usr/local/lib/libcbitcoin-threads.2.0.so /usr/local/lib/libcbitcoin-network.2.0.so /usr/local/lib/libcbitcoin-file-ec.2.0.so /usr/local/lib/libcbitcoin-storage.2.0.so /usr/local/lib/libcbitcoin-crypto.2.0.so /usr/local/lib/libcbitcoin-logging.2.0.so 
 FIRST_MAKEFILE = Makefile
 MAKEFILE_OLD = Makefile.old
 MAKE_APERL_FILE = Makefile.aperl
@@ -151,7 +153,7 @@ BASEEXT = CBHD
 PARENT_NAME = CBitcoin
 DLBASE = $(BASEEXT)
 VERSION_FROM = 
-INC = /usr/local/include
+INC = /home/joeldejesus/Workspace/cbitcoin/library/include
 OBJECT = $(BASEEXT)$(OBJ_EXT)
 LDFROM = $(OBJECT)
 LINKTYPE = dynamic
@@ -491,6 +493,7 @@ static :: $(FIRST_MAKEFILE) $(INST_STATIC)
 
 $(INST_STATIC) : $(OBJECT) $(MYEXTLIB) $(INST_ARCHAUTODIR)$(DFSEP).exists
 	$(RM_RF) $@
+	$(CP) $(MYEXTLIB) $@
 	$(FULL_AR) $(AR_STATIC_ARGS) $@ $(OBJECT) && $(RANLIB) $@
 	$(CHMOD) $(PERM_RWX) $@
 	$(NOECHO) $(ECHO) "$(EXTRALIBS)" > $(INST_ARCHAUTODIR)/extralibs.ld
