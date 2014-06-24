@@ -519,11 +519,17 @@ manifypods : pure_all
 
 # --- MakeMaker subdirs section:
 
-# none
+# The default clean, realclean and test targets in this Makefile
+# have automatically been given entries for each subdir.
+
+
+subdirs ::
+	$(NOECHO) cd old-config && $(MAKE) $(USEMAKEFILE) $(FIRST_MAKEFILE) all $(PASTHRU)
+
 
 # --- MakeMaker clean_subdirs section:
 clean_subdirs :
-	$(NOECHO) $(NOOP)
+	$(ABSPERLRUN)  -e 'exit 0 unless chdir '\''old-config'\'';  system '\''$(MAKE) clean'\'' if -f '\''$(FIRST_MAKEFILE)'\'';' --
 
 
 # --- MakeMaker clean section:
@@ -557,7 +563,8 @@ clean :: clean_subdirs
 
 # --- MakeMaker realclean_subdirs section:
 realclean_subdirs :
-	$(NOECHO) $(NOOP)
+	- $(ABSPERLRUN)  -e 'chdir '\''old-config'\'';  system '\''$(MAKE) $(USEMAKEFILE) $(MAKEFILE_OLD) realclean'\'' if -f '\''$(MAKEFILE_OLD)'\'';' --
+	- $(ABSPERLRUN)  -e 'chdir '\''old-config'\'';  system '\''$(MAKE) $(USEMAKEFILE) $(FIRST_MAKEFILE) realclean'\'' if -f '\''$(FIRST_MAKEFILE)'\'';' --
 
 
 # --- MakeMaker realclean section:
@@ -954,7 +961,7 @@ $(MAP_TARGET) :: static $(MAKE_APERL_FILE)
 $(MAKE_APERL_FILE) : $(FIRST_MAKEFILE) pm_to_blib
 	$(NOECHO) $(ECHO) Writing \"$(MAKE_APERL_FILE)\" for this $(MAP_TARGET)
 	$(NOECHO) $(PERLRUNINST) \
-		Makefile.PL DIR= \
+		Makefile.PL DIR=old-config \
 		MAKEFILE=$(MAKE_APERL_FILE) LINKTYPE=static \
 		MAKEAPERL=1 NORECURS=1 CCCDLFLAGS=
 
@@ -974,7 +981,9 @@ test :: $(TEST_TYPE) subdirs-test
 subdirs-test ::
 	$(NOECHO) $(NOOP)
 
-	$(NOECHO) $(ECHO) 'No tests defined for $(NAME) extension.'
+subdirs-test ::
+	$(NOECHO) cd old-config && $(MAKE) test $(PASTHRU)
+
 
 test_dynamic :: pure_all
 

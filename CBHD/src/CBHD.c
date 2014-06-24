@@ -34,12 +34,12 @@ char* newMasterKey(int arg){
 	return (char *)CBByteArrayGetData(str);
 }
 
-char* deriveChildPrivate(char* privstring,bool hard,int child){
+char* deriveChildPrivate(char* privstring,bool private,int child){
 	CBHDKey* masterkey = importDataToCBHDKey(privstring);
 
 	// generate child key
 	CBHDKey * childkey = CBNewHDKey(true);
-	CBHDKeyChildID childID = { hard, child};
+	CBHDKeyChildID childID = { private, child};
 	CBHDKeyDeriveChild(masterkey, childID, childkey);
 	free(masterkey);
 
@@ -72,6 +72,13 @@ char* exportAddressFromCBHDKey(char* privstring){
 	CBReleaseObject(address);
 	return (char *)CBByteArrayGetData(addressstring);
 }
+char* exportPublicKeyFromCBHDKey(char* privstring){
+	CBHDKey* cbkey = importDataToCBHDKey(privstring);
+	uint8_t* pubkey = CBHDKeyGetPublicKey(cbkey);
+	free(cbkey);
+	return (char*) pubkey;
+}
+
 
 char* newWIF(int arg){
 	CBKeyPair * key = CBNewKeyPair(true);

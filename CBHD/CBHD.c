@@ -47,12 +47,12 @@ char* newMasterKey(int arg){
 	return (char *)CBByteArrayGetData(str);
 }
 
-char* deriveChildPrivate(char* privstring,bool hard,int child){
+char* deriveChildPrivate(char* privstring,bool private,int child){
 	CBHDKey* masterkey = importDataToCBHDKey(privstring);
 
 	// generate child key
 	CBHDKey * childkey = CBNewHDKey(true);
-	CBHDKeyChildID childID = { hard, child};
+	CBHDKeyChildID childID = { private, child};
 	CBHDKeyDeriveChild(masterkey, childID, childkey);
 	free(masterkey);
 
@@ -85,6 +85,13 @@ char* exportAddressFromCBHDKey(char* privstring){
 	CBReleaseObject(address);
 	return (char *)CBByteArrayGetData(addressstring);
 }
+char* exportPublicKeyFromCBHDKey(char* privstring){
+	CBHDKey* cbkey = importDataToCBHDKey(privstring);
+	uint8_t* pubkey = CBHDKeyGetPublicKey(cbkey);
+	free(cbkey);
+	return (char*) pubkey;
+}
+
 
 char* newWIF(int arg){
 	CBKeyPair * key = CBNewKeyPair(true);
@@ -155,7 +162,7 @@ char* createWIF(int arg){
 
 
 
-#line 159 "CBHD.c"
+#line 166 "CBHD.c"
 #ifndef PERL_UNUSED_VAR
 #  define PERL_UNUSED_VAR(var) if (0) var = var
 #endif
@@ -207,7 +214,7 @@ S_croak_xs_usage(pTHX_ const CV *const cv, const char *const params)
 #define newXSproto_portable(name, c_impl, file, proto) (PL_Sv=(SV*)newXS(name, c_impl, file), sv_setpv(PL_Sv, proto), (CV*)PL_Sv)
 #endif /* !defined(newXS_flags) */
 
-#line 211 "CBHD.c"
+#line 218 "CBHD.c"
 
 XS(XS_CBitcoin__CBHD_newMasterKey); /* prototype to pass -Wmissing-prototypes */
 XS(XS_CBitcoin__CBHD_newMasterKey)
@@ -240,15 +247,15 @@ XS(XS_CBitcoin__CBHD_deriveChildPrivate)
     dXSARGS;
 #endif
     if (items != 3)
-       croak_xs_usage(cv,  "privstring, hard, child");
+       croak_xs_usage(cv,  "privstring, private, child");
     {
 	char *	privstring = (char *)SvPV_nolen(ST(0));
-	bool	hard = (bool)SvTRUE(ST(1));
+	bool	private = (bool)SvTRUE(ST(1));
 	int	child = (int)SvIV(ST(2));
 	char *	RETVAL;
 	dXSTARG;
 
-	RETVAL = deriveChildPrivate(privstring, hard, child);
+	RETVAL = deriveChildPrivate(privstring, private, child);
 	sv_setpv(TARG, RETVAL); XSprePUSH; PUSHTARG;
     }
     XSRETURN(1);
@@ -293,6 +300,28 @@ XS(XS_CBitcoin__CBHD_exportAddressFromCBHDKey)
 	dXSTARG;
 
 	RETVAL = exportAddressFromCBHDKey(privstring);
+	sv_setpv(TARG, RETVAL); XSprePUSH; PUSHTARG;
+    }
+    XSRETURN(1);
+}
+
+
+XS(XS_CBitcoin__CBHD_exportPublicKeyFromCBHDKey); /* prototype to pass -Wmissing-prototypes */
+XS(XS_CBitcoin__CBHD_exportPublicKeyFromCBHDKey)
+{
+#ifdef dVAR
+    dVAR; dXSARGS;
+#else
+    dXSARGS;
+#endif
+    if (items != 1)
+       croak_xs_usage(cv,  "privstring");
+    {
+	char *	privstring = (char *)SvPV_nolen(ST(0));
+	char *	RETVAL;
+	dXSTARG;
+
+	RETVAL = exportPublicKeyFromCBHDKey(privstring);
 	sv_setpv(TARG, RETVAL); XSprePUSH; PUSHTARG;
     }
     XSRETURN(1);
@@ -414,6 +443,7 @@ XS(boot_CBitcoin__CBHD)
         newXS("CBitcoin::CBHD::deriveChildPrivate", XS_CBitcoin__CBHD_deriveChildPrivate, file);
         newXS("CBitcoin::CBHD::exportWIFFromCBHDKey", XS_CBitcoin__CBHD_exportWIFFromCBHDKey, file);
         newXS("CBitcoin::CBHD::exportAddressFromCBHDKey", XS_CBitcoin__CBHD_exportAddressFromCBHDKey, file);
+        newXS("CBitcoin::CBHD::exportPublicKeyFromCBHDKey", XS_CBitcoin__CBHD_exportPublicKeyFromCBHDKey, file);
         newXS("CBitcoin::CBHD::newWIF", XS_CBitcoin__CBHD_newWIF, file);
         newXS("CBitcoin::CBHD::publickeyFromWIF", XS_CBitcoin__CBHD_publickeyFromWIF, file);
         newXS("CBitcoin::CBHD::addressFromPublicKey", XS_CBitcoin__CBHD_addressFromPublicKey, file);

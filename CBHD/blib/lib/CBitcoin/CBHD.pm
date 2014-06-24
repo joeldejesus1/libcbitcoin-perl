@@ -14,7 +14,10 @@ DynaLoader::bootstrap CBitcoin::CBHD $CBitcoin::CBHD::VERSION;
 
 sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
+
 # Preloaded methods go here.
+
+
 sub new {
 	my $package = shift;
 	return bless({}, $package);
@@ -25,22 +28,7 @@ sub generate {
 	my $this = shift;
 	eval{
 		my $key = CBitcoin::CBHD::newMasterKey(1);
-		$this->load($key) || die "Cannot load the key.";		
-	};
-	if($@){
-		return 0;
-	}
-	return 1;
-}
-# load
-sub load {
-	my $this = shift;
-	my $serializedkey = shift;
-	
-	eval{
-		# TODO:we need to do some eval here to see if this is a legit master key
-		# .. test(key) || die "key is bad";
-		$this->{serializedkey} = $serializedkey;
+		$this->privatekey($key) || die "Cannot load the key.";		
 	};
 	if($@){
 		return 0;
@@ -48,12 +36,23 @@ sub load {
 	return 1;
 }
 
+sub privatekey {
+	my $this = shift;
+	my $x = shift;
+	if($x){
+		$this->{serializedkey} = $x;
+		return $this->{serializedkey};
+	}
+	else{
+		return $this->{serializedkey};
+	}
+}
 
 sub deriveChild {
 	my $this = shift;
 	my $hardbool = shift;
 	my $childid = shift;
-	my $childkey = new CBitcoin;
+	my $childkey = new CBitcoin::CBHD;
 	eval{
 		if($hardbool){
 			$hardbool = 1;
@@ -64,7 +63,8 @@ sub deriveChild {
 		unless($childid > 0 && $childid < 2**31){
 			die "The child id is not in the correct range.\n";
 		}
-		$childkey->load(CBitcoin::CBHD::deriveChildPrivate($hardbool,$childid));
+		die "no private key" unless $this->privatekey;
+		$childkey->privatekey(CBitcoin::CBHD::deriveChildPrivate($this->privatekey(),$hardbool,$childid));
 		
 	};
 	if($@){
@@ -78,8 +78,8 @@ sub WIF {
 	my $this = shift;
 	my $wif = '';
 	eval{
-		die "no internal key" unless $this->{serializedkey} ;
-		$wif = CBitcoin::CBHD::exportWIFFromCBHDKey($this->{serializedkey});
+		die "no private key" unless $this->privatekey();
+		$wif = CBitcoin::CBHD::exportWIFFromCBHDKey($this->privatekey());
 	};
 	if($@){
 		return undef;
@@ -91,12 +91,26 @@ sub address {
 	my $this = shift;
 	my $address = '';
 	eval{
-		$address = CBitcoin::CBHD::exportAddressFromCBHDKey
+		die "no private key" unless $this->privatekey();
+		$address = CBitcoin::CBHD::exportAddressFromCBHDKey($this->privatekey());
 	};
 	if($@){
 		return undef;
 	}
+	return $address;
 }
 
+sub publickey {
+	my $this = shift;
+	my $x = '';
+	eval{
+		die "no private key" unless $this->privatekey();
+		$x = CBitcoin::CBHD::exportPublicKeyFromCBHDKey($this->privatekey());
+	};
+	if($@){
+		return undef;
+	}
+	return $x;
+}
 
 1;

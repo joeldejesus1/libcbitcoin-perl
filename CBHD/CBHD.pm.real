@@ -28,7 +28,7 @@ sub generate {
 	my $this = shift;
 	eval{
 		my $key = CBitcoin::CBHD::newMasterKey(1);
-		$this->privatekey($key) || die "Cannot load the key.";		
+		$this->load($key) || die "Cannot load the key.";		
 	};
 	if($@){
 		return 0;
@@ -52,7 +52,7 @@ sub deriveChild {
 	my $this = shift;
 	my $hardbool = shift;
 	my $childid = shift;
-	my $childkey = new CBitcoin::CBHD;
+	my $childkey = new CBitcoin;
 	eval{
 		if($hardbool){
 			$hardbool = 1;
@@ -63,8 +63,7 @@ sub deriveChild {
 		unless($childid > 0 && $childid < 2**31){
 			die "The child id is not in the correct range.\n";
 		}
-		die "no private key" unless $this->privatekey;
-		$childkey->privatekey(CBitcoin::CBHD::deriveChildPrivate($this->privatekey(),$hardbool,$childid));
+		$childkey->privatekey(CBitcoin::CBHD::deriveChildPrivate($hardbool,$childid));
 		
 	};
 	if($@){
