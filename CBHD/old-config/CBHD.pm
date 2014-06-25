@@ -28,7 +28,7 @@ sub generate {
 	my $this = shift;
 	eval{
 		my $key = CBitcoin::CBHD::newMasterKey(1);
-		$this->privatekey($key) || die "Cannot load the key.";		
+		$this->serializedkeypair($key) || die "Cannot load the key.";		
 	};
 	if($@){
 		return 0;
@@ -36,7 +36,7 @@ sub generate {
 	return 1;
 }
 
-sub privatekey {
+sub serializedkeypair {
 	my $this = shift;
 	my $x = shift;
 	if($x){
@@ -47,7 +47,12 @@ sub privatekey {
 		return $this->{serializedkey};
 	}
 }
+=head2
+---++ deriveChild($hardbool,$childid)
+If you want to go from private parent keypair to public child keypair, then set $hardbool to false.  If you want to 
+go from private parent keypair to private child keypair, then set $hardbool to true.
 
+=cut
 sub deriveChild {
 	my $this = shift;
 	my $hardbool = shift;
@@ -63,8 +68,8 @@ sub deriveChild {
 		unless($childid > 0 && $childid < 2**31){
 			die "The child id is not in the correct range.\n";
 		}
-		die "no private key" unless $this->privatekey;
-		$childkey->privatekey(CBitcoin::CBHD::deriveChildPrivate($this->privatekey(),$hardbool,$childid));
+		die "no private key" unless $this->serializedkeypair;
+		$childkey->serializedkeypair(CBitcoin::CBHD::deriveChildPrivate($this->serializedkeypair(),$hardbool,$childid));
 		
 	};
 	if($@){
@@ -78,8 +83,8 @@ sub WIF {
 	my $this = shift;
 	my $wif = '';
 	eval{
-		die "no private key" unless $this->privatekey();
-		$wif = CBitcoin::CBHD::exportWIFFromCBHDKey($this->privatekey());
+		die "no private key" unless $this->serializedkeypair();
+		$wif = CBitcoin::CBHD::exportWIFFromCBHDKey($this->serializedkeypair());
 	};
 	if($@){
 		return undef;
@@ -91,8 +96,8 @@ sub address {
 	my $this = shift;
 	my $address = '';
 	eval{
-		die "no private key" unless $this->privatekey();
-		$address = CBitcoin::CBHD::exportAddressFromCBHDKey($this->privatekey());
+		die "no private key" unless $this->serializedkeypair();
+		$address = CBitcoin::CBHD::exportAddressFromCBHDKey($this->serializedkeypair());
 	};
 	if($@){
 		return undef;
@@ -104,8 +109,8 @@ sub publickey {
 	my $this = shift;
 	my $x = '';
 	eval{
-		die "no private key" unless $this->privatekey();
-		$x = CBitcoin::CBHD::exportPublicKeyFromCBHDKey($this->privatekey());
+		die "no private key" unless $this->serializedkeypair();
+		$x = CBitcoin::CBHD::exportPublicKeyFromCBHDKey($this->serializedkeypair());
 	};
 	if($@){
 		return undef;
