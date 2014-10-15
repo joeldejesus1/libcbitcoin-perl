@@ -1,0 +1,46 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+Format: 1.8
+Date: Wed, 15 Oct 2014 13:03:25 +0900
+Source: libperl-cbitcoin-cbhd
+Binary: libperl-cbitcoin-cbhd
+Architecture: source amd64
+Version: 0.01-1
+Distribution: unstable
+Urgency: low
+Maintainer: Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>
+Changed-By: Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>
+Description: 
+ libperl-cbitcoin-cbhd - Install perl object oriented module for CBHD
+Changes: 
+ libperl-cbitcoin-cbhd (0.01-1) unstable; urgency=low
+ .
+   * Initial release (Closes: #nnnn)  <nnnn is the bug number of your ITP>
+Checksums-Sha1: 
+ 0cd24bc03e043dab5dc2dfe3e3decd000818ba32 1475 libperl-cbitcoin-cbhd_0.01-1.dsc
+ 821c19326557403697b8a7f1f5085bcfac7d8c24 39367 libperl-cbitcoin-cbhd_0.01.orig.tar.gz
+ 947dcacb382506e90219d134fba42f119ea3413b 1759 libperl-cbitcoin-cbhd_0.01-1.debian.tar.gz
+ 48d05a96070729625ab7112db936d8b5be34b30e 2092 libperl-cbitcoin-cbhd_0.01-1_amd64.deb
+Checksums-Sha256: 
+ 07994d75a6ba7c5a2315df0ad6723c348cfb1037f40122722943bd6dd4f4ea50 1475 libperl-cbitcoin-cbhd_0.01-1.dsc
+ 44982cc29eb281edeeb00eb363852beca52fd397d9e0599955e3ab07da562aa5 39367 libperl-cbitcoin-cbhd_0.01.orig.tar.gz
+ a81f8f41574f5868b41db9134b86b7f2110365bb18a1f48e7982a81d94bf686e 1759 libperl-cbitcoin-cbhd_0.01-1.debian.tar.gz
+ 2bc6ec44e5ee5837a19c3b35c0be4bb2dc5af03cd5e3e039602c50d4a228ff55 2092 libperl-cbitcoin-cbhd_0.01-1_amd64.deb
+Files: 
+ 275c5379e6312436c5f0aa0ec6384edc 1475 unknown extra libperl-cbitcoin-cbhd_0.01-1.dsc
+ ff21a4babe2357e7476649ca739f40f5 39367 unknown extra libperl-cbitcoin-cbhd_0.01.orig.tar.gz
+ 2d1102d8e75739e5fefbf60073e5c1ea 1759 unknown extra libperl-cbitcoin-cbhd_0.01-1.debian.tar.gz
+ 3da596f4be746d95202f78d21851ed6f 2092 unknown extra libperl-cbitcoin-cbhd_0.01-1_amd64.deb
+
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.12 (GNU/Linux)
+
+iQEcBAEBAgAGBQJUPfWGAAoJEPLtJewQcQQL1RQIAJZSooIPFPa72ACmcjeEcTNM
+gv4ePj/FLyPtuhHNzxOhQphROn3M56FqoZrZDCfVIIt4z/aGkMGoXMhHkl6zFvxS
+pvkjoGxDoej7N7rVsbH0SQxAUxsQOBwkV3RQkgoPVYtqdfLW8ynan/wNRpkufucz
+2To5bVHNiglrlixxQC0w1jRa6SpLjqjnjz4xANO/BtSzfLFs6xhfw2qvYlYE08R8
+Y5D2YJKzWPCkRw4bWVq3gO8C0ivQCnuVw/lhRYQOdK5Hdl5Fo/1pDbj/2sGfa7pE
+/t3NJdK2BKkmTfjh8F2KKGF1xWtf9IdtewGFzPCcUexPejL3PLsKAnMZawNSRIU=
+=EIR4
+-----END PGP SIGNATURE-----
