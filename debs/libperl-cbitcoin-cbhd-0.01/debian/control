@@ -1,7 +1,7 @@
 Source: libperl-cbitcoin-cbhd
 Section: unknown
 Priority: extra
-Maintainer: Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>
+Maintainer: Joel DeJesus <dejesus.joel@e-flamingo.jp>
 Build-Depends: debhelper (>= 8.0.0)
 Standards-Version: 3.9.3
 Homepage: https://e-flamingo.jp

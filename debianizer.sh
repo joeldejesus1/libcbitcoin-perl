@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 ARCH=amd64
 
@@ -6,14 +6,26 @@ set -e
 
 CUSER=$(whoami)
 
-cd CBHD
+CBMODULE=CBHD
+CBDIR=/home/joeldejesus/Workspace/cbitcoin-perl/${CBMODULE}
+MODNAME=libperl-cbitcoin-cbhd
+MODVER="0.01"
+
+
+echo "heading into the $CBDIR directory"
+cd ${CBDIR}
 
 echo "compiling"
-make clean && perl coinx2.pl && cp old-config/* ./ && perl Makefile.PL && make
-DEBTARDIR=../debs/libperl-cbitcoin-cbhd_0.01
+[ -f ${CBDIR}/Makefile ] && make clean
+perl coinx2.pl
+cp -r old-config/* ./ && rm -r debian
+perl Makefile.PL
+make
+DEBTARDIR=../debs/${MODNAME}-${MODVER}
 DEBTARDIRPERL=${DEBTARDIR}/usr/lib/perl5
+
 echo "cleaning out old debian tar directory"
-sudo rm -r ${DEBTARDIR}
+[ -d ${DEBTARDIR} ] && sudo rm -r ${DEBTARDIR}
 
 echo "making directories"
 #[ -d ${DEBTARDIR}/DEBIAN ] || mkdir -p ${DEBTARDIR}/DEBIAN 
@@ -30,3 +42,16 @@ sudo find ${DEBTARDIRPERL}/ -name '*.exists' -exec rm {} \;
 sudo find ${DEBTARDIRPERL}/ -name '*coinx2.pl' -exec rm {} \;
 
 sudo chown -R $CUSER:$CUSER ${DEBTARDIR}
+
+
+cp -r ${CBDIR}/old-config/debian ${DEBTARDIR}/debian
+
+echo "taring files $(pwd) "
+echo "of ${DEBTARDIR}"
+cd ${DEBTARDIR}
+tar zcf ${CBDIR}/../debs/${MODNAME}_${MODVER}.orig.tar.gz *
+
+cd ${CBDIR}/../debs/${MODNAME}-${MODVER}
+
+echo "creating deb package and signing it"
+dpkg-buildpackage -rfakeroot -k

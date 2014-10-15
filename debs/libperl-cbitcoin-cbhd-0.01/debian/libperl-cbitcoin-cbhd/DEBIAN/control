@@ -1,7 +1,7 @@
 Package: libperl-cbitcoin-cbhd
 Version: 0.01-1
 Architecture: amd64
-Maintainer: Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>
+Maintainer: Joel DeJesus <dejesus.joel@e-flamingo.jp>
 Installed-Size: 26
 Section: unknown
 Priority: extra
