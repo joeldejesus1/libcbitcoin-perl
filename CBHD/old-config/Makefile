@@ -13,7 +13,7 @@
 
 #     BUILD_REQUIRES => {  }
 #     CONFIGURE_REQUIRES => {  }
-#     INC => q[../../library/include]
+#     INC => q[~/Workspace/cbitcoin/library/include]
 #     LIBS => [q[-lcbitcoin.2.0], q[-lcbitcoin-network.2.0], q[-lcbitcoin-storage.2.0], q[-lcbitcoin-threads.2.0], q[-lpthread], q[-lcbitcoin-logging.2.0], q[-lcbitcoin-crypto.2.0], q[-lcrypto], q[-lcbitcoin.2.0], q[-lcbitcoin-file-ec.2.0], q[-lcbitcoin-rand.2.0]]
 #     MYEXTLIB => q[/usr/local/lib/libcbitcoin.2.0.so /usr/local/lib/libcbitcoin-file-no-ec.2.0.so /usr/local/lib/libcbitcoin-rand.2.0.so /usr/local/lib/libcbitcoin-threads.2.0.so /usr/local/lib/libcbitcoin-network.2.0.so /usr/local/lib/libcbitcoin-file-ec.2.0.so /usr/local/lib/libcbitcoin-storage.2.0.so /usr/local/lib/libcbitcoin-crypto.2.0.so /usr/local/lib/libcbitcoin-logging.2.0.so ]
 #     NAME => q[CBitcoin::CBHD]
@@ -66,13 +66,10 @@ DEFINE_VERSION = -D$(VERSION_MACRO)=\"$(VERSION)\"
 XS_VERSION = 0.02
 XS_VERSION_MACRO = XS_VERSION
 XS_DEFINE_VERSION = -D$(XS_VERSION_MACRO)=\"$(XS_VERSION)\"
-INST_NAME=../libperl-cbitcoin-cbhd_$(XS_VERSION)
-#INST_ARCHLIB = ../blib/arch
-INST_ARCHLIB = $(INST_NAME)/usr/lib/perl5
+INST_ARCHLIB = ../blib/arch
 INST_SCRIPT = ../blib/script
 INST_BIN = ../blib/bin
-#INST_LIB = ../blib/lib
-INST_LIB = $(INST_NAME)/usr/lib/perl5
+INST_LIB = ../blib/lib
 INST_MAN1DIR = ../blib/man1
 INST_MAN3DIR = ../blib/man3
 MAN1EXT = 1p
@@ -156,7 +153,7 @@ BASEEXT = CBHD
 PARENT_NAME = CBitcoin
 DLBASE = $(BASEEXT)
 VERSION_FROM = 
-INC = ../../library/include
+INC = ~/Workspace/cbitcoin/library/include
 OBJECT = 
 LDFROM = $(OBJECT)
 LINKTYPE = dynamic

@@ -3,7 +3,8 @@ my %options = %{
 {
   'TYPEMAPS' => [],
   'NAME' => 'CBitcoin::CBHD',
-  'INC' => '../../library/include',
+#  'INC' => '../../library/include',
+   'INC' => '~/Workspace/cbitcoin/library/include',
   'LIBS' => ['-lcbitcoin.2.0',
 '-lcbitcoin-network.2.0',
 '-lcbitcoin-storage.2.0',
