@@ -6,7 +6,7 @@ my $package_name = 'CBitcoin::CBHD';
 
 my $config_opts = {'WRITE_PM' => 1,
                      'WRITE_MAKEFILE_PL' => 1,
-                     'VERSION' => 0.01,
+                     'VERSION' => 0.02,
                     };
 
 
