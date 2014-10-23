@@ -14,39 +14,92 @@ Version 0.01
 
 =cut
 
-our $VERSION = '0.01';
+use CBitcoin::Script;
 
+require Exporter;
+*import = \&Exporter::import;
+require DynaLoader;
 
-=head1 SYNOPSIS
+$CBitcoin::TransactionInput::VERSION = '0.01';
 
-Quick summary of what the module does.
+DynaLoader::bootstrap CBitcoin::TransactionInput $CBitcoin::TransactionInput::VERSION;
 
-Perhaps a little code snippet.
+@CBitcoin::TransactionInput::EXPORT = ();
+@CBitcoin::TransactionInput::EXPORT_OK = ();
 
-    use CBitcoin::TransactionInput;
+sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
-    my $foo = CBitcoin::TransactionInput->new();
-    ...
+sub new {
+	use bigint;
+	my $package = shift;
+	my $this = bless({}, $package);
 
-=head1 EXPORT
+	my $x = shift;
+	unless(ref($x) eq 'HASH'){
+		return $this;
+	}
+	if(defined $x->{'data'} && $x->{'data'} =~ m/^([0-9a-zA-Z]+)$/){
+		# we have a tx input which is serialized
+		$this->{'data'} = $x->{'data'};
+	
+	}
+	elsif(
+		defined $x->{'prevOutHash'} && $x->{'prevOutHash'} =~ m/^([0-9a-fA-F]+)$/
+		&& defined $x->{'prevOutIndex'} && $x->{'prevOutIndex'} =~ m/[0-9]+/
+		&& defined $x->{'script'}
+	){
+		my $sequence = hex('0xFFFFFFFF') unless defined $x->{'sequence'};
+		# call this function to validate the data, and get serialized data back
+		#char* create_txinput_obj(char* scriptstring, int sequenceInt, char* prevOutHashString, int prevOutIndexInt){
+		$this->{'data'} = create_txinput_obj(
+			$x->{'script'}
+			,$sequence
+			,$x->{'prevOutHash'}
+			,$x->{'prevOutIndex'}
+		);
+		$this->script;
+		$this->prevOutHash;
+		$this->prevOutIndex;
+	}
+	else{
+		die "no arguments to create Transaction::Input";
+	}
 
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
-
-=head1 SUBROUTINES/METHODS
-
-=head2 function1
-
-=cut
-
-sub function1 {
+	return $this;
 }
 
-=head2 function2
+sub serialized_data {
+	my $this = shift;
+	return $this->{'data'};
+}
 
-=cut
+sub script {
+	my $this = shift;
+	# this is a C function
+	return get_script_from_obj($this->{'data'});
+}
 
-sub function2 {
+sub type_of_script {
+	my $this = shift;
+	return CBitcoin::Script::whatTypeOfScript( $this->script );
+}
+
+sub prevOutHash {
+	use bigint;
+	my $this = shift;
+	# this is a C function
+	return get_prevOutHash_from_obj($this->{'data'});
+}
+
+sub prevOutIndex {
+	use bigint;
+	my $this = shift;
+	return get_prevOutIndex_from_obj($this->{'data'});
+}
+sub sequence {
+	use bigint;
+	my $this = shift;
+	return get_sequence_from_obj($this->{'data'});
 }
 
 =head1 AUTHOR

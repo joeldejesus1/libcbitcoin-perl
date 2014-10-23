@@ -14,39 +14,72 @@ Version 0.01
 
 =cut
 
-our $VERSION = '0.01';
+use CBitcoin::Script;
+
+require Exporter;
+*import = \&Exporter::import;
+require DynaLoader;
+
+$CBitcoin::TransactionOutput::VERSION = '0.01';
+
+DynaLoader::bootstrap CBitcoin::TransactionOutput $CBitcoin::TransactionOutput::VERSION;
+
+@CBitcoin::TransactionOutput::EXPORT = ();
+@CBitcoin::TransactionOutput::EXPORT_OK = ();
+
+sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 
-=head1 SYNOPSIS
-
-Quick summary of what the module does.
-
-Perhaps a little code snippet.
-
-    use CBitcoin::TransactionOutput;
-
-    my $foo = CBitcoin::TransactionOutput->new();
-    ...
-
-=head1 EXPORT
-
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
-
-=head1 SUBROUTINES/METHODS
-
-=head2 function1
-
-=cut
-
-sub function1 {
+sub new {
+	use bigint;
+	my $package = shift;
+	my $this = bless({}, $package);
+	
+	my $x = shift;
+	unless(ref($x) eq 'HASH'){
+		return $this;
+	}
+	if(defined $x->{'data'} && $x->{'data'} =~ m/^([0-9a-zA-Z]+)$/){
+		# we have a tx input which is serialized
+		$this->{'data'} = $x->{'data'};
+		# check if we can set up script and value to make sure that the data is valid
+		$this->script;
+		$this->value;
+	}
+	elsif(
+		defined $x->{'value'} && $x->{'value'} =~ m/^[0-9]+$/
+		&& defined $x->{'script'} 
+	){
+		# call this function to validate the data, and get serialized data back
+		# this is a C function
+		$this->{'data'} = create_txoutput_obj($x->{'script'},$x->{'value'});
+	}
+	else{
+		die "no arguments to create Transaction::Output";
+	}
+		
+	return $this;
 }
 
-=head2 function2
+sub serialized_data {
+	my $this = shift;
+	return $this->{'data'};
+}
 
-=cut
+sub script {
+	my $this = shift;
+	return get_script_from_obj($this->{'data'});
+}
 
-sub function2 {
+sub type_of_script {
+	my $this = shift;
+	return CBitcoin::Script::whatTypeOfScript( $this->script );
+}
+
+sub value {
+	my $this = shift;
+	# this is a C function
+	return get_value_from_obj($this->{'data'});
 }
 
 =head1 AUTHOR

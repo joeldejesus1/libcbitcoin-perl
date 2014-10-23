@@ -24,11 +24,11 @@ foreach my $package ('CBitcoin::CBHD'){
 		]
 		,'MYEXTLIB' => '/usr/local/lib/libcbitcoin.2.0.so /usr/local/lib/libcbitcoin-file-no-ec.2.0.so /usr/local/lib/libcbitcoin-rand.2.0.so /usr/local/lib/libcbitcoin-threads.2.0.so /usr/local/lib/libcbitcoin-network.2.0.so /usr/local/lib/libcbitcoin-file-ec.2.0.so /usr/local/lib/libcbitcoin-storage.2.0.so /usr/local/lib/libcbitcoin-crypto.2.0.so /usr/local/lib/libcbitcoin-logging.2.0.so '
 		,'VERSION' => '0.01'
-		,AUTHOR              => q{Joel De Jesus <dejesus.joel@e-flamingo.jp>}
+		,AUTHOR              => q{Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>}
 		,VERSION_FROM        => 'lib/CBitcoin/CBHD.pm'
 		,ABSTRACT_FROM       => 'lib/CBitcoin/CBHD.pm'
 		,($ExtUtils::MakeMaker::VERSION >= 6.3002
-		      ? ('LICENSE'=> 'perl')
+		      ? ('LICENSE'=> 'gpl_2')
 		      : ())
 		,PL_FILES            => {}
 		,PREREQ_PM => {
