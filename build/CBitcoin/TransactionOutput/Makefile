@@ -1,4 +1,4 @@
-# This Makefile is for the CBitcoin::Script extension to perl.
+# This Makefile is for the CBitcoin::TransactionOutput extension to perl.
 #
 # It was generated automatically by MakeMaker version
 # 6.57_05 (Revision: 65705) from the contents of
@@ -6,25 +6,25 @@
 #
 #       ANY CHANGES MADE HERE WILL BE LOST!
 #
-#   MakeMaker ARGV: ()
+#   MakeMaker ARGV: (q[INSTALL_BASE=debian/libperl-cbitcoin])
 #
 
 #   MakeMaker Parameters:
 
-#     ABSTRACT_FROM => q[lib/CBitcoin/Script.pm]
+#     ABSTRACT_FROM => q[lib/CBitcoin/TransactionOutput.pm]
 #     AUTHOR => [q[Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>]]
 #     BUILD_REQUIRES => {  }
 #     INC => q[~/Workspace/cbitcoin/library/include]
 #     LIBS => [q[-lcbitcoin.2.0], q[-lcbitcoin-network.2.0], q[-lcbitcoin-storage.2.0], q[-lcbitcoin-threads.2.0], q[-lpthread], q[-lcbitcoin-logging.2.0], q[-lcbitcoin-crypto.2.0], q[-lcrypto], q[-lcbitcoin.2.0], q[-lcbitcoin-file-ec.2.0], q[-lcbitcoin-rand.2.0]]
 #     LICENSE => q[gpl_2]
 #     MYEXTLIB => q[/usr/local/lib/libcbitcoin.2.0.so /usr/local/lib/libcbitcoin-file-no-ec.2.0.so /usr/local/lib/libcbitcoin-rand.2.0.so /usr/local/lib/libcbitcoin-threads.2.0.so /usr/local/lib/libcbitcoin-network.2.0.so /usr/local/lib/libcbitcoin-file-ec.2.0.so /usr/local/lib/libcbitcoin-storage.2.0.so /usr/local/lib/libcbitcoin-crypto.2.0.so /usr/local/lib/libcbitcoin-logging.2.0.so ]
-#     NAME => q[CBitcoin::Script]
+#     NAME => q[CBitcoin::TransactionOutput]
 #     OBJECT => q[$(O_FILES)]
 #     PL_FILES => {  }
 #     PREREQ_PM => { Test::More=>q[0] }
 #     TYPEMAPS => []
 #     VERSION => q[0.01]
-#     VERSION_FROM => q[lib/CBitcoin/Script.pm]
+#     VERSION_FROM => q[lib/CBitcoin/TransactionOutput.pm]
 #     clean => { FILES=>q[libperl-cbitcoin-*] }
 #     dist => { COMPRESS=>q[gzip -9f], SUFFIX=>q[gz] }
 
@@ -63,8 +63,8 @@ VENDORLIBEXP = /usr/share/perl5
 AR_STATIC_ARGS = cr
 DIRFILESEP = /
 DFSEP = $(DIRFILESEP)
-NAME = CBitcoin::Script
-NAME_SYM = CBitcoin_Script
+NAME = CBitcoin::TransactionOutput
+NAME_SYM = CBitcoin_TransactionOutput
 VERSION = 0.01
 VERSION_MACRO = VERSION
 VERSION_SYM = 0_01
@@ -81,46 +81,44 @@ INST_MAN3DIR = blib/man3
 MAN1EXT = 1p
 MAN3EXT = 3pm
 INSTALLDIRS = site
+INSTALL_BASE = debian/libperl-cbitcoin
 DESTDIR = 
-PREFIX = /usr
-PERLPREFIX = $(PREFIX)
-SITEPREFIX = $(PREFIX)/local
-VENDORPREFIX = $(PREFIX)
-INSTALLPRIVLIB = $(PERLPREFIX)/share/perl/5.14
+PREFIX = $(INSTALL_BASE)
+INSTALLPRIVLIB = $(INSTALL_BASE)/lib/perl5
 DESTINSTALLPRIVLIB = $(DESTDIR)$(INSTALLPRIVLIB)
-INSTALLSITELIB = $(SITEPREFIX)/share/perl/5.14.2
+INSTALLSITELIB = $(INSTALL_BASE)/lib/perl5
 DESTINSTALLSITELIB = $(DESTDIR)$(INSTALLSITELIB)
-INSTALLVENDORLIB = $(VENDORPREFIX)/share/perl5
+INSTALLVENDORLIB = $(INSTALL_BASE)/lib/perl5
 DESTINSTALLVENDORLIB = $(DESTDIR)$(INSTALLVENDORLIB)
-INSTALLARCHLIB = $(PERLPREFIX)/lib/perl/5.14
+INSTALLARCHLIB = $(INSTALL_BASE)/lib/perl5/x86_64-linux-gnu-thread-multi
 DESTINSTALLARCHLIB = $(DESTDIR)$(INSTALLARCHLIB)
-INSTALLSITEARCH = $(SITEPREFIX)/lib/perl/5.14.2
+INSTALLSITEARCH = $(INSTALL_BASE)/lib/perl5/x86_64-linux-gnu-thread-multi
 DESTINSTALLSITEARCH = $(DESTDIR)$(INSTALLSITEARCH)
-INSTALLVENDORARCH = $(VENDORPREFIX)/lib/perl5
+INSTALLVENDORARCH = $(INSTALL_BASE)/lib/perl5/x86_64-linux-gnu-thread-multi
 DESTINSTALLVENDORARCH = $(DESTDIR)$(INSTALLVENDORARCH)
-INSTALLBIN = $(PERLPREFIX)/bin
+INSTALLBIN = $(INSTALL_BASE)/bin
 DESTINSTALLBIN = $(DESTDIR)$(INSTALLBIN)
-INSTALLSITEBIN = $(SITEPREFIX)/bin
+INSTALLSITEBIN = $(INSTALL_BASE)/bin
 DESTINSTALLSITEBIN = $(DESTDIR)$(INSTALLSITEBIN)
-INSTALLVENDORBIN = $(VENDORPREFIX)/bin
+INSTALLVENDORBIN = $(INSTALL_BASE)/bin
 DESTINSTALLVENDORBIN = $(DESTDIR)$(INSTALLVENDORBIN)
-INSTALLSCRIPT = $(PERLPREFIX)/bin
+INSTALLSCRIPT = $(INSTALL_BASE)/bin
 DESTINSTALLSCRIPT = $(DESTDIR)$(INSTALLSCRIPT)
-INSTALLSITESCRIPT = $(SITEPREFIX)/bin
+INSTALLSITESCRIPT = $(INSTALL_BASE)/bin
 DESTINSTALLSITESCRIPT = $(DESTDIR)$(INSTALLSITESCRIPT)
-INSTALLVENDORSCRIPT = $(VENDORPREFIX)/bin
+INSTALLVENDORSCRIPT = $(INSTALL_BASE)/bin
 DESTINSTALLVENDORSCRIPT = $(DESTDIR)$(INSTALLVENDORSCRIPT)
-INSTALLMAN1DIR = $(PERLPREFIX)/share/man/man1
+INSTALLMAN1DIR = $(INSTALL_BASE)/man/man1
 DESTINSTALLMAN1DIR = $(DESTDIR)$(INSTALLMAN1DIR)
-INSTALLSITEMAN1DIR = $(SITEPREFIX)/man/man1
+INSTALLSITEMAN1DIR = $(INSTALL_BASE)/man/man1
 DESTINSTALLSITEMAN1DIR = $(DESTDIR)$(INSTALLSITEMAN1DIR)
-INSTALLVENDORMAN1DIR = $(VENDORPREFIX)/share/man/man1
+INSTALLVENDORMAN1DIR = $(INSTALL_BASE)/man/man1
 DESTINSTALLVENDORMAN1DIR = $(DESTDIR)$(INSTALLVENDORMAN1DIR)
-INSTALLMAN3DIR = $(PERLPREFIX)/share/man/man3
+INSTALLMAN3DIR = $(INSTALL_BASE)/man/man3
 DESTINSTALLMAN3DIR = $(DESTDIR)$(INSTALLMAN3DIR)
-INSTALLSITEMAN3DIR = $(SITEPREFIX)/man/man3
+INSTALLSITEMAN3DIR = $(INSTALL_BASE)/man/man3
 DESTINSTALLSITEMAN3DIR = $(DESTDIR)$(INSTALLSITEMAN3DIR)
-INSTALLVENDORMAN3DIR = $(VENDORPREFIX)/share/man/man3
+INSTALLVENDORMAN3DIR = $(INSTALL_BASE)/man/man3
 DESTINSTALLVENDORMAN3DIR = $(DESTDIR)$(INSTALLVENDORMAN3DIR)
 PERL_LIB = /usr/share/perl/5.14
 PERL_ARCHLIB = /usr/lib/perl/5.14
@@ -154,11 +152,11 @@ MM_REVISION = 65705
 # PARENT_NAME = NAME without BASEEXT and no trailing :: (eg Foo::Bar)
 # DLBASE  = Basename part of dynamic library. May be just equal BASEEXT.
 MAKE = make
-FULLEXT = CBitcoin/Script
-BASEEXT = Script
+FULLEXT = CBitcoin/TransactionOutput
+BASEEXT = TransactionOutput
 PARENT_NAME = CBitcoin
 DLBASE = $(BASEEXT)
-VERSION_FROM = lib/CBitcoin/Script.pm
+VERSION_FROM = lib/CBitcoin/TransactionOutput.pm
 INC = ~/Workspace/cbitcoin/library/include
 OBJECT = $(O_FILES)
 LDFROM = $(OBJECT)
@@ -171,7 +169,7 @@ C_FILES  =
 O_FILES  = 
 H_FILES  = 
 MAN1PODS = 
-MAN3PODS = lib/CBitcoin/Script.pm
+MAN3PODS = lib/CBitcoin/TransactionOutput.pm
 
 # Where is the Config information that we are using/depend on
 CONFIGDEP = $(PERL_ARCHLIB)$(DFSEP)Config.pm $(PERL_INC)$(DFSEP)config.h
@@ -193,13 +191,13 @@ PERL_ARCHIVE       =
 PERL_ARCHIVE_AFTER = 
 
 
-TO_INST_PM = lib/CBitcoin/Script.pm \
-	lib/CBitcoin/Script.xs
+TO_INST_PM = lib/CBitcoin/TransactionOutput.pm \
+	lib/CBitcoin/TransactionOutput.xs
 
-PM_TO_BLIB = lib/CBitcoin/Script.pm \
-	blib/lib/CBitcoin/Script.pm \
-	lib/CBitcoin/Script.xs \
-	blib/lib/CBitcoin/Script.xs
+PM_TO_BLIB = lib/CBitcoin/TransactionOutput.pm \
+	blib/lib/CBitcoin/TransactionOutput.pm \
+	lib/CBitcoin/TransactionOutput.xs \
+	blib/lib/CBitcoin/TransactionOutput.xs
 
 
 # --- MakeMaker platform_constants section:
@@ -275,8 +273,8 @@ CI = ci -u
 RCS_LABEL = rcs -Nv$(VERSION_SYM): -q
 DIST_CP = best
 DIST_DEFAULT = tardist
-DISTNAME = CBitcoin-Script
-DISTVNAME = CBitcoin-Script-0.01
+DISTNAME = CBitcoin-TransactionOutput
+DISTVNAME = CBitcoin-TransactionOutput-0.01
 
 
 # --- MakeMaker macro section:
@@ -295,7 +293,7 @@ MPOLLUTE =
 
 # --- MakeMaker const_loadlibs section:
 
-# CBitcoin::Script might depend on some other libraries:
+# CBitcoin::TransactionOutput might depend on some other libraries:
 # See ExtUtils::Liblist for details
 #
 EXTRALIBS = 
@@ -318,6 +316,7 @@ PASTHRU = LIBPERL_A="$(LIBPERL_A)"\
 	LINKTYPE="$(LINKTYPE)"\
 	OPTIMIZE="$(OPTIMIZE)"\
 	PREFIX="$(PREFIX)"\
+	INSTALL_BASE="$(INSTALL_BASE)"\
 	PASTHRU_INC="$(PASTHRU_INC)"
 
 
@@ -513,9 +512,9 @@ POD2MAN = $(POD2MAN_EXE)
 
 
 manifypods : pure_all  \
-	lib/CBitcoin/Script.pm
+	lib/CBitcoin/TransactionOutput.pm
 	$(NOECHO) $(POD2MAN) --section=$(MAN3EXT) --perm_rw=$(PERM_RW) \
-	  lib/CBitcoin/Script.pm $(INST_MAN3DIR)/CBitcoin::Script.$(MAN3EXT) 
+	  lib/CBitcoin/TransactionOutput.pm $(INST_MAN3DIR)/CBitcoin::TransactionOutput.$(MAN3EXT) 
 
 
 
@@ -581,9 +580,9 @@ realclean purge ::  clean realclean_subdirs
 metafile : create_distdir
 	$(NOECHO) $(ECHO) Generating META.yml
 	$(NOECHO) $(ECHO) '--- #YAML:1.0' > META_new.yml
-	$(NOECHO) $(ECHO) 'name:               CBitcoin-Script' >> META_new.yml
+	$(NOECHO) $(ECHO) 'name:               CBitcoin-TransactionOutput' >> META_new.yml
 	$(NOECHO) $(ECHO) 'version:            0.01' >> META_new.yml
-	$(NOECHO) $(ECHO) 'abstract:           The great new CBitcoin::Script!' >> META_new.yml
+	$(NOECHO) $(ECHO) 'abstract:           The great new CBitcoin::TransactionOutput!' >> META_new.yml
 	$(NOECHO) $(ECHO) 'author:' >> META_new.yml
 	$(NOECHO) $(ECHO) '    - Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>' >> META_new.yml
 	$(NOECHO) $(ECHO) 'license:            gpl_2' >> META_new.yml
@@ -677,7 +676,7 @@ distdir : create_distdir distmeta
 
 # --- MakeMaker dist_test section:
 disttest : distdir
-	cd $(DISTVNAME) && $(ABSPERLRUN) Makefile.PL 
+	cd $(DISTVNAME) && $(ABSPERLRUN) Makefile.PL "INSTALL_BASE=debian/libperl-cbitcoin"
 	cd $(DISTVNAME) && $(MAKE) $(PASTHRU)
 	cd $(DISTVNAME) && $(MAKE) test $(PASTHRU)
 
@@ -861,7 +860,7 @@ $(FIRST_MAKEFILE) : Makefile.PL $(CONFIGDEP)
 	-$(NOECHO) $(RM_F) $(MAKEFILE_OLD)
 	-$(NOECHO) $(MV)   $(FIRST_MAKEFILE) $(MAKEFILE_OLD)
 	- $(MAKE) $(USEMAKEFILE) $(MAKEFILE_OLD) clean $(DEV_NULL)
-	$(PERLRUN) Makefile.PL 
+	$(PERLRUN) Makefile.PL "INSTALL_BASE=debian/libperl-cbitcoin"
 	$(NOECHO) $(ECHO) "==> Your Makefile has been rebuilt. <=="
 	$(NOECHO) $(ECHO) "==> Please rerun the $(MAKE) command.  <=="
 	$(FALSE)
@@ -882,7 +881,8 @@ $(MAKE_APERL_FILE) : $(FIRST_MAKEFILE) pm_to_blib
 	$(NOECHO) $(PERLRUNINST) \
 		Makefile.PL DIR= \
 		MAKEFILE=$(MAKE_APERL_FILE) LINKTYPE=static \
-		MAKEAPERL=1 NORECURS=1 CCCDLFLAGS=
+		MAKEAPERL=1 NORECURS=1 CCCDLFLAGS= \
+		INSTALL_BASE=debian/libperl-cbitcoin
 
 
 # --- MakeMaker test section:
@@ -921,7 +921,7 @@ testdb_static :: pure_all $(MAP_TARGET)
 # Creates a PPD (Perl Package Description) for a binary distribution.
 ppd :
 	$(NOECHO) $(ECHO) '<SOFTPKG NAME="$(DISTNAME)" VERSION="0.01">' > $(DISTNAME).ppd
-	$(NOECHO) $(ECHO) '    <ABSTRACT>The great new CBitcoin::Script!</ABSTRACT>' >> $(DISTNAME).ppd
+	$(NOECHO) $(ECHO) '    <ABSTRACT>The great new CBitcoin::TransactionOutput!</ABSTRACT>' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '    <AUTHOR>Joel DeJesus (Work Email) &lt;dejesus.joel@e-flamingo.jp&gt;</AUTHOR>' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '    <IMPLEMENTATION>' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <REQUIRE NAME="Test::More" />' >> $(DISTNAME).ppd
@@ -935,8 +935,8 @@ ppd :
 
 pm_to_blib : $(FIRST_MAKEFILE) $(TO_INST_PM)
 	$(NOECHO) $(ABSPERLRUN) -MExtUtils::Install -e 'pm_to_blib({@ARGV}, '\''$(INST_LIB)/auto'\'', q[$(PM_FILTER)], '\''$(PERM_DIR)'\'')' -- \
-	  lib/CBitcoin/Script.pm blib/lib/CBitcoin/Script.pm \
-	  lib/CBitcoin/Script.xs blib/lib/CBitcoin/Script.xs 
+	  lib/CBitcoin/TransactionOutput.pm blib/lib/CBitcoin/TransactionOutput.pm \
+	  lib/CBitcoin/TransactionOutput.xs blib/lib/CBitcoin/TransactionOutput.xs 
 	$(NOECHO) $(TOUCH) pm_to_blib
 
 

@@ -9,5 +9,6 @@ find ${PERLBUILDDIR} -name 'Makefile.PL'  | while read line;
 	CURDIR=$(pwd)
 	cd $(dirname $line)
 	${PERLEXEC} ./Makefile.PL INSTALL_BASE=debian/libperl-cbitcoin
+	rm Makefile.old
 	cd $CURDIR 
 done;
