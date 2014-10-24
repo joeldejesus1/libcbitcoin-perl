@@ -49,12 +49,8 @@ TODO: {
     "placeholder date/time"       => qr(Date/time)
   );
 
+  
   module_boilerplate_ok('lib/CBitcoin/Transaction.pm');
-  module_boilerplate_ok('lib/CBitcoin/CBHD.pm');
-  module_boilerplate_ok('lib/CBitcoin/TransactionInput.pm');
-  module_boilerplate_ok('lib/CBitcoin/TransactionOutput.pm');
-  module_boilerplate_ok('lib/CBitcoin/Script.pm');
-
 
 }
 

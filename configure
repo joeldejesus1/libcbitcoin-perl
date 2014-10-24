@@ -1,3 +1,10 @@
 #!/bin/sh
 
-/usr/bin/perl ./Makefile.PL
+PERLBUILDDIR=build
+PERLEXEC=/usr/bin/perl
+
+
+find ${PERLBUILDDIR} -name 'Makefile.PL'  | while read line; 
+	do echo "running Makefile.PL $line";
+	(cd $line && ${PELREXEC} Makefile.PL ) 
+done;
