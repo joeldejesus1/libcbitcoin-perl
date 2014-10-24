@@ -27,7 +27,7 @@ manpage.1: manpage.sgml
   <!ENTITY dhemail     "<email>dejesus.joel@e-flamingo.jp</email>">
   <!ENTITY dhusername  "Joel DeJesus">
   <!ENTITY dhucpackage "<refentrytitle>LIBPERL-CBITCOIN</refentrytitle>">
-  <!ENTITY dhpackage   "libperl-cbitcoin">
+  <!ENTITY dhpackage   "libperl-cbitcoin-script">
 
   <!ENTITY debian      "<productname>Debian</productname>">
   <!ENTITY gnu         "<acronym>GNU</acronym>">
