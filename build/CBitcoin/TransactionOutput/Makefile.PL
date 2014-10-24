@@ -43,6 +43,7 @@ foreach my $package ('CBitcoin::TransactionOutput'){
 		,'PREREQ_PM' => {
 			'Test::More' => 0,
 		}
+		,'MAKEFILE_OLD' => ''
 		,'dist'                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', }
 		,'clean'               => { FILES => 'libperl-cbitcoin-*' }
 	);

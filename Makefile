@@ -36,15 +36,15 @@ transactionoutput-install:
 clean: clean-all
 clean-all: cbhd-clean script-clean transaction-clean transactioninput-clean transactionoutput-clean
 cbhd-clean:
-	cd build/CBitcoin/CBHD && make clean
+	cd build/CBitcoin/CBHD && make clean && rm Makefile.old
 script-clean:
-	cd build/CBitcoin/Script && make clean
+	cd build/CBitcoin/Script && make clean && rm Makefile.old
 transaction-clean:
-	cd build/CBitcoin/Transaction && make clean
+	cd build/CBitcoin/Transaction && make clean && rm Makefile.old
 transactioninput-clean:
-	cd build/CBitcoin/TransactionInput && make clean
+	cd build/CBitcoin/TransactionInput && make clean && rm Makefile.old
 transactionoutput-clean:
-	cd build/CBitcoin/TransactionOutput && make clean
+	cd build/CBitcoin/TransactionOutput && make clean && rm Makefile.old
 
 
 distclean: clean
