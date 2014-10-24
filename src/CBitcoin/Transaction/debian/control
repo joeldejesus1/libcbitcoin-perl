@@ -1,0 +1,13 @@
+Source: libperl-cbitcoin-transaction
+Section: extra
+Priority: extra
+Maintainer: Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>
+Build-Depends: debhelper (>= 8.0.0), autotools-dev
+Standards-Version: 3.9.3
+Homepage: https://e-flamingo.jp
+
+Package: libperl-cbitcoin-transaction
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libperl-cbitcoin-script, libperl-cbitcoin-transactioninput, libperl-cbitcoin-transactionoutput
+Description: Perl modules for cbitcoin.
+ Manipulate bitcoin objects in perl.
