@@ -24,18 +24,27 @@ foreach my $package ('CBitcoin::CBHD'){
 		]
 		,'MYEXTLIB' => '/usr/local/lib/libcbitcoin.2.0.so /usr/local/lib/libcbitcoin-file-no-ec.2.0.so /usr/local/lib/libcbitcoin-rand.2.0.so /usr/local/lib/libcbitcoin-threads.2.0.so /usr/local/lib/libcbitcoin-network.2.0.so /usr/local/lib/libcbitcoin-file-ec.2.0.so /usr/local/lib/libcbitcoin-storage.2.0.so /usr/local/lib/libcbitcoin-crypto.2.0.so /usr/local/lib/libcbitcoin-logging.2.0.so '
 		,'VERSION' => '0.01'
-		,AUTHOR              => q{Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>}
-		,VERSION_FROM        => 'lib/CBitcoin/CBHD.pm'
-		,ABSTRACT_FROM       => 'lib/CBitcoin/CBHD.pm'
+		
+		,'AUTHOR'              => q{Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>}
+		,'VERSION_FROM'        => 'lib/CBitcoin/CBHD.pm'
+		,'ABSTRACT_FROM'       => 'lib/CBitcoin/CBHD.pm'
+		,'OBJECT'              => q/$(O_FILES)/
+		,'XS'      => {
+			"lib/CBitcoin/CBHD.xs" => "lib/CBitcoin/CBHD.c"
+			,"lib/CBitcoin/Transaction.xs" => "lib/CBitcoin/Transaction.c"
+			,"lib/CBitcoin/TransactionInput.xs" => "lib/CBitcoin/TransactionInput.c"
+			,"lib/CBitcoin/TransactionOutput.xs" => "lib/CBitcoin/TransactionOutput.c"
+			,"lib/CBitcoin/Script.xs" => "lib/CBitcoin/Script.c"
+		}
 		,($ExtUtils::MakeMaker::VERSION >= 6.3002
 		      ? ('LICENSE'=> 'gpl_2')
 		      : ())
-		,PL_FILES            => {}
-		,PREREQ_PM => {
+		,'PL_FILES'            => {}
+		,'PREREQ_PM' => {
 			'Test::More' => 0,
 		}
-		,dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', }
-		,clean               => { FILES => 'libperl-cbitcoin-*' }
+		,'dist'                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', }
+		,'clean'               => { FILES => 'libperl-cbitcoin-*' }
 	);
 }
 
