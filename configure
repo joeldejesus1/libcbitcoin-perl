@@ -8,6 +8,6 @@ find ${PERLBUILDDIR} -name 'Makefile.PL'  | while read line;
 	do echo "running Makefile.PL $line";
 	CURDIR=$(pwd)
 	cd $(dirname $line)
-	${PERLEXEC} ./Makefile.PL
+	${PERLEXEC} ./Makefile.PL INSTALL_BASE=debian/libperl-cbitcoin
 	cd $CURDIR 
 done;
