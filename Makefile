@@ -18,6 +18,18 @@ transactioninput-build:
 transactionoutput-build:
 	cd build/CBitcoin/TransactionOutput && make
 
+
+cbhd-install:
+	cd build/CBitcoin/CBHD && make install 
+script-install:
+	cd build/CBitcoin/Script && make install
+transaction-install:
+	cd build/CBitcoin/Transaction && make install
+transactioninput-install:
+	cd build/CBitcoin/TransactionInput && make install
+transactionoutput-install:
+	cd build/CBitcoin/TransactionOutput && make install
+
 clean: clean-all
 
 clean-all: cbhd-clean script-clean transaction-clean transactioninput-clean transactionoutput-clean
@@ -35,3 +47,4 @@ transactionoutput-clean:
 
 
 distclean: clean
+
