@@ -6,5 +6,8 @@ PERLEXEC=/usr/bin/perl
 
 find ${PERLBUILDDIR} -name 'Makefile.PL'  | while read line; 
 	do echo "running Makefile.PL $line";
-	(cd $line && ${PELREXEC} Makefile.PL ) 
+	CURDIR=$(pwd)
+	cd $(dirname $line)
+	${PERLEXEC} ./Makefile.PL
+	cd $CURDIR 
 done;
