@@ -36,9 +36,15 @@ WriteMakefile(
 
 # Remove the Makefile dependency. Causes problems on a few systems.
 sub MY::makefile {
+#	return qq{ };
+
 	return qq{
 all ::
-	(cd blib/arch/auto/CBitcoin/ && mkdir CBHD && ln -s ../CBitcoin.so CBHD/CBHD.so )
-	(cd blib/arch/auto/CBitcoin/ && mkdir Script && ln -s ../CBitcoin.so Script/Script.so )
+	(cd blib/arch/auto/CBitcoin/ && ( [ -d CBHD ] || mkdir CBHD ) && ([ -e CBHD/CBHD.so ] || ln -s ../CBitcoin.so CBHD/CBHD.so ) )
+	(cd blib/arch/auto/CBitcoin/ && ( [ -d Script ] || mkdir Script ) && ( [ -e Script/Script.so ] || ln -s ../CBitcoin.so Script/Script.so ) )
+	(cd blib/arch/auto/CBitcoin/ && ( [ -d TransactionInput ] || mkdir TransactionInput ) && ( [ -e TransactionInput/TransactionInput.so ] || ln -s ../CBitcoin.so TransactionInput/TransactionInput.so ) )
+	(cd blib/arch/auto/CBitcoin/ && ( [ -d TransactionOutput ] || mkdir TransactionOutput ) && ( [ -e TransactionOutput/TransactionOutput.so ] || ln -s ../CBitcoin.so TransactionOutput/TransactionOutput.so ) )
+	(cd blib/arch/auto/CBitcoin/ && ( [ -d Transaction ] || mkdir Transaction ) && ( [ -e Transaction/Transaction.so ] || ln -s ../CBitcoin.so Transaction/Transaction.so ) )
 };
+
 }
