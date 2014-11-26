@@ -11,7 +11,7 @@ foreach my $package ('CBitcoin::CBHD'){
 	#  'INC' => '../../library/include',
 	     'LIBS' => [ ' -lpthread -lcrypto -lcbitcoin ' ],
 		,'VERSION' => '0.01'
-		,'MYEXTLIB' => '/usr/lib/libcbitcoin.so'
+#		,'MYEXTLIB' => '/usr/lib/libcbitcoin.so'
 		,'AUTHOR'              => q{Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>}
 		,'VERSION_FROM'        => 'lib/CBitcoin/CBHD.pm'
 		,'ABSTRACT_FROM'       => 'lib/CBitcoin/CBHD.pm'

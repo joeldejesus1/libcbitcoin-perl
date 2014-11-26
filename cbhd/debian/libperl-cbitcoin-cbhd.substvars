@@ -1,0 +1,3 @@
+perl:Depends=perl (>= 5.14.2-21+deb7u1), perlapi-5.14.2
+shlibs:Depends=libc6-amd64 (>= 2.2.5), libcbitcoin0, libssl1.0.0 (>= 1.0.0)
+misc:Depends=
