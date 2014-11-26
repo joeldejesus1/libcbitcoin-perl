@@ -15,6 +15,8 @@
 #     AUTHOR => [q[Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>]]
 #     BUILD_REQUIRES => {  }
 #     CONFIGURE_REQUIRES => {  }
+#     LDDLFLAGS => q[ -shared -fstack-protector ]
+#     LDFLAGS => q[ -fstack-protector ]
 #     LIBS => [q[-lcrypto -lcbitcoin]]
 #     LICENSE => q[gpl_2]
 #     MAKEFILE_OLD => q[]
@@ -45,8 +47,8 @@ DLSRC = dl_dlopen.xs
 EXE_EXT = 
 FULL_AR = /usr/bin/ar
 LD = cc
-LDDLFLAGS = -shared -L/usr/local/lib -fstack-protector
-LDFLAGS =  -fstack-protector -L/usr/local/lib
+LDDLFLAGS =  -shared -fstack-protector 
+LDFLAGS =  -fstack-protector 
 LIBC = 
 LIB_EXT = .a
 OBJ_EXT = .o
@@ -946,22 +948,6 @@ $(OBJECT) : $(PERL_HDRS)
 
 
 # --- MakeMaker makefile section:
-
-$(OBJECT) : $(FIRST_MAKEFILE)
-
-# We take a very conservative approach here, but it's worth it.
-# We move Makefile to Makefile.old here to avoid gnu make looping.
-$(FIRST_MAKEFILE) : Makefile.PL $(CONFIGDEP)
-	$(NOECHO) $(ECHO) "Makefile out-of-date with respect to $?"
-	$(NOECHO) $(ECHO) "Cleaning current config before rebuilding Makefile..."
-	-$(NOECHO) $(RM_F) $(MAKEFILE_OLD)
-	-$(NOECHO) $(MV)   $(FIRST_MAKEFILE) $(MAKEFILE_OLD)
-	- $(MAKE) $(USEMAKEFILE) $(MAKEFILE_OLD) clean $(DEV_NULL)
-	$(PERLRUN) Makefile.PL 
-	$(NOECHO) $(ECHO) "==> Your Makefile has been rebuilt. <=="
-	$(NOECHO) $(ECHO) "==> Please rerun the $(MAKE) command.  <=="
-	$(FALSE)
-
 
 
 # --- MakeMaker staticmake section:

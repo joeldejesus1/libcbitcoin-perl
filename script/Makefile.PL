@@ -11,9 +11,9 @@ WriteMakefile(
 		,'VERSION' => '0.01'
 
 		,'AUTHOR'              => q{Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>}
-		,'VERSION_FROM'        => 'lib/CBitcoin/Script.pm'
-		,'ABSTRACT_FROM'       => 'lib/CBitcoin/Script.pm'
-		,'OBJECT'              => q/$(O_FILES)/
+		,'VERSION_FROM'        => 'Script.pm'
+		,'ABSTRACT_FROM'       => 'Script.pm'
+		#,'OBJECT'              => q/$(O_FILES)/
 
 	,($ExtUtils::MakeMaker::VERSION >= 6.3002
 	      ? ('LICENSE'=> 'gpl_2')

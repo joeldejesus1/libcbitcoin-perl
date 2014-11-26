@@ -11,7 +11,7 @@
 
 #   MakeMaker Parameters:
 
-#     ABSTRACT_FROM => q[lib/CBitcoin/Transaction.pm]
+#     ABSTRACT_FROM => q[Transaction.pm]
 #     AUTHOR => [q[Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>]]
 #     BUILD_REQUIRES => {  }
 #     CONFIGURE_REQUIRES => {  }
@@ -19,13 +19,12 @@
 #     LICENSE => q[gpl_2]
 #     MAKEFILE_OLD => q[]
 #     NAME => q[CBitcoin::Transaction]
-#     OBJECT => q[$(O_FILES)]
 #     PL_FILES => {  }
 #     PREREQ_PM => { Test::More=>q[0] }
 #     TEST_REQUIRES => {  }
 #     TYPEMAPS => []
 #     VERSION => q[0.01]
-#     VERSION_FROM => q[lib/CBitcoin/Transaction.pm]
+#     VERSION_FROM => q[Transaction.pm]
 #     clean => { FILES=>q[libperl-cbitcoin-*] }
 #     dist => { COMPRESS=>q[gzip -9f], SUFFIX=>q[gz] }
 
@@ -158,19 +157,19 @@ FULLEXT = CBitcoin/Transaction
 BASEEXT = Transaction
 PARENT_NAME = CBitcoin
 DLBASE = $(BASEEXT)
-VERSION_FROM = lib/CBitcoin/Transaction.pm
-OBJECT = $(O_FILES)
+VERSION_FROM = Transaction.pm
+OBJECT = $(BASEEXT)$(OBJ_EXT)
 LDFROM = $(OBJECT)
 LINKTYPE = dynamic
 BOOTDEP = 
 
 # Handy lists of source code files:
-XS_FILES = 
-C_FILES  = 
-O_FILES  = 
+XS_FILES = Transaction.xs
+C_FILES  = Transaction.c
+O_FILES  = Transaction.o
 H_FILES  = 
 MAN1PODS = 
-MAN3PODS = lib/CBitcoin/Transaction.pm
+MAN3PODS = Transaction.pm
 
 # Where is the Config information that we are using/depend on
 CONFIGDEP = $(PERL_ARCHLIB)$(DFSEP)Config.pm $(PERL_INC)$(DFSEP)config.h
@@ -192,13 +191,10 @@ PERL_ARCHIVE       =
 PERL_ARCHIVE_AFTER = 
 
 
-TO_INST_PM = lib/CBitcoin/Transaction.pm \
-	lib/CBitcoin/Transaction.xs
+TO_INST_PM = Transaction.pm
 
-PM_TO_BLIB = lib/CBitcoin/Transaction.pm \
-	blib/lib/CBitcoin/Transaction.pm \
-	lib/CBitcoin/Transaction.xs \
-	blib/lib/CBitcoin/Transaction.xs
+PM_TO_BLIB = Transaction.pm \
+	$(INST_LIB)/CBitcoin/Transaction.pm
 
 
 # --- MakeMaker platform_constants section:
@@ -509,9 +505,9 @@ POD2MAN = $(POD2MAN_EXE)
 
 
 manifypods : pure_all  \
-	lib/CBitcoin/Transaction.pm
+	Transaction.pm
 	$(NOECHO) $(POD2MAN) --section=3 --perm_rw=$(PERM_RW) \
-	  lib/CBitcoin/Transaction.pm $(INST_MAN3DIR)/CBitcoin::Transaction.$(MAN3EXT) 
+	  Transaction.pm $(INST_MAN3DIR)/CBitcoin::Transaction.$(MAN3EXT) 
 
 
 
@@ -544,16 +540,16 @@ clean :: clean_subdirs
 	  $(INST_ARCHAUTODIR)/extralibs.ld $(MAKE_APERL_FILE) \
 	  *$(LIB_EXT) *$(OBJ_EXT) \
 	  *perl.core MYMETA.json \
-	  MYMETA.yml blibdirs.ts \
-	  core core.*perl.*.? \
-	  core.[0-9] core.[0-9][0-9] \
-	  core.[0-9][0-9][0-9] core.[0-9][0-9][0-9][0-9] \
-	  core.[0-9][0-9][0-9][0-9][0-9] lib$(BASEEXT).def \
-	  mon.out perl \
-	  perl$(EXE_EXT) perl.exe \
-	  perlmain.c pm_to_blib \
-	  pm_to_blib.ts so_locations \
-	  tmon.out 
+	  MYMETA.yml Transaction.c \
+	  blibdirs.ts core \
+	  core.*perl.*.? core.[0-9] \
+	  core.[0-9][0-9] core.[0-9][0-9][0-9] \
+	  core.[0-9][0-9][0-9][0-9] core.[0-9][0-9][0-9][0-9][0-9] \
+	  lib$(BASEEXT).def mon.out \
+	  perl perl$(EXE_EXT) \
+	  perl.exe perlmain.c \
+	  pm_to_blib pm_to_blib.ts \
+	  so_locations tmon.out 
 	- $(RM_RF) \
 	  blib libperl-cbitcoin-* 
 	  $(NOECHO) $(RM_F) $(MAKEFILE_OLD)
@@ -944,6 +940,8 @@ PERL_HDRS = \
 
 $(OBJECT) : $(PERL_HDRS)
 
+Transaction.c : $(XSUBPPDEPS)
+
 
 # --- MakeMaker makefile section:
 
@@ -1031,8 +1029,7 @@ ppd :
 
 pm_to_blib : $(FIRST_MAKEFILE) $(TO_INST_PM)
 	$(NOECHO) $(ABSPERLRUN) -MExtUtils::Install -e 'pm_to_blib({@ARGV}, '\''$(INST_LIB)/auto'\'', q[$(PM_FILTER)], '\''$(PERM_DIR)'\'')' -- \
-	  lib/CBitcoin/Transaction.pm blib/lib/CBitcoin/Transaction.pm \
-	  lib/CBitcoin/Transaction.xs blib/lib/CBitcoin/Transaction.xs 
+	  Transaction.pm $(INST_LIB)/CBitcoin/Transaction.pm 
 	$(NOECHO) $(TOUCH) pm_to_blib
 
 

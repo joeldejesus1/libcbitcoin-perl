@@ -12,9 +12,9 @@ foreach my $package ('CBitcoin::TransactionOutput'){
 		,'VERSION' => '0.01'
 		
 		,'AUTHOR'              => q{Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>}
-		,'VERSION_FROM'        => 'lib/CBitcoin/TransactionOutput.pm'
-		,'ABSTRACT_FROM'       => 'lib/CBitcoin/TransactionOutput.pm'
-		,'OBJECT'              => q/$(O_FILES)/
+		,'VERSION_FROM'        => 'TransactionOutput.pm'
+		,'ABSTRACT_FROM'       => 'TransactionOutput.pm'
+		#,'OBJECT'              => q/$(O_FILES)/
 
 		,($ExtUtils::MakeMaker::VERSION >= 6.3002
 		      ? ('LICENSE'=> 'gpl_2')

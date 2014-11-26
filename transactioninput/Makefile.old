@@ -11,11 +11,11 @@
 
 #   MakeMaker Parameters:
 
-#     ABSTRACT_FROM => q[lib/CBitcoin/TransactionInput.pm]
+#     ABSTRACT_FROM => q[TransactionInput.pm]
 #     AUTHOR => [q[Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>]]
 #     BUILD_REQUIRES => {  }
 #     CONFIGURE_REQUIRES => {  }
-#     LIBS => [q[-lcbitcoin -lcrypto]]
+#     LIBS => [q[-lcrypto -lcbitcoin]]
 #     LICENSE => q[gpl_2]
 #     MAKEFILE_OLD => q[]
 #     NAME => q[CBitcoin::TransactionInput]
@@ -25,7 +25,7 @@
 #     TEST_REQUIRES => {  }
 #     TYPEMAPS => []
 #     VERSION => q[0.01]
-#     VERSION_FROM => q[lib/CBitcoin/TransactionInput.pm]
+#     VERSION_FROM => q[TransactionInput.pm]
 #     clean => { FILES=>q[libperl-cbitcoin-*] }
 #     dist => { COMPRESS=>q[gzip -9f], SUFFIX=>q[gz] }
 
@@ -158,19 +158,19 @@ FULLEXT = CBitcoin/TransactionInput
 BASEEXT = TransactionInput
 PARENT_NAME = CBitcoin
 DLBASE = $(BASEEXT)
-VERSION_FROM = lib/CBitcoin/TransactionInput.pm
+VERSION_FROM = TransactionInput.pm
 OBJECT = $(O_FILES)
 LDFROM = $(OBJECT)
 LINKTYPE = dynamic
 BOOTDEP = 
 
 # Handy lists of source code files:
-XS_FILES = 
-C_FILES  = 
-O_FILES  = 
+XS_FILES = TransactionInput.xs
+C_FILES  = TransactionInput.c
+O_FILES  = TransactionInput.o
 H_FILES  = 
 MAN1PODS = 
-MAN3PODS = lib/CBitcoin/TransactionInput.pm
+MAN3PODS = TransactionInput.pm
 
 # Where is the Config information that we are using/depend on
 CONFIGDEP = $(PERL_ARCHLIB)$(DFSEP)Config.pm $(PERL_INC)$(DFSEP)config.h
@@ -192,13 +192,10 @@ PERL_ARCHIVE       =
 PERL_ARCHIVE_AFTER = 
 
 
-TO_INST_PM = lib/CBitcoin/TransactionInput.pm \
-	lib/CBitcoin/TransactionInput.xs
+TO_INST_PM = TransactionInput.pm
 
-PM_TO_BLIB = lib/CBitcoin/TransactionInput.pm \
-	blib/lib/CBitcoin/TransactionInput.pm \
-	lib/CBitcoin/TransactionInput.xs \
-	blib/lib/CBitcoin/TransactionInput.xs
+PM_TO_BLIB = TransactionInput.pm \
+	$(INST_LIB)/CBitcoin/TransactionInput.pm
 
 
 # --- MakeMaker platform_constants section:
@@ -298,10 +295,10 @@ MPOLLUTE =
 # CBitcoin::TransactionInput might depend on some other libraries:
 # See ExtUtils::Liblist for details
 #
-EXTRALIBS = -lcbitcoin -lcrypto
-LDLOADLIBS = -lcbitcoin -lcrypto
+EXTRALIBS = -lcrypto -lcbitcoin
+LDLOADLIBS = -lcrypto -lcbitcoin
 BSLOADLIBS = 
-LD_RUN_PATH = /usr/lib/../lib:/usr/lib/x86_64-linux-gnu
+LD_RUN_PATH = /usr/lib/x86_64-linux-gnu:/usr/lib/../lib
 
 
 # --- MakeMaker const_cccmd section:
@@ -509,9 +506,9 @@ POD2MAN = $(POD2MAN_EXE)
 
 
 manifypods : pure_all  \
-	lib/CBitcoin/TransactionInput.pm
+	TransactionInput.pm
 	$(NOECHO) $(POD2MAN) --section=3 --perm_rw=$(PERM_RW) \
-	  lib/CBitcoin/TransactionInput.pm $(INST_MAN3DIR)/CBitcoin::TransactionInput.$(MAN3EXT) 
+	  TransactionInput.pm $(INST_MAN3DIR)/CBitcoin::TransactionInput.$(MAN3EXT) 
 
 
 
@@ -544,16 +541,16 @@ clean :: clean_subdirs
 	  $(INST_ARCHAUTODIR)/extralibs.ld $(MAKE_APERL_FILE) \
 	  *$(LIB_EXT) *$(OBJ_EXT) \
 	  *perl.core MYMETA.json \
-	  MYMETA.yml blibdirs.ts \
-	  core core.*perl.*.? \
-	  core.[0-9] core.[0-9][0-9] \
-	  core.[0-9][0-9][0-9] core.[0-9][0-9][0-9][0-9] \
-	  core.[0-9][0-9][0-9][0-9][0-9] lib$(BASEEXT).def \
-	  mon.out perl \
-	  perl$(EXE_EXT) perl.exe \
-	  perlmain.c pm_to_blib \
-	  pm_to_blib.ts so_locations \
-	  tmon.out 
+	  MYMETA.yml TransactionInput.c \
+	  blibdirs.ts core \
+	  core.*perl.*.? core.[0-9] \
+	  core.[0-9][0-9] core.[0-9][0-9][0-9] \
+	  core.[0-9][0-9][0-9][0-9] core.[0-9][0-9][0-9][0-9][0-9] \
+	  lib$(BASEEXT).def mon.out \
+	  perl perl$(EXE_EXT) \
+	  perl.exe perlmain.c \
+	  pm_to_blib pm_to_blib.ts \
+	  so_locations tmon.out 
 	- $(RM_RF) \
 	  blib libperl-cbitcoin-* 
 	  $(NOECHO) $(RM_F) $(MAKEFILE_OLD)
@@ -944,24 +941,10 @@ PERL_HDRS = \
 
 $(OBJECT) : $(PERL_HDRS)
 
+TransactionInput.c : $(XSUBPPDEPS)
+
 
 # --- MakeMaker makefile section:
-
-$(OBJECT) : $(FIRST_MAKEFILE)
-
-# We take a very conservative approach here, but it's worth it.
-# We move Makefile to Makefile.old here to avoid gnu make looping.
-$(FIRST_MAKEFILE) : Makefile.PL $(CONFIGDEP)
-	$(NOECHO) $(ECHO) "Makefile out-of-date with respect to $?"
-	$(NOECHO) $(ECHO) "Cleaning current config before rebuilding Makefile..."
-	-$(NOECHO) $(RM_F) $(MAKEFILE_OLD)
-	-$(NOECHO) $(MV)   $(FIRST_MAKEFILE) $(MAKEFILE_OLD)
-	- $(MAKE) $(USEMAKEFILE) $(MAKEFILE_OLD) clean $(DEV_NULL)
-	$(PERLRUN) Makefile.PL 
-	$(NOECHO) $(ECHO) "==> Your Makefile has been rebuilt. <=="
-	$(NOECHO) $(ECHO) "==> Please rerun the $(MAKE) command.  <=="
-	$(FALSE)
-
 
 
 # --- MakeMaker staticmake section:
@@ -1031,8 +1014,7 @@ ppd :
 
 pm_to_blib : $(FIRST_MAKEFILE) $(TO_INST_PM)
 	$(NOECHO) $(ABSPERLRUN) -MExtUtils::Install -e 'pm_to_blib({@ARGV}, '\''$(INST_LIB)/auto'\'', q[$(PM_FILTER)], '\''$(PERM_DIR)'\'')' -- \
-	  lib/CBitcoin/TransactionInput.pm blib/lib/CBitcoin/TransactionInput.pm \
-	  lib/CBitcoin/TransactionInput.xs blib/lib/CBitcoin/TransactionInput.xs 
+	  TransactionInput.pm $(INST_LIB)/CBitcoin/TransactionInput.pm 
 	$(NOECHO) $(TOUCH) pm_to_blib
 
 

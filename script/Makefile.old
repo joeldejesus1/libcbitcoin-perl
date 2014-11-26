@@ -1,4 +1,4 @@
-# This Makefile is for the CBitcoin::CBHD extension to perl.
+# This Makefile is for the CBitcoin::Script extension to perl.
 #
 # It was generated automatically by MakeMaker version
 # 6.9 (Revision: 69000) from the contents of
@@ -11,15 +11,22 @@
 
 #   MakeMaker Parameters:
 
+#     ABSTRACT_FROM => q[Script.pm]
+#     AUTHOR => [q[Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>]]
 #     BUILD_REQUIRES => {  }
 #     CONFIGURE_REQUIRES => {  }
-#     INC => q[/usr/include]
-#     LIBS => [q[-lcbitcoin]]
-#     NAME => q[CBitcoin::CBHD]
-#     PREREQ_PM => {  }
+#     LIBS => [q[-lcrypto -lcbitcoin]]
+#     LICENSE => q[gpl_2]
+#     MAKEFILE_OLD => q[]
+#     NAME => q[CBitcoin::Script]
+#     PL_FILES => {  }
+#     PREREQ_PM => { Test::More=>q[0] }
 #     TEST_REQUIRES => {  }
 #     TYPEMAPS => []
 #     VERSION => q[0.01]
+#     VERSION_FROM => q[Script.pm]
+#     clean => { FILES=>q[libperl-cbitcoin-*] }
+#     dist => { COMPRESS=>q[gzip -9f], SUFFIX=>q[gz] }
 
 # --- MakeMaker post_initialize section:
 
@@ -56,8 +63,8 @@ VENDORLIBEXP = /usr/share/perl5
 AR_STATIC_ARGS = cr
 DIRFILESEP = /
 DFSEP = $(DIRFILESEP)
-NAME = CBitcoin::CBHD
-NAME_SYM = CBitcoin_CBHD
+NAME = CBitcoin::Script
+NAME_SYM = CBitcoin_Script
 VERSION = 0.01
 VERSION_MACRO = VERSION
 VERSION_SYM = 0_01
@@ -146,24 +153,23 @@ MM_REVISION = 69000
 # PARENT_NAME = NAME without BASEEXT and no trailing :: (eg Foo::Bar)
 # DLBASE  = Basename part of dynamic library. May be just equal BASEEXT.
 MAKE = make
-FULLEXT = CBitcoin/CBHD
-BASEEXT = CBHD
+FULLEXT = CBitcoin/Script
+BASEEXT = Script
 PARENT_NAME = CBitcoin
 DLBASE = $(BASEEXT)
-VERSION_FROM = 
-INC = /usr/include
-OBJECT = 
+VERSION_FROM = Script.pm
+OBJECT = $(BASEEXT)$(OBJ_EXT)
 LDFROM = $(OBJECT)
 LINKTYPE = dynamic
 BOOTDEP = 
 
 # Handy lists of source code files:
-XS_FILES = 
-C_FILES  = 
-O_FILES  = 
+XS_FILES = Script.xs
+C_FILES  = Script.c
+O_FILES  = Script.o
 H_FILES  = 
 MAN1PODS = 
-MAN3PODS = lib/CBitcoin/Script.pm
+MAN3PODS = Script.pm
 
 # Where is the Config information that we are using/depend on
 CONFIGDEP = $(PERL_ARCHLIB)$(DFSEP)Config.pm $(PERL_INC)$(DFSEP)config.h
@@ -175,9 +181,9 @@ INST_ARCHLIBDIR  = $(INST_ARCHLIB)/CBitcoin
 INST_AUTODIR     = $(INST_LIB)/auto/$(FULLEXT)
 INST_ARCHAUTODIR = $(INST_ARCHLIB)/auto/$(FULLEXT)
 
-INST_STATIC      = 
-INST_DYNAMIC     = 
-INST_BOOT        = 
+INST_STATIC      = $(INST_ARCHAUTODIR)/$(BASEEXT)$(LIB_EXT)
+INST_DYNAMIC     = $(INST_ARCHAUTODIR)/$(DLBASE).$(DLEXT)
+INST_BOOT        = $(INST_ARCHAUTODIR)/$(BASEEXT).bs
 
 # Extra linker info
 EXPORT_LIST        = 
@@ -185,13 +191,10 @@ PERL_ARCHIVE       =
 PERL_ARCHIVE_AFTER = 
 
 
-TO_INST_PM = lib/CBitcoin/Script.pm \
-	lib/CBitcoin/Script.xs
+TO_INST_PM = Script.pm
 
-PM_TO_BLIB = lib/CBitcoin/Script.pm \
-	blib/lib/CBitcoin/Script.pm \
-	lib/CBitcoin/Script.xs \
-	blib/lib/CBitcoin/Script.xs
+PM_TO_BLIB = Script.pm \
+	$(INST_LIB)/CBitcoin/Script.pm
 
 
 # --- MakeMaker platform_constants section:
@@ -206,6 +209,14 @@ AUTOSPLITFILE = $(ABSPERLRUN)  -e 'use AutoSplit;  autosplit($$$$ARGV[0], $$$$AR
 
 
 # --- MakeMaker tool_xsubpp section:
+
+XSUBPPDIR = /usr/share/perl/5.14/ExtUtils
+XSUBPP = $(XSUBPPDIR)$(DFSEP)xsubpp
+XSUBPPRUN = $(PERLRUN) $(XSUBPP)
+XSPROTOARG = 
+XSUBPPDEPS = /usr/share/perl/5.14/ExtUtils/typemap $(XSUBPP)
+XSUBPPARGS = -typemap /usr/share/perl/5.14/ExtUtils/typemap
+XSUBPP_EXTRA_ARGS =
 
 
 # --- MakeMaker tools_other section:
@@ -250,7 +261,7 @@ TAR = tar
 TARFLAGS = cvf
 ZIP = zip
 ZIPFLAGS = -r
-COMPRESS = gzip --best
+COMPRESS = gzip -9f
 SUFFIX = .gz
 SHAR = shar
 PREOP = $(NOECHO) $(NOOP)
@@ -260,8 +271,8 @@ CI = ci -u
 RCS_LABEL = rcs -Nv$(VERSION_SYM): -q
 DIST_CP = best
 DIST_DEFAULT = tardist
-DISTNAME = CBitcoin-CBHD
-DISTVNAME = CBitcoin-CBHD-0.01
+DISTNAME = CBitcoin-Script
+DISTVNAME = CBitcoin-Script-0.01
 
 
 # --- MakeMaker macro section:
@@ -272,12 +283,28 @@ DISTVNAME = CBitcoin-CBHD-0.01
 
 # --- MakeMaker cflags section:
 
+CCFLAGS = -D_REENTRANT -D_GNU_SOURCE -DDEBIAN -fstack-protector -fno-strict-aliasing -pipe -I/usr/local/include -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+OPTIMIZE = -O2 -g
+PERLTYPE = 
+MPOLLUTE = 
+
 
 # --- MakeMaker const_loadlibs section:
 
+# CBitcoin::Script might depend on some other libraries:
+# See ExtUtils::Liblist for details
+#
+EXTRALIBS = -lcrypto -lcbitcoin
+LDLOADLIBS = -lcrypto -lcbitcoin
+BSLOADLIBS = 
+LD_RUN_PATH = /usr/lib/x86_64-linux-gnu:/usr/lib/../lib
+
 
 # --- MakeMaker const_cccmd section:
-
+CCCMD = $(CC) -c $(PASTHRU_INC) $(INC) \
+	$(CCFLAGS) $(OPTIMIZE) \
+	$(PERLTYPE) $(MPOLLUTE) $(DEFINE_VERSION) \
+	$(XS_DEFINE_VERSION)
 
 # --- MakeMaker post_constants section:
 
@@ -286,8 +313,8 @@ DISTVNAME = CBitcoin-CBHD-0.01
 
 PASTHRU = LIBPERL_A="$(LIBPERL_A)"\
 	LINKTYPE="$(LINKTYPE)"\
-	PREFIX="$(PREFIX)"\
-	PASTHRU_INC="$(PASTHRU_INC)"
+	OPTIMIZE="$(OPTIMIZE)"\
+	PREFIX="$(PREFIX)"
 
 
 # --- MakeMaker special_targets section:
@@ -299,11 +326,42 @@ PASTHRU = LIBPERL_A="$(LIBPERL_A)"\
 
 # --- MakeMaker c_o section:
 
+.c.i:
+	cc -E -c $(PASTHRU_INC) $(INC) \
+	$(CCFLAGS) $(OPTIMIZE) \
+	$(PERLTYPE) $(MPOLLUTE) $(DEFINE_VERSION) \
+	$(XS_DEFINE_VERSION) $(CCCDLFLAGS) "-I$(PERL_INC)" $(PASTHRU_DEFINE) $(DEFINE) $*.c > $*.i
+
+.c.s:
+	$(CCCMD) -S $(CCCDLFLAGS) "-I$(PERL_INC)" $(PASTHRU_DEFINE) $(DEFINE) $*.c
+
+.c$(OBJ_EXT):
+	$(CCCMD) $(CCCDLFLAGS) "-I$(PERL_INC)" $(PASTHRU_DEFINE) $(DEFINE) $*.c
+
+.cpp$(OBJ_EXT):
+	$(CCCMD) $(CCCDLFLAGS) "-I$(PERL_INC)" $(PASTHRU_DEFINE) $(DEFINE) $*.cpp
+
+.cxx$(OBJ_EXT):
+	$(CCCMD) $(CCCDLFLAGS) "-I$(PERL_INC)" $(PASTHRU_DEFINE) $(DEFINE) $*.cxx
+
+.cc$(OBJ_EXT):
+	$(CCCMD) $(CCCDLFLAGS) "-I$(PERL_INC)" $(PASTHRU_DEFINE) $(DEFINE) $*.cc
+
+.C$(OBJ_EXT):
+	$(CCCMD) $(CCCDLFLAGS) "-I$(PERL_INC)" $(PASTHRU_DEFINE) $(DEFINE) $*.C
+
 
 # --- MakeMaker xs_c section:
 
+.xs.c:
+	$(XSUBPPRUN) $(XSPROTOARG) $(XSUBPPARGS) $(XSUBPP_EXTRA_ARGS) $*.xs > $*.xsc && $(MV) $*.xsc $*.c
+
 
 # --- MakeMaker xs_o section:
+
+.xs$(OBJ_EXT):
+	$(XSUBPPRUN) $(XSPROTOARG) $(XSUBPPARGS) $*.xs > $*.xsc && $(MV) $*.xsc $*.c
+	$(CCCMD) $(CCCDLFLAGS) "-I$(PERL_INC)" $(PASTHRU_DEFINE) $(DEFINE) $*.c
 
 
 # --- MakeMaker top_targets section:
@@ -384,8 +442,18 @@ linkext :: $(LINKTYPE)
 
 
 # --- MakeMaker dynamic_bs section:
+BOOTSTRAP = $(BASEEXT).bs
 
-BOOTSTRAP =
+# As Mkbootstrap might not write a file (if none is required)
+# we use touch to prevent make continually trying to remake it.
+# The DynaLoader only reads a non-empty file.
+$(BOOTSTRAP) : $(FIRST_MAKEFILE) $(BOOTDEP) $(INST_ARCHAUTODIR)$(DFSEP).exists
+	$(NOECHO) $(ECHO) "Running Mkbootstrap for $(NAME) ($(BSLOADLIBS))"
+	$(NOECHO) $(PERLRUN) \
+		"-MExtUtils::Mkbootstrap" \
+		-e "Mkbootstrap('$(BASEEXT)','$(BSLOADLIBS)');"
+	$(NOECHO) $(TOUCH) $@
+	$(CHMOD) $(PERM_RW) $@
 
 
 # --- MakeMaker dynamic section:
@@ -395,6 +463,22 @@ dynamic :: $(FIRST_MAKEFILE) $(BOOTSTRAP) $(INST_DYNAMIC)
 
 
 # --- MakeMaker dynamic_lib section:
+
+# This section creates the dynamically loadable $(INST_DYNAMIC)
+# from $(OBJECT) and possibly $(MYEXTLIB).
+ARMAYBE = :
+OTHERLDFLAGS = 
+INST_DYNAMIC_DEP = 
+INST_DYNAMIC_FIX = 
+
+$(INST_DYNAMIC): $(OBJECT) $(MYEXTLIB) $(INST_ARCHAUTODIR)$(DFSEP).exists $(EXPORT_LIST) $(PERL_ARCHIVE) $(PERL_ARCHIVE_AFTER) $(INST_DYNAMIC_DEP)
+	$(RM_F) $@
+	LD_RUN_PATH="$(LD_RUN_PATH)" $(LD)  $(LDDLFLAGS) $(LDFROM) $(OTHERLDFLAGS) -o $@ $(MYEXTLIB)	\
+	  $(PERL_ARCHIVE) $(LDLOADLIBS) $(PERL_ARCHIVE_AFTER) $(EXPORT_LIST)	\
+	  $(INST_DYNAMIC_FIX)
+	$(CHMOD) $(PERM_RWX) $@
+	$(NOECHO) $(RM_RF) $(BOOTSTRAP)
+	- $(CP_NONEMPTY) $(BOOTSTRAP) $(INST_BOOT) $(PERM_RW)
 
 
 # --- MakeMaker static section:
@@ -407,6 +491,12 @@ static :: $(FIRST_MAKEFILE) $(INST_STATIC)
 
 # --- MakeMaker static_lib section:
 
+$(INST_STATIC) : $(OBJECT) $(MYEXTLIB) $(INST_ARCHAUTODIR)$(DFSEP).exists
+	$(RM_RF) $@
+	$(FULL_AR) $(AR_STATIC_ARGS) $@ $(OBJECT) && $(RANLIB) $@
+	$(CHMOD) $(PERM_RWX) $@
+	$(NOECHO) $(ECHO) "$(EXTRALIBS)" > $(INST_ARCHAUTODIR)/extralibs.ld
+
 
 # --- MakeMaker manifypods section:
 
@@ -415,9 +505,9 @@ POD2MAN = $(POD2MAN_EXE)
 
 
 manifypods : pure_all  \
-	lib/CBitcoin/Script.pm
+	Script.pm
 	$(NOECHO) $(POD2MAN) --section=3 --perm_rw=$(PERM_RW) \
-	  lib/CBitcoin/Script.pm $(INST_MAN3DIR)/CBitcoin::Script.$(MAN3EXT) 
+	  Script.pm $(INST_MAN3DIR)/CBitcoin::Script.$(MAN3EXT) 
 
 
 
@@ -450,18 +540,18 @@ clean :: clean_subdirs
 	  $(INST_ARCHAUTODIR)/extralibs.ld $(MAKE_APERL_FILE) \
 	  *$(LIB_EXT) *$(OBJ_EXT) \
 	  *perl.core MYMETA.json \
-	  MYMETA.yml blibdirs.ts \
-	  core core.*perl.*.? \
-	  core.[0-9] core.[0-9][0-9] \
-	  core.[0-9][0-9][0-9] core.[0-9][0-9][0-9][0-9] \
-	  core.[0-9][0-9][0-9][0-9][0-9] lib$(BASEEXT).def \
-	  mon.out perl \
-	  perl$(EXE_EXT) perl.exe \
-	  perlmain.c pm_to_blib \
-	  pm_to_blib.ts so_locations \
-	  tmon.out 
+	  MYMETA.yml Script.c \
+	  blibdirs.ts core \
+	  core.*perl.*.? core.[0-9] \
+	  core.[0-9][0-9] core.[0-9][0-9][0-9] \
+	  core.[0-9][0-9][0-9][0-9] core.[0-9][0-9][0-9][0-9][0-9] \
+	  lib$(BASEEXT).def mon.out \
+	  perl perl$(EXE_EXT) \
+	  perl.exe perlmain.c \
+	  pm_to_blib pm_to_blib.ts \
+	  so_locations tmon.out 
 	- $(RM_RF) \
-	  blib 
+	  blib libperl-cbitcoin-* 
 	  $(NOECHO) $(RM_F) $(MAKEFILE_OLD)
 	- $(MV) $(FIRST_MAKEFILE) $(MAKEFILE_OLD) $(DEV_NULL)
 
@@ -475,7 +565,8 @@ realclean_subdirs :
 # Delete temporary files (via clean) and also delete dist files
 realclean purge ::  clean realclean_subdirs
 	- $(RM_F) \
-	  $(MAKEFILE_OLD) $(FIRST_MAKEFILE) 
+	  $(OBJECT) $(MAKEFILE_OLD) \
+	  $(FIRST_MAKEFILE) 
 	- $(RM_RF) \
 	  $(DISTVNAME) 
 
@@ -484,43 +575,44 @@ realclean purge ::  clean realclean_subdirs
 metafile : create_distdir
 	$(NOECHO) $(ECHO) Generating META.yml
 	$(NOECHO) $(ECHO) '---' > META_new.yml
-	$(NOECHO) $(ECHO) 'abstract: unknown' >> META_new.yml
+	$(NOECHO) $(ECHO) 'abstract: '\''The great new CBitcoin::Script!'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) 'author:' >> META_new.yml
-	$(NOECHO) $(ECHO) '  - unknown' >> META_new.yml
+	$(NOECHO) $(ECHO) '  - '\''Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) 'build_requires:' >> META_new.yml
 	$(NOECHO) $(ECHO) '  ExtUtils::MakeMaker: '\''0'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) 'configure_requires:' >> META_new.yml
 	$(NOECHO) $(ECHO) '  ExtUtils::MakeMaker: '\''0'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) 'dynamic_config: 1' >> META_new.yml
 	$(NOECHO) $(ECHO) 'generated_by: '\''ExtUtils::MakeMaker version 6.9, CPAN::Meta::Converter version 2.142690'\''' >> META_new.yml
-	$(NOECHO) $(ECHO) 'license: unknown' >> META_new.yml
+	$(NOECHO) $(ECHO) 'license: gpl' >> META_new.yml
 	$(NOECHO) $(ECHO) 'meta-spec:' >> META_new.yml
 	$(NOECHO) $(ECHO) '  url: http://module-build.sourceforge.net/META-spec-v1.4.html' >> META_new.yml
 	$(NOECHO) $(ECHO) '  version: '\''1.4'\''' >> META_new.yml
-	$(NOECHO) $(ECHO) 'name: CBitcoin-CBHD' >> META_new.yml
+	$(NOECHO) $(ECHO) 'name: CBitcoin-Script' >> META_new.yml
 	$(NOECHO) $(ECHO) 'no_index:' >> META_new.yml
 	$(NOECHO) $(ECHO) '  directory:' >> META_new.yml
 	$(NOECHO) $(ECHO) '    - t' >> META_new.yml
 	$(NOECHO) $(ECHO) '    - inc' >> META_new.yml
-	$(NOECHO) $(ECHO) 'requires: {}' >> META_new.yml
+	$(NOECHO) $(ECHO) 'requires:' >> META_new.yml
+	$(NOECHO) $(ECHO) '  Test::More: '\''0'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) 'version: '\''0.01'\''' >> META_new.yml
 	-$(NOECHO) $(MV) META_new.yml $(DISTVNAME)/META.yml
 	$(NOECHO) $(ECHO) Generating META.json
 	$(NOECHO) $(ECHO) '{' > META_new.json
-	$(NOECHO) $(ECHO) '   "abstract" : "unknown",' >> META_new.json
+	$(NOECHO) $(ECHO) '   "abstract" : "The great new CBitcoin::Script!",' >> META_new.json
 	$(NOECHO) $(ECHO) '   "author" : [' >> META_new.json
-	$(NOECHO) $(ECHO) '      "unknown"' >> META_new.json
+	$(NOECHO) $(ECHO) '      "Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>"' >> META_new.json
 	$(NOECHO) $(ECHO) '   ],' >> META_new.json
 	$(NOECHO) $(ECHO) '   "dynamic_config" : 1,' >> META_new.json
 	$(NOECHO) $(ECHO) '   "generated_by" : "ExtUtils::MakeMaker version 6.9, CPAN::Meta::Converter version 2.142690",' >> META_new.json
 	$(NOECHO) $(ECHO) '   "license" : [' >> META_new.json
-	$(NOECHO) $(ECHO) '      "unknown"' >> META_new.json
+	$(NOECHO) $(ECHO) '      "gpl_2"' >> META_new.json
 	$(NOECHO) $(ECHO) '   ],' >> META_new.json
 	$(NOECHO) $(ECHO) '   "meta-spec" : {' >> META_new.json
 	$(NOECHO) $(ECHO) '      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",' >> META_new.json
 	$(NOECHO) $(ECHO) '      "version" : "2"' >> META_new.json
 	$(NOECHO) $(ECHO) '   },' >> META_new.json
-	$(NOECHO) $(ECHO) '   "name" : "CBitcoin-CBHD",' >> META_new.json
+	$(NOECHO) $(ECHO) '   "name" : "CBitcoin-Script",' >> META_new.json
 	$(NOECHO) $(ECHO) '   "no_index" : {' >> META_new.json
 	$(NOECHO) $(ECHO) '      "directory" : [' >> META_new.json
 	$(NOECHO) $(ECHO) '         "t",' >> META_new.json
@@ -539,7 +631,9 @@ metafile : create_distdir
 	$(NOECHO) $(ECHO) '         }' >> META_new.json
 	$(NOECHO) $(ECHO) '      },' >> META_new.json
 	$(NOECHO) $(ECHO) '      "runtime" : {' >> META_new.json
-	$(NOECHO) $(ECHO) '         "requires" : {}' >> META_new.json
+	$(NOECHO) $(ECHO) '         "requires" : {' >> META_new.json
+	$(NOECHO) $(ECHO) '            "Test::More" : "0"' >> META_new.json
+	$(NOECHO) $(ECHO) '         }' >> META_new.json
 	$(NOECHO) $(ECHO) '      }' >> META_new.json
 	$(NOECHO) $(ECHO) '   },' >> META_new.json
 	$(NOECHO) $(ECHO) '   "release_status" : "stable",' >> META_new.json
@@ -778,6 +872,75 @@ FORCE :
 
 
 # --- MakeMaker perldepend section:
+PERL_HDRS = \
+        $(PERL_INC)/EXTERN.h            \
+        $(PERL_INC)/INTERN.h            \
+        $(PERL_INC)/XSUB.h            \
+        $(PERL_INC)/av.h            \
+        $(PERL_INC)/bitcount.h            \
+        $(PERL_INC)/config.h            \
+        $(PERL_INC)/cop.h            \
+        $(PERL_INC)/cv.h            \
+        $(PERL_INC)/dosish.h            \
+        $(PERL_INC)/embed.h            \
+        $(PERL_INC)/embedvar.h            \
+        $(PERL_INC)/fakesdio.h            \
+        $(PERL_INC)/fakethr.h            \
+        $(PERL_INC)/form.h            \
+        $(PERL_INC)/git_version.h            \
+        $(PERL_INC)/gv.h            \
+        $(PERL_INC)/handy.h            \
+        $(PERL_INC)/hv.h            \
+        $(PERL_INC)/intrpvar.h            \
+        $(PERL_INC)/iperlsys.h            \
+        $(PERL_INC)/keywords.h            \
+        $(PERL_INC)/l1_char_class_tab.h            \
+        $(PERL_INC)/malloc_ctl.h            \
+        $(PERL_INC)/metaconfig.h            \
+        $(PERL_INC)/mg.h            \
+        $(PERL_INC)/mydtrace.h            \
+        $(PERL_INC)/nostdio.h            \
+        $(PERL_INC)/op.h            \
+        $(PERL_INC)/op_reg_common.h            \
+        $(PERL_INC)/opcode.h            \
+        $(PERL_INC)/opnames.h            \
+        $(PERL_INC)/overload.h            \
+        $(PERL_INC)/pad.h            \
+        $(PERL_INC)/parser.h            \
+        $(PERL_INC)/patchlevel-debian.h            \
+        $(PERL_INC)/patchlevel.h            \
+        $(PERL_INC)/perl.h            \
+        $(PERL_INC)/perlapi.h            \
+        $(PERL_INC)/perlio.h            \
+        $(PERL_INC)/perliol.h            \
+        $(PERL_INC)/perlsdio.h            \
+        $(PERL_INC)/perlsfio.h            \
+        $(PERL_INC)/perlvars.h            \
+        $(PERL_INC)/perly.h            \
+        $(PERL_INC)/pp.h            \
+        $(PERL_INC)/pp_proto.h            \
+        $(PERL_INC)/proto.h            \
+        $(PERL_INC)/reentr.h            \
+        $(PERL_INC)/regcharclass.h            \
+        $(PERL_INC)/regcomp.h            \
+        $(PERL_INC)/regexp.h            \
+        $(PERL_INC)/regnodes.h            \
+        $(PERL_INC)/scope.h            \
+        $(PERL_INC)/sv.h            \
+        $(PERL_INC)/thread.h            \
+        $(PERL_INC)/time64.h            \
+        $(PERL_INC)/time64_config.h            \
+        $(PERL_INC)/uconfig.h            \
+        $(PERL_INC)/unixish.h            \
+        $(PERL_INC)/utf8.h            \
+        $(PERL_INC)/utfebcdic.h            \
+        $(PERL_INC)/util.h            \
+        $(PERL_INC)/uudmap.h            \
+        $(PERL_INC)/warnings.h            
+
+$(OBJECT) : $(PERL_HDRS)
+
+Script.c : $(XSUBPPDEPS)
 
 
 # --- MakeMaker makefile section:
@@ -824,17 +987,22 @@ testdb_dynamic :: pure_all
 
 test_ : test_dynamic
 
-test_static :: test_dynamic
-testdb_static :: testdb_dynamic
+test_static :: pure_all $(MAP_TARGET)
+	PERL_DL_NONLAZY=1 ./$(MAP_TARGET) "-MExtUtils::Command::MM" "-MTest::Harness" "-e" "undef *Test::Harness::Switches; test_harness($(TEST_VERBOSE), '$(INST_LIB)', '$(INST_ARCHLIB)')" $(TEST_FILES)
+
+testdb_static :: pure_all $(MAP_TARGET)
+	PERL_DL_NONLAZY=1 ./$(MAP_TARGET) $(TESTDB_SW) "-I$(INST_LIB)" "-I$(INST_ARCHLIB)" $(TEST_FILE)
+
 
 
 # --- MakeMaker ppd section:
 # Creates a PPD (Perl Package Description) for a binary distribution.
 ppd :
 	$(NOECHO) $(ECHO) '<SOFTPKG NAME="$(DISTNAME)" VERSION="$(VERSION)">' > $(DISTNAME).ppd
-	$(NOECHO) $(ECHO) '    <ABSTRACT></ABSTRACT>' >> $(DISTNAME).ppd
-	$(NOECHO) $(ECHO) '    <AUTHOR></AUTHOR>' >> $(DISTNAME).ppd
+	$(NOECHO) $(ECHO) '    <ABSTRACT>The great new CBitcoin::Script!</ABSTRACT>' >> $(DISTNAME).ppd
+	$(NOECHO) $(ECHO) '    <AUTHOR>Joel DeJesus (Work Email) &lt;dejesus.joel@e-flamingo.jp&gt;</AUTHOR>' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '    <IMPLEMENTATION>' >> $(DISTNAME).ppd
+	$(NOECHO) $(ECHO) '        <REQUIRE NAME="Test::More" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <ARCHITECTURE NAME="x86_64-linux-gnu-thread-multi-5.14" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <CODEBASE HREF="" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '    </IMPLEMENTATION>' >> $(DISTNAME).ppd
@@ -845,8 +1013,7 @@ ppd :
 
 pm_to_blib : $(FIRST_MAKEFILE) $(TO_INST_PM)
 	$(NOECHO) $(ABSPERLRUN) -MExtUtils::Install -e 'pm_to_blib({@ARGV}, '\''$(INST_LIB)/auto'\'', q[$(PM_FILTER)], '\''$(PERM_DIR)'\'')' -- \
-	  lib/CBitcoin/Script.pm blib/lib/CBitcoin/Script.pm \
-	  lib/CBitcoin/Script.xs blib/lib/CBitcoin/Script.xs 
+	  Script.pm $(INST_LIB)/CBitcoin/Script.pm 
 	$(NOECHO) $(TOUCH) pm_to_blib
 
 

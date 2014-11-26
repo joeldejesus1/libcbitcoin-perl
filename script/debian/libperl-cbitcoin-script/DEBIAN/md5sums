@@ -1,0 +1,9 @@
+fa973e0b79c0c66cc1f61cb7686a72d3  usr/lib/perl5/CBitcoin/Script.pm
+54762dbd9c20995b8dc4608875a63df1  usr/lib/perl5/CBitcoin/Script.xs
+b0b377ea67756f389b338666242261fc  usr/lib/perl5/auto/CBitcoin/Script/.packlist
+159a1ddf5b19599e2b1a1b3c76758997  usr/lib/perl5/auto/CBitcoin/Script/Script.so
+c2951021007a751fe6221cd9655e44a1  usr/share/doc/libperl-cbitcoin-script/README.Debian
+ebfd2faae79bdce6aca8f3e36c909ae2  usr/share/doc/libperl-cbitcoin-script/changelog.Debian.gz
+755dee4ed1a54469ac3283aa6b9d3724  usr/share/doc/libperl-cbitcoin-script/changelog.gz
+aabff7eefe6e5faf0e524d7df3c79ba5  usr/share/doc/libperl-cbitcoin-script/copyright
+29b75b333acbcc986cb91e70f22e08f0  usr/share/man/man3/CBitcoin::Script.3pm.gz

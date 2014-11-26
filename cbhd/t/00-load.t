@@ -1,5 +1,5 @@
 #!perl -T
-
+use 5.006;
 use Test::More tests => 1;
 
 BEGIN {
@@ -7,3 +7,4 @@ BEGIN {
 }
 
 diag( "Testing CBitcoin::CBHD $CBitcoin::CBHD::VERSION, Perl $], $^X" );
+

@@ -50,7 +50,7 @@ TODO: {
   );
 
   
-  module_boilerplate_ok('lib/CBitcoin/Script.pm');
+  module_boilerplate_ok('Script.pm');
 
 }
 
