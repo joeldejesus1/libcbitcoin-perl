@@ -1,21 +1,22 @@
 ---
-abstract: unknown
+abstract: 'The great new CBitcoin::Script!'
 author:
-  - unknown
+  - 'Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>'
 build_requires:
   ExtUtils::MakeMaker: '0'
 configure_requires:
   ExtUtils::MakeMaker: '0'
 dynamic_config: 0
 generated_by: 'ExtUtils::MakeMaker version 6.9, CPAN::Meta::Converter version 2.142690'
-license: unknown
+license: gpl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
   version: '1.4'
-name: CBitcoin-CBHD
+name: CBitcoin-Script
 no_index:
   directory:
     - t
     - inc
-requires: {}
+requires:
+  Test::More: '0'
 version: '0.01'

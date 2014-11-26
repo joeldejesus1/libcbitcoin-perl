@@ -1,4 +1,4 @@
-libperl-cbitcoin-script (2.00-1) unstable; urgency=low
+libperl-cbitcoin-script (0.1-1) unstable; urgency=low
 
   * Initial release (Closes: #1)
 

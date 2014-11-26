@@ -1,18 +1,18 @@
 {
-   "abstract" : "unknown",
+   "abstract" : "The great new CBitcoin::Script!",
    "author" : [
-      "unknown"
+      "Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>"
    ],
    "dynamic_config" : 0,
    "generated_by" : "ExtUtils::MakeMaker version 6.9, CPAN::Meta::Converter version 2.142690",
    "license" : [
-      "unknown"
+      "gpl_2"
    ],
    "meta-spec" : {
       "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
       "version" : "2"
    },
-   "name" : "CBitcoin-CBHD",
+   "name" : "CBitcoin-Script",
    "no_index" : {
       "directory" : [
          "t",
@@ -31,7 +31,9 @@
          }
       },
       "runtime" : {
-         "requires" : {}
+         "requires" : {
+            "Test::More" : "0"
+         }
       }
    },
    "release_status" : "stable",

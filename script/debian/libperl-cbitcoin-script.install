@@ -1,0 +1,4 @@
+usr/lib/perl5/auto/CBitcoin/Script/Script.so
+usr/lib/perl5/CBitcoin/Script.xs
+usr/lib/perl5/CBitcoin/Script.pm
+usr/share/man/man3/CBitcoin::Script.3pm
