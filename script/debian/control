@@ -8,6 +8,6 @@ Homepage: https://e-flamingo.jp
 
 Package: libperl-cbitcoin-script
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: libdigest-sha-perl, libc6-amd64:i386 (>= 2.3.2) [amd64], libevent-2.0-5 (>= 2.0.10-stable), libevent-core-2.0-5 (>= 2.0.10-stable), libevent-extra-2.0-5 (>= 2.0.10-stable), libevent-openssl-2.0-5 (>= 2.0.10-stable), libevent-pthreads-2.0-5 (>= 2.0.10-stable), libssl1.0.0 (>= 1.0.0), ${misc:Depends}, libperl-cbitcoin-cbhd
 Description: Perl modules for cbitcoin.
  Manipulate bitcoin objects in perl.

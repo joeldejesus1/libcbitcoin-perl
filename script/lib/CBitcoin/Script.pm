@@ -22,10 +22,18 @@ require DynaLoader;
 
 $CBitcoin::Script::VERSION = '0.01';
 
-DynaLoader::bootstrap CBitcoin::Script $CBitcoin::Script::VERSION;
+#DynaLoader::bootstrap CBitcoin::Script $CBitcoin::Script::VERSION;
 
 @CBitcoin::Script::EXPORT = ();
 @CBitcoin::Script::EXPORT_OK = ();
+
+
+=item dl_load_flags
+
+Don't worry about this.
+
+=cut
+
 
 sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
@@ -40,6 +48,13 @@ sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 =cut
 
+=item address_to_script
+
+---++ address_to_script
+
+=cut
+
+
 sub address_to_script {
 	#use bigint;
 	my $x = shift;
@@ -51,6 +66,12 @@ sub address_to_script {
 		die "this is not an address($x)";
 	}	
 }
+
+=item script_to_address
+
+---++ script_to_address
+
+=cut
 
 sub script_to_address {
 	#use bigint;
@@ -65,7 +86,7 @@ sub script_to_address {
 	}
 }
 
-=pod
+=item pubkeys_to_multisig_script
 
 ---++ pubkeys_to_multisig_script(\@cbhdkeys,$m) 
 
