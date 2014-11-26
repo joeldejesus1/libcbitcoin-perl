@@ -9,7 +9,7 @@ foreach my $package ('CBitcoin::CBHD'){
 	  'TYPEMAPS' => [],
 	  'NAME' => $package,
 	#  'INC' => '../../library/include',
-	     'LIBS' => [ ' -lpthread -lcrypto -lcbitcoin ' ],
+	     'LIBS' => [ ' -lcrypto -lcbitcoin ' ],
 		,'VERSION' => '0.01'
 #		,'MYEXTLIB' => '/usr/lib/libcbitcoin.so'
 		,'AUTHOR'              => q{Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>}

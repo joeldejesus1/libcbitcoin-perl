@@ -15,7 +15,7 @@
 #     AUTHOR => [q[Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>]]
 #     BUILD_REQUIRES => {  }
 #     CONFIGURE_REQUIRES => {  }
-#     LIBS => [q[-lpthread -lcrypto -lcbitcoin]]
+#     LIBS => [q[-lcrypto -lcbitcoin]]
 #     LICENSE => q[gpl_2]
 #     MAKEFILE_OLD => q[]
 #     NAME => q[CBitcoin::CBHD]
@@ -299,7 +299,7 @@ MPOLLUTE =
 # See ExtUtils::Liblist for details
 #
 EXTRALIBS = -lcrypto -lcbitcoin
-LDLOADLIBS = -lpthread -lcrypto -lcbitcoin
+LDLOADLIBS = -lcrypto -lcbitcoin
 BSLOADLIBS = 
 LD_RUN_PATH = /usr/lib/x86_64-linux-gnu:/usr/lib/../lib
 
