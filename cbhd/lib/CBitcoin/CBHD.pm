@@ -1,6 +1,6 @@
 package CBitcoin::CBHD;
 
-use 5.006;
+use 5.014002;
 use strict;
 use warnings;
 
@@ -20,16 +20,30 @@ require DynaLoader;
 
 $CBitcoin::CBHD::VERSION = '0.01';
 
-DynaLoader::bootstrap CBitcoin::CBHD $CBitcoin::CBHD::VERSION;
+#DynaLoader::bootstrap CBitcoin::CBHD $CBitcoin::CBHD::VERSION;
 
 @CBitcoin::CBHD::EXPORT = ();
 @CBitcoin::CBHD::EXPORT_OK = ();
+
+
+=item dl_load_flags
+
+Don't worry about this.
+
+=cut
 
 sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 
 # Preloaded methods go here.
 
+=item new
+
+---+ new()
+
+Create a cbhd object.
+
+=cut
 
 sub new {
 	my $package = shift;
@@ -42,8 +56,17 @@ sub new {
 	return $this;
 }
 
-# newMasterKey deriveChildPrivate exportWIFFromCBHDKey exportAddressFromCBHDKey publickeyFromWIF
-# generate a key (parent)
+=item generate
+
+---+ generate
+
+newMasterKey deriveChildPrivate exportWIFFromCBHDKey exportAddressFromCBHDKey publickeyFromWIF
+
+generate a key (parent)
+
+=cut
+
+
 sub generate {
 	my $this = shift;
 	eval{
@@ -55,6 +78,14 @@ sub generate {
 	}
 	return 1;
 }
+
+=item serialized_data
+
+---+ serialized_data
+
+hi
+=cut
+
 
 sub serialized_data {
 	my $this = shift;
@@ -70,7 +101,8 @@ sub serialized_data {
 		die "no arguments to create CBitcoin::CBHD data";
 	}
 }
-=pod
+
+=item deriveChild
 
 ---++ deriveChild($hardbool,$childid)
 
@@ -105,6 +137,13 @@ sub deriveChild {
 	
 }
 
+=item WIF
+
+---++ $cbhd->WIF()
+
+=cut
+
+
 sub WIF {
 	my $this = shift;
 	my $wif = '';
@@ -118,6 +157,12 @@ sub WIF {
 	return $wif;
 }
 
+=item address
+
+---++ address()
+
+=cut
+
 sub address {
 	my $this = shift;
 	my $address = '';
@@ -130,6 +175,12 @@ sub address {
 	}
 	return $address;
 }
+
+=item publickey
+
+---++ $cbhd->publickey()
+
+=cut
 
 sub publickey {
 	my $this = shift;

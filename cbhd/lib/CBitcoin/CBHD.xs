@@ -191,9 +191,9 @@ char* createWIF(int arg){
 MODULE = CBitcoin::CBHD	PACKAGE = CBitcoin::CBHD	
 
 
-#BOOT:
+BOOT:
 # boot the second XS file
-#boot_CBitcoin__Script(aTHX_ cv);
+#boot_CBitcoin__CBHD(aTHX_ cv);
 
 
 PROTOTYPES: DISABLE
