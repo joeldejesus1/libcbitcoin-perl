@@ -1,6 +1,6 @@
 package CBitcoin::Transaction;
 
-use 5.006;
+use 5.014002;
 use strict;
 use warnings;
 
@@ -25,7 +25,7 @@ require DynaLoader;
 
 $CBitcoin::Transaction::VERSION = '0.01';
 
-DynaLoader::bootstrap CBitcoin::Transaction $CBitcoin::Transaction::VERSION;
+#DynaLoader::bootstrap CBitcoin::Transaction $CBitcoin::Transaction::VERSION;
 
 @CBitcoin::Transaction::EXPORT = ();
 @CBitcoin::Transaction::EXPORT_OK = ();
@@ -34,9 +34,9 @@ sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 
 
-=pod
+=item new
 
----++ constructors
+---++ new()
 
 =cut
 
@@ -92,9 +92,9 @@ sub new {
 	
 	return $this;
 }
-=pod
+=item serialized_data
 
----++ variable accessors
+---++ serialized_data
 
 =cut
 
@@ -114,18 +114,35 @@ sub serialized_data {
 
 }
 
+=item lockTime
+
+---++ lockTime
+
+=cut
+
 sub lockTime {
 	my $this = shift;
 	# this is a C function
 	return get_lockTime_from_obj($this->{'data'});
 }
 
+=item version
+
+---++ version
+
+=cut
 
 sub version {
 	my $this = shift;
 	# this is a C function
 	return get_version_from_obj($this->{'data'});
 }
+
+=item hash
+
+---++ hash
+
+=cut
 
 sub hash {
 	my $this = shift;
@@ -134,9 +151,9 @@ sub hash {
 
 
 # signatures....
-=pod
+=item sign_single_input
 
----+++ sign($index,$cbhdkey)
+---+++ sign_single_input($index,$cbhdkey)
 
 Sign the ith ($index) output with the private key corresponding to the inputs.  The index starts from 0!!!!!
 
@@ -199,9 +216,9 @@ sub sign_single_input {
 	return $this->serialized_data($data);	
 }
 
-=pod
+=item numOfInputs
 
----++ methods
+---++ numOfInputs
 
 =cut
 
@@ -209,6 +226,12 @@ sub numOfInputs {
 	my $this = shift;
 	return get_numOfInputs($this->{'data'});	
 }
+
+=item input
+
+---++ input($index)
+
+=cut
 
 sub input {
 	my $this = shift;
@@ -220,10 +243,22 @@ sub input {
 	return CBitcoin::TransactionInput->new({'data' => get_Input($this->{'data'},$index) });
 }
 
+=item numOfOutputs
+
+---++ numOfOutputs()
+
+=cut
+
 sub numOfOutputs {
 	my $this = shift;
 	return get_numOfOutputs($this->{'data'});
 }
+
+=item output
+
+---++ output
+
+=cut
 
 sub output {
 	my $this = shift;

@@ -1,6 +1,6 @@
 #!perl -T
 
-use Test::More tests => 5;
+use Test::More tests => 1;
 
 BEGIN {
     use_ok( 'CBitcoin::TransactionOutput' ) || print "Bail out!\n";

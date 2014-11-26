@@ -1,6 +1,6 @@
 package CBitcoin::TransactionOutput;
 
-use 5.006;
+use 5.014002;
 use strict;
 use warnings;
 
@@ -22,13 +22,23 @@ require DynaLoader;
 
 $CBitcoin::TransactionOutput::VERSION = '0.01';
 
-DynaLoader::bootstrap CBitcoin::TransactionOutput $CBitcoin::TransactionOutput::VERSION;
+#DynaLoader::bootstrap CBitcoin::TransactionOutput $CBitcoin::TransactionOutput::VERSION;
 
 @CBitcoin::TransactionOutput::EXPORT = ();
 @CBitcoin::TransactionOutput::EXPORT_OK = ();
 
+
+=item dl_load_flags
+
+=cut
+
 sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
+=item new
+
+---++ new()
+
+=cut
 
 sub new {
 	use bigint;
@@ -61,20 +71,45 @@ sub new {
 	return $this;
 }
 
+=item serialized_data
+
+---++ serialized_data
+
+=cut
+
 sub serialized_data {
 	my $this = shift;
 	return $this->{'data'};
 }
+
+
+=item script
+
+---++ script
+
+=cut
 
 sub script {
 	my $this = shift;
 	return get_script_from_obj($this->{'data'});
 }
 
+=item type_of_script
+
+---++ type_of_script
+
+=cut
+
 sub type_of_script {
 	my $this = shift;
 	return CBitcoin::Script::whatTypeOfScript( $this->script );
 }
+
+=item value
+
+---++ value
+
+=cut
 
 sub value {
 	my $this = shift;

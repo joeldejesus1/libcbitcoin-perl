@@ -1,6 +1,6 @@
 package CBitcoin::TransactionInput;
 
-use 5.006;
+use 5.014002;
 use strict;
 use warnings;
 
@@ -22,12 +22,27 @@ require DynaLoader;
 
 $CBitcoin::TransactionInput::VERSION = '0.01';
 
-DynaLoader::bootstrap CBitcoin::TransactionInput $CBitcoin::TransactionInput::VERSION;
+#DynaLoader::bootstrap CBitcoin::TransactionInput $CBitcoin::TransactionInput::VERSION;
 
 @CBitcoin::TransactionInput::EXPORT = ();
 @CBitcoin::TransactionInput::EXPORT_OK = ();
 
+
+=item dl_load_flags
+
+Don't worry about this.
+
+=cut
+
+
 sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
+
+=item new
+
+---++ new()
+
+=cut
+
 
 sub new {
 	use bigint;
@@ -68,10 +83,23 @@ sub new {
 	return $this;
 }
 
+=item serialized_data
+
+---++ serialized_data()
+
+=cut
+
+
 sub serialized_data {
 	my $this = shift;
 	return $this->{'data'};
 }
+
+=item script
+
+---++ script
+
+=cut
 
 sub script {
 	my $this = shift;
@@ -79,10 +107,22 @@ sub script {
 	return get_script_from_obj($this->{'data'});
 }
 
+=item type_of_script
+
+---++ type_of_script
+
+=cut
+
 sub type_of_script {
 	my $this = shift;
 	return CBitcoin::Script::whatTypeOfScript( $this->script );
 }
+
+=item prevOutHash
+
+---++ prevOutHash()
+
+=cut
 
 sub prevOutHash {
 	use bigint;
@@ -91,11 +131,24 @@ sub prevOutHash {
 	return get_prevOutHash_from_obj($this->{'data'});
 }
 
+=item prevOutIndex
+
+---++ prevOutIndex()
+
+=cut
+
 sub prevOutIndex {
 	use bigint;
 	my $this = shift;
 	return get_prevOutIndex_from_obj($this->{'data'});
 }
+
+=item sequence
+
+---++ sequence
+
+=cut
+
 sub sequence {
 	use bigint;
 	my $this = shift;
