@@ -1,0 +1,10 @@
+9b58c03672bd26073b16d1bcaed15d50  usr/lib/perl/5.14/perllocal.pod
+f1cc57f04c15432512345d056c03810b  usr/lib/perl5/CBitcoin/CBHD.pm
+7e23a3bb4e601a2dacc666d1dd9ea977  usr/lib/perl5/CBitcoin/CBHD.xs
+01dc568589f6d77dad90a78ffbfa1d08  usr/lib/perl5/auto/CBitcoin/CBHD/.packlist
+bcfcd1e8f581299cf755e439aa786497  usr/lib/perl5/auto/CBitcoin/CBHD/CBHD.so
+d53a8d48b338bcfc12a147207c7f5c64  usr/share/doc/libperl-cbitcoin-cbhd/README.Debian
+068736e1aa178356a0b92ee730c2c3d0  usr/share/doc/libperl-cbitcoin-cbhd/changelog.Debian.gz
+28f5480d037899df514f951f2642a955  usr/share/doc/libperl-cbitcoin-cbhd/changelog.gz
+aabff7eefe6e5faf0e524d7df3c79ba5  usr/share/doc/libperl-cbitcoin-cbhd/copyright
+db8121065bd2ab91ece31bce10e7c89d  usr/share/man/man3/CBitcoin::CBHD.3pm.gz

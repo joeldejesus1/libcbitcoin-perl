@@ -1,0 +1,12 @@
+Changes
+lib/CBitcoin.pm
+lib/CBitcoin/CBHD.pm
+lib/CBitcoin/Script.pm
+CBHD.xs
+Script.xs
+Makefile.PL
+MANIFEST			This list of files
+README
+t/00-load.t
+t/manifest.t
+t/CBHD.t

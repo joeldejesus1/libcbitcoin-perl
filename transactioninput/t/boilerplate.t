@@ -50,7 +50,7 @@ TODO: {
   );
 
   
-  module_boilerplate_ok('lib/CBitcoin/TransactionInput.pm');
+  module_boilerplate_ok('TransactionInput.pm');
 
 }
 

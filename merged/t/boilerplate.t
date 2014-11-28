@@ -50,7 +50,7 @@ TODO: {
   );
 
   
-  module_boilerplate_ok('Transaction.pm');
+  module_boilerplate_ok('CBHD.pm');
 
 }
 
