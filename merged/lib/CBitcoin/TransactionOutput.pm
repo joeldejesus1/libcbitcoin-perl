@@ -22,7 +22,7 @@ require DynaLoader;
 
 $CBitcoin::TransactionOutput::VERSION = '0.01';
 
-#DynaLoader::bootstrap CBitcoin::TransactionOutput $CBitcoin::TransactionOutput::VERSION;
+DynaLoader::bootstrap CBitcoin::TransactionOutput $CBitcoin::TransactionOutput::VERSION;
 
 @CBitcoin::TransactionOutput::EXPORT = ();
 @CBitcoin::TransactionOutput::EXPORT_OK = ();

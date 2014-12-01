@@ -31,30 +31,24 @@ int dummy(int arg){
 	return 1;
 }
 
+#define crutch_stack_wrap(directive) do { \
+	PUSHMARK(SP);  \
+	PUTBACK; \
+	directive; \
+	SPAGAIN; \
+	PUTBACK; \
+} while(0)
+
 
 MODULE = CBitcoin	PACKAGE = CBitcoin	
 
 
 BOOT:
-	PUSHMARK(SP); if (items >= 2) { XPUSHs(ST(0)); XPUSHs(ST(1)); } PUTBACK;
-	boot_CBitcoin__Script(aTHX_ cv);
-	SPAGAIN; POPs;
-	//
-	PUSHMARK(SP); if (items >= 2) { XPUSHs(ST(0)); XPUSHs(ST(1)); } PUTBACK;
-	boot_CBitcoin__CBHD(aTHX_ cv);
-	SPAGAIN; POPs;
-	//
-	PUSHMARK(SP); if (items >= 2) { XPUSHs(ST(0)); XPUSHs(ST(1)); } PUTBACK;
-	boot_CBitcoin__TransactionInput(aTHX_ cv);
-	SPAGAIN; POPs;
-	//
-	PUSHMARK(SP); if (items >= 2) { XPUSHs(ST(0)); XPUSHs(ST(1)); } PUTBACK;
-	boot_CBitcoin__TransactionOutput(aTHX_ cv);
-	SPAGAIN; POPs;
-	//
-	PUSHMARK(SP); if (items >= 2) { XPUSHs(ST(0)); XPUSHs(ST(1)); } PUTBACK;
-	boot_CBitcoin__Transaction(aTHX_ cv);
-	SPAGAIN; POPs;
+	crutch_stack_wrap(boot_CBitcoin__Script(aTHX_ cv));
+	crutch_stack_wrap(boot_CBitcoin__CBHD(aTHX_ cv));
+	crutch_stack_wrap(boot_CBitcoin__TransactionInput(aTHX_ cv));
+	crutch_stack_wrap(boot_CBitcoin__TransactionOutput(aTHX_ cv));
+	crutch_stack_wrap(boot_CBitcoin__Transaction(aTHX_ cv));
 	
 PROTOTYPES: DISABLED
 

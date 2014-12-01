@@ -22,7 +22,7 @@ require DynaLoader;
 
 $CBitcoin::TransactionInput::VERSION = '0.01';
 
-#DynaLoader::bootstrap CBitcoin::TransactionInput $CBitcoin::TransactionInput::VERSION;
+DynaLoader::bootstrap CBitcoin::TransactionInput $CBitcoin::TransactionInput::VERSION;
 
 @CBitcoin::TransactionInput::EXPORT = ();
 @CBitcoin::TransactionInput::EXPORT_OK = ();
@@ -128,7 +128,7 @@ sub prevOutHash {
 	use bigint;
 	my $this = shift;
 	# this is a C function
-	return CBTransactionInput_get_prevOutHash_from_obj($this->{'data'});
+	txin_get_prevOutHash_from_obj($this->{'data'});
 }
 
 =item prevOutIndex
