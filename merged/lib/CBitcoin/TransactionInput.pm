@@ -104,7 +104,7 @@ sub serialized_data {
 sub script {
 	my $this = shift;
 	# this is a C function
-	return get_script_from_obj($this->{'data'});
+	return CBTransactionInput_get_script_from_obj($this->{'data'});
 }
 
 =item type_of_script
@@ -128,7 +128,7 @@ sub prevOutHash {
 	use bigint;
 	my $this = shift;
 	# this is a C function
-	return get_prevOutHash_from_obj($this->{'data'});
+	return CBTransactionInput_get_prevOutHash_from_obj($this->{'data'});
 }
 
 =item prevOutIndex
@@ -140,7 +140,7 @@ sub prevOutHash {
 sub prevOutIndex {
 	use bigint;
 	my $this = shift;
-	return get_prevOutIndex_from_obj($this->{'data'});
+	return CBTransactionInput_get_prevOutIndex_from_obj($this->{'data'});
 }
 
 =item sequence
@@ -152,7 +152,7 @@ sub prevOutIndex {
 sub sequence {
 	use bigint;
 	my $this = shift;
-	return get_sequence_from_obj($this->{'data'});
+	return CBTransactionInput_get_sequence_from_obj($this->{'data'});
 }
 
 =head1 AUTHOR

@@ -1,3 +1,4 @@
+use 5.014002;
 use strict;
 use warnings;
 
@@ -9,7 +10,8 @@ require CBitcoin::CBHD;
 
 my $x = CBitcoin::CBHD->new();
 $x->generate();
-warn "Address:".$x->address()."\n";
-ok (1, 'get address');
+my $address = $x->address();
+warn "\nAddress:".$address."\n";
+ok ($address, 'get address');
 
 

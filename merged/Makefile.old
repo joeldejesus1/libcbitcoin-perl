@@ -1,4 +1,4 @@
-# This Makefile is for the CBitcoin::CBHD extension to perl.
+# This Makefile is for the CBitcoin extension to perl.
 #
 # It was generated automatically by MakeMaker version
 # 6.9 (Revision: 69000) from the contents of
@@ -17,7 +17,7 @@
 #     LIBS => [q[-lcrypto -lcbitcoin]]
 #     LICENSE => q[gpl_2]
 #     MAKEFILE_OLD => q[]
-#     NAME => q[CBitcoin::CBHD]
+#     NAME => q[CBitcoin]
 #     OBJECT => q[$(O_FILES)]
 #     PL_FILES => {  }
 #     PREREQ_PM => { Test::More=>q[0] }
@@ -63,8 +63,8 @@ VENDORLIBEXP = /usr/share/perl5
 AR_STATIC_ARGS = cr
 DIRFILESEP = /
 DFSEP = $(DIRFILESEP)
-NAME = CBitcoin::CBHD
-NAME_SYM = CBitcoin_CBHD
+NAME = CBitcoin
+NAME_SYM = CBitcoin
 VERSION = 0.01
 VERSION_MACRO = VERSION
 VERSION_SYM = 0_01
@@ -153,9 +153,9 @@ MM_REVISION = 69000
 # PARENT_NAME = NAME without BASEEXT and no trailing :: (eg Foo::Bar)
 # DLBASE  = Basename part of dynamic library. May be just equal BASEEXT.
 MAKE = make
-FULLEXT = CBitcoin/CBHD
-BASEEXT = CBHD
-PARENT_NAME = CBitcoin
+FULLEXT = CBitcoin
+BASEEXT = CBitcoin
+PARENT_NAME = 
 DLBASE = $(BASEEXT)
 VERSION_FROM = lib/CBitcoin.pm
 OBJECT = $(O_FILES)
@@ -165,16 +165,19 @@ BOOTDEP =
 
 # Handy lists of source code files:
 XS_FILES = CBHD.xs \
+	CBitcoin.xs \
 	Script.xs \
 	Transaction.xs \
 	TransactionInput.xs \
 	TransactionOutput.xs
 C_FILES  = CBHD.c \
+	CBitcoin.c \
 	Script.c \
 	Transaction.c \
 	TransactionInput.c \
 	TransactionOutput.c
 O_FILES  = CBHD.o \
+	CBitcoin.o \
 	Script.o \
 	Transaction.o \
 	TransactionInput.o \
@@ -192,8 +195,8 @@ MAN3PODS = lib/CBitcoin.pm \
 CONFIGDEP = $(PERL_ARCHLIB)$(DFSEP)Config.pm $(PERL_INC)$(DFSEP)config.h
 
 # Where to build things
-INST_LIBDIR      = $(INST_LIB)/CBitcoin
-INST_ARCHLIBDIR  = $(INST_ARCHLIB)/CBitcoin
+INST_LIBDIR      = $(INST_LIB)
+INST_ARCHLIBDIR  = $(INST_ARCHLIB)
 
 INST_AUTODIR     = $(INST_LIB)/auto/$(FULLEXT)
 INST_ARCHAUTODIR = $(INST_ARCHLIB)/auto/$(FULLEXT)
@@ -303,8 +306,8 @@ CI = ci -u
 RCS_LABEL = rcs -Nv$(VERSION_SYM): -q
 DIST_CP = best
 DIST_DEFAULT = tardist
-DISTNAME = CBitcoin-CBHD
-DISTVNAME = CBitcoin-CBHD-0.01
+DISTNAME = CBitcoin
+DISTVNAME = CBitcoin-0.01
 
 
 # --- MakeMaker macro section:
@@ -323,7 +326,7 @@ MPOLLUTE =
 
 # --- MakeMaker const_loadlibs section:
 
-# CBitcoin::CBHD might depend on some other libraries:
+# CBitcoin might depend on some other libraries:
 # See ExtUtils::Liblist for details
 #
 EXTRALIBS = -lcrypto -lcbitcoin
@@ -582,18 +585,19 @@ clean :: clean_subdirs
 	  $(INST_ARCHAUTODIR)/extralibs.ld $(MAKE_APERL_FILE) \
 	  *$(LIB_EXT) *$(OBJ_EXT) \
 	  *perl.core CBHD.c \
-	  MYMETA.json MYMETA.yml \
-	  Script.c Transaction.c \
-	  TransactionInput.c TransactionOutput.c \
-	  blibdirs.ts core \
-	  core.*perl.*.? core.[0-9] \
-	  core.[0-9][0-9] core.[0-9][0-9][0-9] \
-	  core.[0-9][0-9][0-9][0-9] core.[0-9][0-9][0-9][0-9][0-9] \
-	  lib$(BASEEXT).def mon.out \
-	  perl perl$(EXE_EXT) \
-	  perl.exe perlmain.c \
-	  pm_to_blib pm_to_blib.ts \
-	  so_locations tmon.out 
+	  CBitcoin.c MYMETA.json \
+	  MYMETA.yml Script.c \
+	  Transaction.c TransactionInput.c \
+	  TransactionOutput.c blibdirs.ts \
+	  core core.*perl.*.? \
+	  core.[0-9] core.[0-9][0-9] \
+	  core.[0-9][0-9][0-9] core.[0-9][0-9][0-9][0-9] \
+	  core.[0-9][0-9][0-9][0-9][0-9] lib$(BASEEXT).def \
+	  mon.out perl \
+	  perl$(EXE_EXT) perl.exe \
+	  perlmain.c pm_to_blib \
+	  pm_to_blib.ts so_locations \
+	  tmon.out 
 	- $(RM_RF) \
 	  blib libperl-cbitcoin-* 
 	  $(NOECHO) $(RM_F) $(MAKEFILE_OLD)
@@ -632,7 +636,7 @@ metafile : create_distdir
 	$(NOECHO) $(ECHO) 'meta-spec:' >> META_new.yml
 	$(NOECHO) $(ECHO) '  url: http://module-build.sourceforge.net/META-spec-v1.4.html' >> META_new.yml
 	$(NOECHO) $(ECHO) '  version: '\''1.4'\''' >> META_new.yml
-	$(NOECHO) $(ECHO) 'name: CBitcoin-CBHD' >> META_new.yml
+	$(NOECHO) $(ECHO) 'name: CBitcoin' >> META_new.yml
 	$(NOECHO) $(ECHO) 'no_index:' >> META_new.yml
 	$(NOECHO) $(ECHO) '  directory:' >> META_new.yml
 	$(NOECHO) $(ECHO) '    - t' >> META_new.yml
@@ -656,7 +660,7 @@ metafile : create_distdir
 	$(NOECHO) $(ECHO) '      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",' >> META_new.json
 	$(NOECHO) $(ECHO) '      "version" : "2"' >> META_new.json
 	$(NOECHO) $(ECHO) '   },' >> META_new.json
-	$(NOECHO) $(ECHO) '   "name" : "CBitcoin-CBHD",' >> META_new.json
+	$(NOECHO) $(ECHO) '   "name" : "CBitcoin",' >> META_new.json
 	$(NOECHO) $(ECHO) '   "no_index" : {' >> META_new.json
 	$(NOECHO) $(ECHO) '      "directory" : [' >> META_new.json
 	$(NOECHO) $(ECHO) '         "t",' >> META_new.json
@@ -984,7 +988,7 @@ PERL_HDRS = \
 
 $(OBJECT) : $(PERL_HDRS)
 
-TransactionOutput.c Script.c Transaction.c CBHD.c TransactionInput.c : $(XSUBPPDEPS)
+TransactionOutput.c CBitcoin.c Script.c Transaction.c CBHD.c TransactionInput.c : $(XSUBPPDEPS)
 
 
 # --- MakeMaker makefile section:

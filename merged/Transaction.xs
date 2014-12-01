@@ -19,27 +19,8 @@
 #include <CBTransactionOutput.h>
 
 
-// print CBByteArray to hex string
-char* bytearray_to_hexstring(CBByteArray * serializeddata,uint32_t dlen){
-	char* answer = malloc(dlen*sizeof(char*));
-	CBByteArrayToString(serializeddata, 0, dlen, answer, 0);
-	return answer;
-}
-CBByteArray* hexstring_to_bytearray(char* hexstring){
-	CBByteArray* answer = CBNewByteArrayFromHex(hexstring);
-	return answer;
-}
 
-//bool CBInitScriptFromString(CBScript * self, char * string)
-char* scriptToString(CBScript* script){
-	char* answer = (char *)malloc(CBScriptStringMaxSize(script)*sizeof(char));
-	CBScriptToString(script, answer);
-	return answer;
-
-}
-
-
-CBTransaction* serializeddata_to_obj(char* datastring){
+CBTransaction* CBTransaction_serializeddata_to_obj(char* datastring){
 
 	CBByteArray* data = hexstring_to_bytearray(datastring);
 
@@ -50,7 +31,7 @@ CBTransaction* serializeddata_to_obj(char* datastring){
 	return tx;
 }
 
-char* obj_to_serializeddata(CBTransaction * tx){
+char* CBTransaction_obj_to_serializeddata(CBTransaction * tx){
 	CBTransactionPrepareBytes(tx);
 	int dlen = CBTransactionSerialise(tx,1);
 	CBByteArray* serializeddata = CBGetMessage(tx)->bytes;
@@ -60,94 +41,7 @@ char* obj_to_serializeddata(CBTransaction * tx){
 	return answer;
 }
 
-/*
- * TransactionOutput related functions
- */
-char* txoutput_obj_to_serializeddata(CBTransactionOutput * txoutput){
-	CBTransactionOutputPrepareBytes(txoutput);
-	int dlen = CBTransactionOutputSerialise(txoutput);
-	CBByteArray* serializeddata = CBGetMessage(txoutput)->bytes;
 
-	char* answer = bytearray_to_hexstring(serializeddata,dlen);
-
-	return answer;
-}
-CBTransactionOutput* txoutput_serializeddata_to_obj(char* datastring){
-
-	CBByteArray* data = hexstring_to_bytearray(datastring);
-
-	CBTransactionOutput* txoutput = CBNewTransactionOutputFromData(data);
-	int dlen = (int)CBTransactionOutputDeserialise(txoutput);
-
-	//CBTransactionInputDeserialise(txinput);
-	//CBDestroyByteArray(data);
-	return txoutput;
-}
-/*
- * TransactionInput related functions
- */
-
-CBTransactionInput* txinput_serializeddata_to_obj(char* datastring){
-
-	CBByteArray* data = hexstring_to_bytearray(datastring);
-
-	CBTransactionInput* txinput = CBNewTransactionInputFromData(data);
-	int dlen = (int)CBTransactionInputDeserialise(txinput);
-
-	//CBTransactionInputDeserialise(txinput);
-	//CBDestroyByteArray(data);
-	return txinput;
-}
-
-char* txinput_obj_to_serializeddata(CBTransactionInput * txinput){
-	CBTransactionInputPrepareBytes(txinput);
-	int dlen = CBTransactionInputSerialise(txinput);
-	CBByteArray* serializeddata = CBGetMessage(txinput)->bytes;
-
-	char* answer = bytearray_to_hexstring(serializeddata,dlen);
-
-	return answer;
-}
-
-// CBHDKeys
-
-CBHDKey* cbhdkey_serializeddata_to_obj(char* privstring){
-	CBByteArray * masterString = CBNewByteArrayFromString(privstring, true);
-	CBChecksumBytes * masterData = CBNewChecksumBytesFromString(masterString, false);
-	CBReleaseObject(masterString);
-	CBHDKey * masterkey = CBNewHDKeyFromData(CBByteArrayGetData(CBGetByteArray(masterData)));
-	CBReleaseObject(masterData);
-	return (CBHDKey *)masterkey;
-}
-
-char* cbhdkey_obj_to_serializeddata(CBHDKey * keypair){
-	uint8_t * keyData = malloc(CB_HD_KEY_STR_SIZE);
-	CBHDKeySerialise(keypair, keyData);
-
-	CBChecksumBytes * checksumBytes = CBNewChecksumBytesFromBytes(keyData, 82, false);
-	// need to figure out how to free keyData memory
-	CBByteArray * str = CBChecksumBytesGetString(checksumBytes);
-	CBReleaseObject(checksumBytes);
-	return (char *)CBByteArrayGetData(str);
-}
-/*
- *  CBScript
- */
-char* script_obj_to_serializeddata(CBScript* script){
-	char* answer = (char *)malloc(CBScriptStringMaxSize(script)*sizeof(char));
-	CBScriptToString(script, answer);
-	return answer;
-
-}
-CBScript* script_serializeddata_to_obj(char* scriptstring){
-	CBScript* self;
-	if(CBInitScriptFromString(self,scriptstring)){
-		return self;
-	}
-	else{
-		return NULL;
-	}
-}
 
 //////////////////////// perl export functions /////////////
 //CBTransactionInput * CBNewTransactionInput(CBScript * script, uint32_t sequence, CBByteArray * prevOutHash, uint32_t prevOutIndex)
@@ -175,71 +69,64 @@ char* create_tx_obj(int lockTime, int version, SV* inputs, SV* outputs, int numO
 		STRLEN l;
 
 		char * fn = SvPV (*av_fetch ((AV *) SvRV (inputs), n, 0), l);
-		CBTransactionInput * inx = txinput_serializeddata_to_obj(fn);
+		CBTransactionInput * inx = CBTransactionInput_serializeddata_to_obj(fn);
 		CBTransactionAddInput(tx,inx);
 	}
 	for (n=0; n<=out_length; n++) {
 		STRLEN l;
 
 		char * fn = SvPV (*av_fetch ((AV *) SvRV (outputs), n, 0), l);
-		CBTransactionOutput * outx = txoutput_serializeddata_to_obj(fn);
+		CBTransactionOutput * outx = CBTransactionOutput_serializeddata_to_obj(fn);
 		CBTransactionAddOutput(tx,outx);
 	}
-	char* answer = obj_to_serializeddata(tx);
+	char* answer = CBTransaction_obj_to_serializeddata(tx);
 	//CBFreeTransaction(tx);
 	return answer;
 }
-/*
-char* get_script_from_obj(char* serializedDataString){
-	CBTransactionOutput* txoutput = serializeddata_to_obj(serializedDataString);
-	char* scriptstring = scriptToString(txoutput->scriptObject);
-	//CBFreeTransactionOutput(txoutput);
-	return scriptstring;
-}
-*/
+
 int get_numOfInputs(char* serializedDataString){
-	CBTransaction* tx = serializeddata_to_obj(serializedDataString);
+	CBTransaction* tx = CBTransaction_serializeddata_to_obj(serializedDataString);
 	uint32_t numOfInputs = tx->inputNum;
 	CBFreeTransaction(tx);
 	return (int)numOfInputs;	
 }
 int get_numOfOutputs(char* serializedDataString){
-	CBTransaction* tx = serializeddata_to_obj(serializedDataString);
+	CBTransaction* tx = CBTransaction_serializeddata_to_obj(serializedDataString);
 	uint32_t numOfOutputs = tx->outputNum;
 	CBFreeTransaction(tx);
 	return (int)numOfOutputs;
 }
 char* get_Input(char* serializedDataString,int InputIndex){
-	CBTransaction* tx = serializeddata_to_obj(serializedDataString);
+	CBTransaction* tx = CBTransaction_serializeddata_to_obj(serializedDataString);
 	CBTransactionInput** inputs = tx->inputs;
-	char* answer = txinput_obj_to_serializeddata(inputs[InputIndex]);
+	char* answer = CBTransactionInput_obj_to_serializeddata(inputs[InputIndex]);
 	CBFreeTransaction(tx);
 	return answer;
 }
 char* get_Output(char* serializedDataString,int OutputIndex){
-	CBTransaction* tx = serializeddata_to_obj(serializedDataString);
+	CBTransaction* tx = CBTransaction_serializeddata_to_obj(serializedDataString);
 	CBTransactionOutput** outputs = tx->outputs;
-	char* answer = txoutput_obj_to_serializeddata(outputs[OutputIndex]);
+	char* answer = CBTransactionOutput_obj_to_serializeddata(outputs[OutputIndex]);
 	CBFreeTransaction(tx);
 	return answer;
 }
 
 char* hash_of_tx(char* serializedDataString){
-	CBTransaction* tx = serializeddata_to_obj(serializedDataString);
+	CBTransaction* tx = CBTransaction_serializeddata_to_obj(serializedDataString);
 	CBByteArray * data = CBNewByteArrayWithData(CBTransactionGetHash(tx), (uint32_t)32);
 	CBFreeTransaction(tx);
 	return bytearray_to_hexstring(data,32);
 }
 
 int get_lockTime_from_obj(char* serializedDataString){
-	CBTransaction* tx = serializeddata_to_obj(serializedDataString);
+	CBTransaction* tx = CBTransaction_serializeddata_to_obj(serializedDataString);
 	uint32_t lockTime = tx->lockTime;
 	CBFreeTransaction(tx);
 	return (int)lockTime;
 }
 
 int get_version_from_obj(char* serializedDataString){
-	CBTransaction* tx = serializeddata_to_obj(serializedDataString);
+	CBTransaction* tx = CBTransaction_serializeddata_to_obj(serializedDataString);
 	uint32_t version = tx->version;
 	CBFreeTransaction(tx);
 	return (int)version;
@@ -248,11 +135,11 @@ int get_version_from_obj(char* serializedDataString){
 char* sign_tx_pubkeyhash(char* txString, char* keypairString, char* prevOutSubScriptString, int input, char* signTypeString){
         //CBLogError("sign 0.");
 	//fprintf(stderr, "sign 0.");
-	CBTransaction * tx = serializeddata_to_obj(txString);
+	CBTransaction * tx = CBTransaction_serializeddata_to_obj(txString);
         //fprintf(stderr, "sign 0.1");
-	CBHDKey * keypair = cbhdkey_serializeddata_to_obj(keypairString);
+	CBHDKey * keypair = CBHDKey_serializeddata_to_obj(keypairString);
         //fprintf(stderr, "sign 0.2");
-	//CBScript * prevOutSubScript = script_serializeddata_to_obj(prevOutSubScriptString);
+	//CBScript * prevOutSubScript = CBScript_serializeddata_to_obj(prevOutSubScriptString);
 	CBScript * prevOutSubScript = tx->inputs[input]->scriptObject;
 	//CBLogError("sign 1.");
 	// figure out the signature type
@@ -303,7 +190,7 @@ char* sign_tx_pubkeyhash(char* txString, char* keypairString, char* prevOutSubSc
 	memcpy(CBByteArrayGetData(tx->inputs[input]->scriptObject) + sigLen + 1, keypair->keyPair->pubkey.key, CB_PUBKEY_SIZE);
 	//return txString;
 */
-	return obj_to_serializeddata(tx);
+	return CBTransaction_obj_to_serializeddata(tx);
 
 }
 bool CBTransactionSignMultisigInputV2(CBTransaction * self, CBKeyPair * key, CBByteArray * prevOutSubScript, uint32_t input, CBSignType signType) {
@@ -324,9 +211,9 @@ bool CBTransactionSignMultisigInputV2(CBTransaction * self, CBKeyPair * key, CBB
 }
 
 char* sign_tx_multisig(char* txString, char* keypairString, char* prevOutSubScriptString, int input, char* signTypeString){
-	CBTransaction * tx = serializeddata_to_obj(txString);
-	CBHDKey * keypair = cbhdkey_serializeddata_to_obj(keypairString);
-	//CBScript * prevOutSubScript = script_serializeddata_to_obj(prevOutSubScriptString);
+	CBTransaction * tx = CBTransaction_serializeddata_to_obj(txString);
+	CBHDKey * keypair = CBHDKey_serializeddata_to_obj(keypairString);
+	//CBScript * prevOutSubScript = CBScript_serializeddata_to_obj(prevOutSubScriptString);
 	CBScript * prevOutSubScript = CBByteArrayCopy((CBByteArray*) tx->inputs[input]->scriptObject);
 
 
@@ -360,7 +247,7 @@ char* sign_tx_multisig(char* txString, char* keypairString, char* prevOutSubScri
 		return "NULL";
 	}
 
-	return obj_to_serializeddata(tx);
+	return CBTransaction_obj_to_serializeddata(tx);
 }
 
 

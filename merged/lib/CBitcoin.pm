@@ -1,6 +1,6 @@
 package CBitcoin;
 
-#use 5.006;
+use 5.014002;
 use strict;
 use warnings;
 
@@ -20,7 +20,7 @@ require DynaLoader;
 
 $CBitcoin::VERSION = '0.01';
 
-#DynaLoader::bootstrap CBitcoin $CBitcoin::VERSION;
+DynaLoader::bootstrap CBitcoin $CBitcoin::VERSION;
 
 @CBitcoin::EXPORT = ();
 @CBitcoin::EXPORT_OK = ();

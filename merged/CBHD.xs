@@ -15,24 +15,25 @@
 #include <CBBase58.h>
 
 
-// print CBByteArray to hex string
-char* bytearray_to_hexstring(CBByteArray * serializeddata,uint32_t dlen){
-	char* answer = malloc(dlen*sizeof(char*));
-	CBByteArrayToString(serializeddata, 0, dlen, answer, 0);
-	return answer;
+CBHDKey* CBHDKey_serializeddata_to_obj(char* privstring){
+	CBByteArray * masterString = CBNewByteArrayFromString(privstring, true);
+	CBChecksumBytes * masterData = CBNewChecksumBytesFromString(masterString, false);
+	CBReleaseObject(masterString);
+	CBHDKey * masterkey = CBNewHDKeyFromData(CBByteArrayGetData(CBGetByteArray(masterData)));
+	CBReleaseObject(masterData);
+	return (CBHDKey *)masterkey;
 }
-CBByteArray* hexstring_to_bytearray(char* hexstring){
-	CBByteArray* answer = CBNewByteArrayFromHex(hexstring);
-	return answer;
-}
-/*
-//bool CBInitScriptFromString(CBScript * self, char * string)
-char* scriptToString(CBScript* script){
-	char* answer = (char *)malloc(CBScriptStringMaxSize(script)*sizeof(char));
-	CBScriptToString(script, answer);
-	return answer;
 
-}*/
+char* CBHDKey_obj_to_serializeddata(CBHDKey * keypair){
+	uint8_t * keyData = malloc(CB_HD_KEY_STR_SIZE);
+	CBHDKeySerialise(keypair, keyData);
+
+	CBChecksumBytes * checksumBytes = CBNewChecksumBytesFromBytes(keyData, 82, false);
+	// need to figure out how to free keyData memory
+	CBByteArray * str = CBChecksumBytesGetString(checksumBytes);
+	CBReleaseObject(checksumBytes);
+	return (char *)CBByteArrayGetData(str);
+}
 
 CBHDKey* importDataToCBHDKey(char* privstring) {
 	CBByteArray * masterString = CBNewByteArrayFromString(privstring, true);
@@ -191,22 +192,6 @@ char* createWIF(int arg){
 MODULE = CBitcoin::CBHD	PACKAGE = CBitcoin::CBHD	
 
 
-BOOT:
-	PUSHMARK(SP); if (items >= 2) { XPUSHs(ST(0)); XPUSHs(ST(1)); } PUTBACK;
-	boot_CBitcoin__Script(aTHX_ cv);
-	SPAGAIN; POPs;
-	//
-        PUSHMARK(SP); if (items >= 2) { XPUSHs(ST(0)); XPUSHs(ST(1)); } PUTBACK;
-        boot_CBitcoin__TransactionInput(aTHX_ cv);
-        SPAGAIN; POPs;
-	//
-        PUSHMARK(SP); if (items >= 2) { XPUSHs(ST(0)); XPUSHs(ST(1)); } PUTBACK;
-        boot_CBitcoin__TransactionOutput(aTHX_ cv);
-        SPAGAIN; POPs;
-	//
-        PUSHMARK(SP); if (items >= 2) { XPUSHs(ST(0)); XPUSHs(ST(1)); } PUTBACK;
-        boot_CBitcoin__Transaction(aTHX_ cv);
-        SPAGAIN; POPs;
 PROTOTYPES: DISABLED
 
 

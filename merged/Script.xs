@@ -15,17 +15,6 @@
 #include <CBBase58.h>
 #include <CBScript.h>
 
-// print CBByteArray to hex string
-char* bytearray_to_hexstring(CBByteArray * serializeddata,uint32_t dlen){
-	char* answer = malloc(dlen*sizeof(char*));
-	CBByteArrayToString(serializeddata, 0, dlen, answer, 0);
-	return answer;
-}
-CBByteArray* hexstring_to_bytearray(char* hexstring){
-	CBByteArray* answer = CBNewByteArrayFromHex(hexstring);
-	return answer;
-}
-
 
 //bool CBInitScriptFromString(CBScript * self, char * string)
 char* scriptToString(CBScript* script){
@@ -45,6 +34,21 @@ CBScript* stringToScript(char* scriptstring){
 	}
 }
 
+char* CBScript_obj_to_serializeddata(CBScript* script){
+	char* answer = (char *)malloc(CBScriptStringMaxSize(script)*sizeof(char));
+	CBScriptToString(script, answer);
+	return answer;
+
+}
+CBScript* CBScript_serializeddata_to_obj(char* scriptstring){
+	CBScript* self;
+	if(CBInitScriptFromString(self,scriptstring)){
+		return self;
+	}
+	else{
+		return NULL;
+	}
+}
 
 //////////////////////// perl export functions /////////////
 

@@ -91,7 +91,7 @@ sub serialized_data {
 
 sub script {
 	my $this = shift;
-	return get_script_from_obj($this->{'data'});
+	return CBTransactionOutput_get_script_from_obj($this->{'data'});
 }
 
 =item type_of_script
@@ -114,7 +114,7 @@ sub type_of_script {
 sub value {
 	my $this = shift;
 	# this is a C function
-	return get_value_from_obj($this->{'data'});
+	return CBTransactionOutput_get_value_from_obj($this->{'data'});
 }
 
 =head1 AUTHOR

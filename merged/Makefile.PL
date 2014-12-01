@@ -6,7 +6,7 @@ use ExtUtils::MakeMaker;
 
 WriteMakefile(
 	    'TYPEMAPS' => []
-	    ,'NAME' => 'CBitcoin::CBHD'
+	    ,'NAME' => 'CBitcoin'
 	     ,'LIBS' => [ ' -lcrypto -lcbitcoin ' ]
 		,'VERSION' => '0.01'
 

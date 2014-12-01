@@ -17,25 +17,7 @@
 #include <CBTransactionInput.h>
 
 
-// print CBByteArray to hex string
-char* bytearray_to_hexstring(CBByteArray * serializeddata,uint32_t dlen){
-	char* answer = malloc(dlen*sizeof(char*));
-	CBByteArrayToString(serializeddata, 0, dlen, answer, 0);
-	return answer;
-}
-CBByteArray* hexstring_to_bytearray(char* hexstring){
-	CBByteArray* answer = CBNewByteArrayFromHex(hexstring);
-	return answer;
-}
 
-//bool CBInitScriptFromString(CBScript * self, char * string)
-char* scriptToString(CBScript* script){
-	char* answer = (char *)malloc(CBScriptStringMaxSize(script)*sizeof(char));
-	CBScriptToString(script, answer);
-	return answer;
-
-}
-// CBScript * script = CBNewScriptFromString(scriptstring);
 
 CBTransactionInput* stringToTransactionInput(char* scriptstring, int sequenceInt, char* prevOutHashString, int prevOutIndexInt){
 	// prevOutHash is stored as a hex
@@ -60,7 +42,7 @@ CBTransactionInput* stringToTransactionInput(char* scriptstring, int sequenceInt
 	return txinput;
 }
 
-CBTransactionInput* serializeddata_to_obj(char* datastring){
+CBTransactionInput* CBTransactionInput_serializeddata_to_obj(char* datastring){
 
 	CBByteArray* data = hexstring_to_bytearray(datastring);
 
@@ -72,7 +54,7 @@ CBTransactionInput* serializeddata_to_obj(char* datastring){
 	return txinput;
 }
 
-char* obj_to_serializeddata(CBTransactionInput * txinput){
+char* CBTransactionInput_obj_to_serializeddata(CBTransactionInput * txinput){
 	CBTransactionInputPrepareBytes(txinput);
 	int dlen = CBTransactionInputSerialise(txinput);
 	CBByteArray* serializeddata = CBGetMessage(txinput)->bytes;
@@ -88,33 +70,33 @@ char* obj_to_serializeddata(CBTransactionInput * txinput){
 //CBTransactionInput * CBNewTransactionInput(CBScript * script, uint32_t sequence, CBByteArray * prevOutHash, uint32_t prevOutIndex)
 char* create_txinput_obj(char* scriptstring, int sequenceInt, char* prevOutHashString, int prevOutIndexInt){
 	CBTransactionInput* txinput = stringToTransactionInput(scriptstring,sequenceInt,prevOutHashString,prevOutIndexInt);
-	char* answer = obj_to_serializeddata(txinput);
+	char* answer = CBTransactionInput_obj_to_serializeddata(txinput);
 	//CBFreeTransactionInput(txinput);
 	return answer;
 }
 
-char* get_script_from_obj(char* serializedDataString){
-	CBTransactionInput* txinput = serializeddata_to_obj(serializedDataString);
+char* CBTransactionInput_get_script_from_obj(char* serializedDataString){
+	CBTransactionInput* txinput = CBTransactionInput_serializeddata_to_obj(serializedDataString);
 	char* scriptstring = scriptToString(txinput->scriptObject);
 	//CBFreeTransactionInput(txinput);
 	return scriptstring;
 }
-char* get_prevOutHash_from_obj(char* serializedDataString){
-	CBTransactionInput* txinput = serializeddata_to_obj(serializedDataString);
+char* CBTransactionInput_get_prevOutHash_from_obj(char* serializedDataString){
+	CBTransactionInput* txinput = CBTransactionInput_serializeddata_to_obj(serializedDataString);
 	CBByteArray* dataInReverse = txinput->prevOut.hash;
 	CBByteArray* data = CBByteArrayCopy(dataInReverse);
 	CBByteArrayReverseBytes(data);
 	char * answer = bytearray_to_hexstring(data,data->length);
 	return answer;
 }
-int get_prevOutIndex_from_obj(char* serializedDataString){
-	CBTransactionInput* txinput = serializeddata_to_obj(serializedDataString);
+int CBTransactionInput_get_prevOutIndex_from_obj(char* serializedDataString){
+	CBTransactionInput* txinput = CBTransactionInput_serializeddata_to_obj(serializedDataString);
 	uint32_t index = txinput->prevOut.index;
 	CBFreeTransactionInput(txinput);
 	return (int)index;
 }
-int get_sequence_from_obj(char* serializedDataString){
-	CBTransactionInput* txinput = serializeddata_to_obj(serializedDataString);
+int CBTransactionInput_get_sequence_from_obj(char* serializedDataString){
+	CBTransactionInput* txinput = CBTransactionInput_serializeddata_to_obj(serializedDataString);
 	uint32_t sequence = txinput->sequence;
 	CBFreeTransactionInput(txinput);
 	return (int)sequence;
@@ -136,18 +118,18 @@ create_txinput_obj (scriptstring, sequenceInt, prevOutHashString, prevOutIndexIn
 	int	prevOutIndexInt
 
 char *
-get_script_from_obj (serializedDataString)
+CBTransactionInput_get_script_from_obj (serializedDataString)
 	char *	serializedDataString
 
 char *
-get_prevOutHash_from_obj (serializedDataString)
+CBTransactionInput_get_prevOutHash_from_obj (serializedDataString)
 	char *	serializedDataString
 
 int
-get_prevOutIndex_from_obj (serializedDataString)
+CBTransactionInput_get_prevOutIndex_from_obj (serializedDataString)
 	char *	serializedDataString
 
 int
-get_sequence_from_obj (serializedDataString)
+CBTransactionInput_get_sequence_from_obj (serializedDataString)
 	char *	serializedDataString
 

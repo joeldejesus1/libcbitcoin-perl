@@ -17,25 +17,7 @@
 #include <CBTransactionOutput.h>
 
 
-// print CBByteArray to hex string
-char* bytearray_to_hexstring(CBByteArray * serializeddata,uint32_t dlen){
-	char* answer = malloc(dlen*sizeof(char*));
-	CBByteArrayToString(serializeddata, 0, dlen, answer, 0);
-	return answer;
-}
-CBByteArray* hexstring_to_bytearray(char* hexstring){
-	CBByteArray* answer = CBNewByteArrayFromHex(hexstring);
-	return answer;
-}
 
-//bool CBInitScriptFromString(CBScript * self, char * string)
-char* scriptToString(CBScript* script){
-	char* answer = (char *)malloc(CBScriptStringMaxSize(script)*sizeof(char));
-	CBScriptToString(script, answer);
-	return answer;
-
-}
-// CBScript * script = CBNewScriptFromString(scriptstring);
 
 CBTransactionOutput* stringToTransactionOutput(char* scriptstring, int valueInt){
 
@@ -47,7 +29,7 @@ CBTransactionOutput* stringToTransactionOutput(char* scriptstring, int valueInt)
 	return answer;
 }
 
-CBTransactionOutput* serializeddata_to_obj(char* datastring){
+CBTransactionOutput* CBTransactionOutput_serializeddata_to_obj(char* datastring){
 
 	CBByteArray* data = hexstring_to_bytearray(datastring);
 
@@ -59,7 +41,7 @@ CBTransactionOutput* serializeddata_to_obj(char* datastring){
 	return txoutput;
 }
 
-char* obj_to_serializeddata(CBTransactionOutput * txoutput){
+char* CBTransactionOutput_obj_to_serializeddata(CBTransactionOutput * txoutput){
 	CBTransactionOutputPrepareBytes(txoutput);
 	int dlen = CBTransactionOutputSerialise(txoutput);
 	CBByteArray* serializeddata = CBGetMessage(txoutput)->bytes;
@@ -75,20 +57,20 @@ char* obj_to_serializeddata(CBTransactionOutput * txoutput){
 //CBTransactionInput * CBNewTransactionInput(CBScript * script, uint32_t sequence, CBByteArray * prevOutHash, uint32_t prevOutIndex)
 char* create_txoutput_obj(char* scriptstring, int valueInt){
 	CBTransactionOutput* txoutput = stringToTransactionOutput(scriptstring,valueInt);
-	char* answer = obj_to_serializeddata(txoutput);
+	char* answer = CBTransactionOutput_obj_to_serializeddata(txoutput);
 	//CBFreeTransactionOutput(txoutput);
 	return answer;
 }
 
-char* get_script_from_obj(char* serializedDataString){
-	CBTransactionOutput* txoutput = serializeddata_to_obj(serializedDataString);
+char* CBTransactionOutput_get_script_from_obj(char* serializedDataString){
+	CBTransactionOutput* txoutput = CBTransactionOutput_serializeddata_to_obj(serializedDataString);
 	char* scriptstring = scriptToString(txoutput->scriptObject);
 	//CBFreeTransactionOutput(txoutput);
 	return scriptstring;
 }
 
-int get_value_from_obj(char* serializedDataString){
-	CBTransactionOutput* txoutput = serializeddata_to_obj(serializedDataString);
+int CBTransactionOutput_get_value_from_obj(char* serializedDataString){
+	CBTransactionOutput* txoutput = CBTransactionOutput_serializeddata_to_obj(serializedDataString);
 	uint64_t value = txoutput->value;
 	CBFreeTransactionOutput(txoutput);
 	return (int)value;
@@ -109,10 +91,10 @@ create_txoutput_obj (scriptstring, valueInt)
 	int	valueInt
 
 char *
-get_script_from_obj (serializedDataString)
+CBTransactionOutput_get_script_from_obj (serializedDataString)
 	char *	serializedDataString
 
 int
-get_value_from_obj (serializedDataString)
+CBTransactionOutput_get_value_from_obj (serializedDataString)
 	char *	serializedDataString
 
