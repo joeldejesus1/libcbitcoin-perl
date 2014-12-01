@@ -1,4 +1,0 @@
-debian/libperl-cbitcoin-script/usr/lib/perl5/CBitcoin/Script.pm
-debian/libperl-cbitcoin-script/usr/lib/perl5/CBitcoin/Script.xs
-debian/libperl-cbitcoin-script/usr/lib/perl5/auto/CBitcoin/Script/Script.so
-debian/libperl-cbitcoin-script/usr/share/man/man3/CBitcoin::Script.3pm
