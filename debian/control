@@ -1,4 +1,4 @@
-Source: libperl-cbitcoin-cbhd
+Source: libcbitcoin-perl
 Section: extra
 Priority: extra
 Maintainer: Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>
@@ -6,7 +6,7 @@ Build-Depends: debhelper (>= 8.0.0), autotools-dev, libcbitcoin0,libcbitcoin-dev
 Standards-Version: 3.9.3
 Homepage: https://e-flamingo.jp
 
-Package: libperl-cbitcoin-cbhd
+Package: libcbitcoin-perl
 Architecture: any
 Depends: libc6, libcbitcoin0, libdigest-sha-perl, ${misc:Depends}
 Description: Perl modules for cbitcoin.

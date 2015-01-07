@@ -13,4 +13,4 @@
 	dh $@  --with autotools-dev
 
 override_dh_auto_install:
-	make DESTDIR=debian/libperl-cbitcoin-cbhd pure_install
+	make DESTDIR=debian/libcbitcoin-perl pure_install
