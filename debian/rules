@@ -14,3 +14,6 @@
 
 override_dh_auto_install:
 	make DESTDIR=debian/libcbitcoin-perl pure_install
+
+#build:
+#	ln -s arch/auto/CBitcoin/CBitcoin.so debian/libcbitcoin-perl/arch/auto/CBitcoin/CBitcoin.so

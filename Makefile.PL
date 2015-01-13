@@ -35,4 +35,10 @@ WriteMakefile(
 );
 
 # Remove the Makefile dependency. Causes problems on a few systems.
-sub MY::makefile { '' }
+sub MY::makefile {
+	return qq{
+all ::
+	(cd blib/arch/auto/CBitcoin/ && mkdir CBHD && ln -s ../CBitcoin.so CBHD/CBHD.so )
+	(cd blib/arch/auto/CBitcoin/ && mkdir Script && ln -s ../CBitcoin.so Script/Script.so )
+};
+}
