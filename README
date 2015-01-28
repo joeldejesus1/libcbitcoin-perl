@@ -7,7 +7,7 @@ To create Hierarchial Deterministic keys, see CBitcoin::CBHD.  To create scripts
 DEBIAN INSTALLATION
 
 To compile a debian package, first install libcbitcoin0, which is https://github.com/favioflamingo/cbitcoin.  Once you compile and install the cbitcoin source package, go into the main directory and tyoe:
-    dh_make -p cbitcoin_0.01 --createorig -l
+    dh_make -p libcbitcoin-perl_0.01 --createorig -l
     debuild -uc
 
 INSTALLATION
