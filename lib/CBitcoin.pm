@@ -53,43 +53,6 @@ sub hello {
 
 Joel De Jesus, C<< <dejesus.joel at e-flamingo.jp> >>
 
-=head1 BUGS
-
-Please report any bugs or feature requests to C<bug-libcbitcoin-perl at rt.cpan.org>, or through
-the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=libcbitcoin-perl>.  I will be notified, and then you'll
-automatically be notified of progress on your bug as I make changes.
-
-
-
-
-=head1 SUPPORT
-
-You can find documentation for this module with the perldoc command.
-
-    perldoc CBitcoin
-
-
-You can also look for information at:
-
-=over 4
-
-=item * RT: CPAN's request tracker (report bugs here)
-
-L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=libcbitcoin-perl>
-
-=item * AnnoCPAN: Annotated CPAN documentation
-
-L<http://annocpan.org/dist/libcbitcoin-perl>
-
-=item * CPAN Ratings
-
-L<http://cpanratings.perl.org/d/libcbitcoin-perl>
-
-=item * Search CPAN
-
-L<http://search.cpan.org/dist/libcbitcoin-perl/>
-
-=back
 
 
 =head1 ACKNOWLEDGEMENTS
@@ -97,14 +60,23 @@ L<http://search.cpan.org/dist/libcbitcoin-perl/>
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2014 Joel De Jesus.
 
-This program is free software; you can redistribute it and/or modify it
-under the terms of either: the GNU General Public License as published
-by the Free Software Foundation; or the Artistic License.
+    CBitcoin perl modules is a wrapper for the CBitcoin library written by Matthew Mitchell.
+    Copyright (C) 2015  Joel De Jesus
 
-See http://dev.perl.org/licenses/ for more information.
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
 
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 =cut
 
