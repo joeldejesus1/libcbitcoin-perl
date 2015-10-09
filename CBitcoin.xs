@@ -49,6 +49,7 @@ BOOT:
 	crutch_stack_wrap(boot_CBitcoin__TransactionInput(aTHX_ cv));
 	crutch_stack_wrap(boot_CBitcoin__TransactionOutput(aTHX_ cv));
 	crutch_stack_wrap(boot_CBitcoin__Transaction(aTHX_ cv));
+	crutch_stack_wrap(boot_CBitcoin__Message(aTHX_ cv));
 	
 PROTOTYPES: DISABLED
 
