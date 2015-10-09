@@ -6,7 +6,9 @@ use CBitcoin::Message;
 
 use Test::More tests => 1;
 
-my $x = CBitcoin::Message::testmsg(33);
+my $input = "eat my socks mofo";
+my $x = CBitcoin::Message::testmsg($input,length($input));
+warn "what?";
 require Data::Dumper;
 my $xo = Data::Dumper::Dumper($x);
 

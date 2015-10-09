@@ -18,10 +18,13 @@
 
 
 
-HV *  testmsg(int x){
+// newSVnv for floaters, newSViv for integers, and 
+
+HV *  testmsg(char * x, int size){
+	
 	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
 	
-	hv_store(rh, "eatme", 5, newSViv(x), 0);
+	hv_store(rh, "eatme", 5, newSVpv(x,size), 0);
 	return rh;
 }
 
@@ -32,5 +35,6 @@ MODULE = CBitcoin::Message	PACKAGE = CBitcoin::Message
 PROTOTYPES: DISABLE
 
 HV * 
-testmsg (x)
-	int	x
+testmsg (x,size)
+	char*	x
+	int		size
