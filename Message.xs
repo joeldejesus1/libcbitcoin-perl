@@ -18,9 +18,12 @@
 
 
 
-// newSVnv for floaters, newSViv for integers, and 
+// newSVnv for floaters, newSViv for integers, and newSVpv(char* x,int y) for character arrayss
 
 HV *  testmsg(char * x, int size){
+	
+	
+	
 	
 	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
 	
@@ -28,6 +31,15 @@ HV *  testmsg(char * x, int size){
 	return rh;
 }
 
+
+int testmsg2(SV* x){
+	STRLEN len;
+	unsigned char* msg1 = (unsigned char*) SvPV(x,len);
+	//CBByteArray * masterString = hexstring_to_bytearray(msg1);
+	CBByteArray * masterString = CBNewByteArrayWithData(msg1, (uint32_t) len);
+	
+	return (int) len;
+}
 
 
 MODULE = CBitcoin::Message	PACKAGE = CBitcoin::Message	
@@ -38,3 +50,7 @@ HV *
 testmsg (x,size)
 	char*	x
 	int		size
+	
+int 
+testmsg2 (x)
+	SV*	x

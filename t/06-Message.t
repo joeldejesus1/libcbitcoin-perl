@@ -8,7 +8,8 @@ use Test::More tests => 1;
 
 my $input = "eat my socks mofo";
 my $x = CBitcoin::Message::testmsg($input,length($input));
-warn "what?";
+my $y = CBitcoin::Message::testmsg2('32');
+warn "what?=$y";
 require Data::Dumper;
 my $xo = Data::Dumper::Dumper($x);
 
