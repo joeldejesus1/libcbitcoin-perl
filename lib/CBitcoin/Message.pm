@@ -14,6 +14,8 @@ Version 0.01
 
 =cut
 
+use Net::IP;
+
 use bigint;
 use CBitcoin::Script;
 use CBitcoin::TransactionInput;
@@ -56,6 +58,65 @@ sub new {
 }
 
 
+=pod
+
+---++ create_version($addr_recv_ip,$addr_recv_port)
+
+$addr_recv is of the format: cidr:port
+
+=cut
+
+sub create_version{
+	my ($addr_recv_ip,$addr_recv_port) = (shift,shift);
+	return getversion1(ip_convert_to_binary($addr_recv_ip),$addr_recv_port);
+}
+
+
+=pod
+
+---++ ip_convert_to_binary($string)
+
+Convert AAA.BBB.CCC.DDD to network byte notation
+
+=cut
+
+sub ip_convert_to_binary {
+	my($string) = (shift);
+	my $ip  = Net::IP->new($string);
+	if($ip->hexip() < 12){
+		# set it so it goes in as an ipv6, cuz bitcoin mandates
+		warn "this is an ipv4 with full=".unpack('H*',pack('B*',$ip->binip()))."\n";
+		return pack('H*','00000000000000000000ffff'.unpack('H*',pack('B*',$ip->binip())));
+	}
+	else{
+		return pack('H*',unpack('H*',pack('B*',$ip->binip())));
+	}	
+}
+
+
+=pod
+
+---++ ip_convert_to_string
+
+=cut
+
+sub ip_convert_to_string {
+	my $binipv6 = shift;
+	
+	my $stripv6 = unpack('H*',$binipv6);
+	
+	if(substr($stripv6,0,24) eq '00000000000000000000ffff'){
+		warn "ipv4 with full=$stripv6\n";
+		return hex2ip(substr($stripv6,24,8));
+	}
+	else{
+		warn "ipv6\n";
+		return $stripv6;
+	}
+}
+
+# helper function
+sub hex2ip { return join(".", map {hex($_)} unpack('A2 A2 A2 A2',shift)) }
 
 
 =head1 AUTHOR
