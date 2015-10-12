@@ -86,24 +86,43 @@ sub version_serialize {
 	my $services = 0;
 	
 	my $data = '';
+	my $x = '';
 	# version 
-	$data .= pack('l',$version);
+	$x = pack('l',$version);
+	warn "Version=".unpack('H*',$x);
+	$data .= $x;
 	# services, 0
-	$data .= pack('Q',$services);
+	$x = pack('Q',$services);
+	warn "services=".unpack('H*',$x);
+	$data .= $x;
 	# timestamp
-	$data .= pack('q',$lastseen);
+	$x = pack('q',$lastseen);
+	warn "timestamp=".unpack('H*',$x);
+	$data .= $x;
 	# addr_recv
-	$data .= CBitcoin::Utilities::network_address_serialize($lastseen,$services,$addr_recv_ip,$addr_recv_port);
+	$x =  CBitcoin::Utilities::network_address_serialize_forversion($services,$addr_recv_ip,$addr_recv_port);
+	warn "addr_recv=".unpack('H*',$x);
+	$data .= $x;
 	# addr_from
-	$data .= CBitcoin::Utilities::network_address_serialize(0,$services,$addr_from_ip,$addr_from_port);
+	$x = CBitcoin::Utilities::network_address_serialize_forversion($services,$addr_from_ip,$addr_from_port);
+	warn "addr_from=".unpack('H*',$x);
+	$data .= $x;
 	# nonce
-	$data .= CBitcoin::Utilities::generate_random(8);
+	$x = CBitcoin::Utilities::generate_random(8);
+	warn "nonce=".unpack('H*',$x);
+	$data .= $x;
 	# user agent (null, no string)
-	$data .= pack('C',0);
+	$x = pack('C',0);
+	warn "user agent=".unpack('H*',$x);
+	$data .= $x;
 	# start height
-	$data .= pack('l',$blockheight);
+	$x = pack('l',$blockheight);
+	warn "blockheight=".unpack('H*',$x);
+	$data .= $x;
 	# bool for relaying
-	$data .= pack('C',0);
+	$x = pack('C',0);
+	warn "bool for relaying=".unpack('H*',$x);
+	$data .= $x;
 	return $data;
 }
 

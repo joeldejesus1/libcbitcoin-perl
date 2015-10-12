@@ -21,6 +21,9 @@ use CBitcoin::Script;
 use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
 use CBitcoin::Transaction;
+use Digest::SHA;
+
+use constant MAINNET    => 0xd9b4bef9, TESTNET => pack('L',0xdab5bffa), TESTNET3 => pack('L',0x0709110b), NAMECOIN => pack('L',0xfeb4bef9) ;
 
 require Exporter;
 *import = \&Exporter::import;
@@ -56,6 +59,85 @@ sub new {
 
 	return $this;
 }
+
+
+sub net_magic {
+	my $x = shift;
+	$x = 'MAINNET' unless defined $x; # did this to avoid warnings about inititialized values
+	my $netmapper = {'MAINNET' => 0xd9b4bef9, 'TESTNET' => 0xdab5bffa,'TESTNET3' => 0x0709110b,'NAMECOIN' => 0xfeb4bef9};
+	return $netmapper->{$x} if defined $netmapper->{$x};
+	return $netmapper->{'MAINNET'};
+}
+
+=pod
+
+---+ Subroutines
+
+
+=cut
+
+=pod
+
+---++ serialize($payload,$command,$magic)
+
+main 0xd9b4bef9
+testnet, 0xdab5bffa
+testnet3, 0x0709110b
+namecoin, 0xfeb4bef9
+
+
+=cut
+
+
+
+sub serialize {
+	my $payload = shift;
+	my $command = shift;
+	my $magic = shift;
+	$magic = pack('L',net_magic($magic));
+	
+	
+	#die "payload is 0" unless length($payload) > 0;
+	#warn "Magic=".unpack('H*',$magic)."\n";
+	#warn "Command=".unpack('H*',serialize_command($command))."\n";
+	#warn "Length=".unpack('H*',pack('L',length($payload)))."\n";
+	#warn "Checksum=".unpack('H*',substr(checksum_payload($payload),0,4))."\n";
+	return $magic.serialize_command($command).pack('L',length($payload)).substr(checksum_payload($payload),0,4).$payload;
+	
+}
+
+sub checksum_payload {
+	my $payload = shift;
+	if(length($payload) > 0){
+		return Digest::SHA::sha256(Digest::SHA::sha256($payload));
+	}
+	else{
+		return pack('L',0xe2e0f65d);
+	}
+}
+
+
+sub serialize_command{
+	my $command = shift;
+	die "command is too short" unless defined $command && length($command) > 0;
+	die "command is too long" unless length($command) <= 12;
+	my @ASCII = unpack("C*", $command);	
+
+	my @bin;
+	foreach my $i (0..11){
+		$bin[$i] = pack('C',$ASCII[$i]) unless $i >= scalar(@ASCII);
+		if($i < scalar(@ASCII)){
+			$bin[$i] = pack('C',$ASCII[$i]);
+		}
+		else{
+			$bin[$i] = pack('x');
+		}
+	}
+	return join('',@bin);
+}
+
+
+
 
 
 

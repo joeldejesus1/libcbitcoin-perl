@@ -71,6 +71,15 @@ sub network_address_serialize {
 	return $data;
 }
 
+sub network_address_serialize_forversion {
+	my ($services,$ipaddr,$port) = @_;
+	my $data = '';
+	$data .= pack('Q',$services);
+	$data .= ip_convert_to_binary($ipaddr);
+	$data .= pack('n',$port);
+	return $data;
+}
+
 
 sub generate_random {
 	my $bytes = shift;
