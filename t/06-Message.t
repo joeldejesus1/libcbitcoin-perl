@@ -30,52 +30,29 @@ my @conn = ('10.19.202.164','8333');
 
 $spv->add_peer($socket,@conn);
 
-my $n = $spv->peer(@conn)->write_data();
-print "Wrote $n to peer\n";
 
 
-my $msg = $spv->peer(@conn)->read_data();
+############################# EPoll stuff for quick testing ########################
 
-# what message do we have?
-print "We have got a ".$msg->command()." message \n";
+use IO::Epoll;
+
+my $epfd = epoll_create(10);
+
+epoll_ctl($epfd, EPOLL_CTL_ADD, fileno($spv->peer(@conn)->socket()), EPOLLIN | EPOLLOUT ) >= 0 || die "epoll_ctl: $!\n";
 
 
-=pod
-
-eval{
-	
-	
-	
-	$y = $spv->add_peer('10.19.202.164','8333');
-	
-	my $socket = new IO::Socket::INET (
-		PeerHost => '10.19.202.164',
-		PeerPort => '8333',
-		Proto => 'tcp',
-	) or die "ERROR in Socket Creation : $!\n";
-
-	#warn $spv->peer('10.19.202.164','8333')->our_version;
-
-	syswrite($socket,$spv->peer('10.19.202.164','8333')->our_version);
-	
-	my $buf;
-	while(sysread($socket,$buf,8192)){
-		warn "Buf=$buf\n";
-		close($socket);
-	}	
-	
-	
-	warn "hello\n";
-
-};
-if($@){
-	my $error = $@;
-	die "Error=$error\n";
+while(my $events = epoll_wait($epfd, 10, -1)){
+	foreach my $event (@{$events}){
+		my $n = 0;
+		if($event->[1] & EPOLLIN){
+			# time to read
+			$spv->peer(@conn)->read_data();
+		}
+		if($event->[1] & EPOLLOUT ){
+			$spv->peer(@conn)->write_data();
+		}
+	}
 }
-=cut
-
-#my $y = CBitcoin::Message::getversion1(CBitcoin::SPV::ip_convert_to_binary('10.24.44.2'),'32',CBitcoin::SPV::ip_convert_to_binary('10.88.44.2'),'8333');
-
 
 
 

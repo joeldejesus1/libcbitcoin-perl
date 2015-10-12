@@ -17,7 +17,7 @@ sub new {
 		
 	$options->{'block height'} ||= 0;
 	$options->{'version'} ||= 70002; 
-	
+	$options->{'magic'} = 'MAINNET' unless defined $options->{'magic'};
 	
 	die "no good ip address given" unless CBitcoin::Utilities::ip_convert_to_binary($options->{'address'})
 		&& CBitcoin::Utilities::ip_convert_to_binary($options->{'our address'});
@@ -93,7 +93,9 @@ sub address {
 sub port {
 	return shift->{'port'};
 }
-
+sub magic {
+	return shift->{'magic'};
+}
 
 sub our_version {
 	return shift->{'handshake'}->{'our version'};
@@ -185,38 +187,75 @@ sub version_serialize {
 
 sub send_version {
 	my $this = shift;
+	$this->{'sent version'} = 1;
 	return $this->write(CBitcoin::Message::serialize($this->our_version(),'version'));
 }
 
-
-
-=pod
-
----++ handshake_sentverack
-
-
-=cut
-
-sub handshake_sentverack {
+sub send_verack {
 	my $this = shift;
-	return shift->{'sent verack'};
+	$this->{'sent verack'} = 1;
+	return $this->write(CBitcoin::Message::serialize('','verack',$this->magic));
 }
 
+
+
+
 =pod
 
----++ handshake_sentversion
+---+ Callbacks
 
 
-=cut
-
-sub handshake_sentversion {
+sub sent_version {
 	return shift->{'sent version'};
 }
+sub sent_verack {
+	return shift->{'sent verack'};
+}
+sub received_version {
+	return shift->{'received version'};
+}
+sub received_verack {
+	return shift->{'received verack'};
+}
+
+=cut
 
 
 =pod
 
----++ handshake_getverack
+---++ callback_gotversion
+
+
+=cut
+
+sub callback_gotversion {
+	my $this = shift;
+	
+	
+	# handshake should not be finished
+	if($this->handshake_finished()){
+		die "bad peer";
+	}
+	
+	# we should not already have a version
+	if($this->received_version()){
+		die "peer already sent a version";
+	}
+	
+	# parse version
+	#open(my)
+	
+	
+	$this->send_verack();
+	
+}
+
+
+
+
+=pod
+
+---++ callback_gotverack
 
 
 =cut
@@ -230,19 +269,7 @@ sub callback_gotverack {
 }
 
 
-=pod
 
----++ handshake_getversion
-
-
-=cut
-
-sub callback_gotversion {
-	my $this = shift;
-	
-	die "handshake get version";
-	# should we be getting a verack
-}
 
 
 =pod
