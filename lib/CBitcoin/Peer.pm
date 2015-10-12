@@ -4,6 +4,8 @@ use strict;
 use warnings;
 use CBitcoin::Message; # out of laziness, all c functions get referenced out of CBitcoin::Message
 use CBitcoin::Utilities;
+use constant BUFFSIZE => 8192;
+
 
 
 sub new {
@@ -11,7 +13,7 @@ sub new {
 	
 	my $options = shift;
 	die "no options given" unless defined $options && ref($options) eq 'HASH' && defined $options->{'address'} && defined $options->{'port'} 
-		&& defined $options->{'our address'} && defined $options->{'our port'};
+		&& defined $options->{'our address'} && defined $options->{'our port'} && defined $options->{'socket'} && fileno($options->{'socket'}) > 0;
 		
 	$options->{'block height'} ||= 0;
 	$options->{'version'} ||= 70002; 
@@ -32,20 +34,25 @@ sub new {
 #		,$options->{'block height'} # block ehight
 #	);
 	my $this = {
+		'handshake finished' => 0,'sent version' => 0, 'sent verack' => 0, 'received version' => 0, 'received verack' => 0,
 		'buffer'=> {},
-		'message definition' => {'magic' => 4,'command' => 12, 'length' => 4, 'checksum' => 4 }
+		'socket' => $options->{'socket'},
+		'message definition' => {'magic' => 4,'command' => 12, 'length' => 4, 'checksum' => 4 },
+		'message definition order' => ['magic','command', 'length', 'checksum','payload' ]
 	};
+	# to have some human readable stuff for later 
+	$this->{'address'} = $options->{'address'};
+	$this->{'port'} = $options->{'port'};
+	
 	bless($this,$package);
 	$this->{'handshake'}->{'our version'} = $this->version_serialize(
 		$options->{'address'},$options->{'port'},
 		$options->{'our address'},$options->{'our port'},
 		time(),$options->{'version'},$options->{'block height'}
 	); 
+	$this->send_version();
 	
-	
-	# to have some human readable stuff for later 
-	$this->{'address'} = $options->{'address'};
-	$this->{'port'} = $options->{'port'};
+
 	
 	
 	#require Data::Dumper;
@@ -61,6 +68,23 @@ sub new {
 ---+ Getters/Setters
 
 =cut
+
+sub handshake_finished{
+	return shift->{'handshake finished'};
+}
+
+sub sent_version {
+	return shift->{'sent version'};
+}
+sub sent_verack {
+	return shift->{'sent verack'};
+}
+sub received_version {
+	return shift->{'received version'};
+}
+sub received_verack {
+	return shift->{'received verack'};
+}
 
 sub address {
 	return shift->{'address'};
@@ -122,42 +146,104 @@ sub version_serialize {
 	my $x = '';
 	# version 
 	$x = pack('l',$version);
-	warn "Version=".unpack('H*',$x);
+	#warn "Version=".unpack('H*',$x);
 	$data .= $x;
 	# services, 0
 	$x = pack('Q',$services);
-	warn "services=".unpack('H*',$x);
+	#warn "services=".unpack('H*',$x);
 	$data .= $x;
 	# timestamp
 	$x = pack('q',$lastseen);
-	warn "timestamp=".unpack('H*',$x);
+	#warn "timestamp=".unpack('H*',$x);
 	$data .= $x;
 	# addr_recv
 	$x =  CBitcoin::Utilities::network_address_serialize_forversion($services,$addr_recv_ip,$addr_recv_port);
-	warn "addr_recv=".unpack('H*',$x);
+	#warn "addr_recv=".unpack('H*',$x);
 	$data .= $x;
 	# addr_from
 	$x = CBitcoin::Utilities::network_address_serialize_forversion($services,$addr_from_ip,$addr_from_port);
-	warn "addr_from=".unpack('H*',$x);
+	#warn "addr_from=".unpack('H*',$x);
 	$data .= $x;
 	# nonce
 	$x = CBitcoin::Utilities::generate_random(8);
-	warn "nonce=".unpack('H*',$x);
+	#warn "nonce=".unpack('H*',$x);
 	$data .= $x;
 	# user agent (null, no string)
 	$x = pack('C',0);
-	warn "user agent=".unpack('H*',$x);
+	#warn "user agent=".unpack('H*',$x);
 	$data .= $x;
 	# start height
 	$x = pack('l',$blockheight);
-	warn "blockheight=".unpack('H*',$x);
+	#warn "blockheight=".unpack('H*',$x);
 	$data .= $x;
 	# bool for relaying
 	$x = pack('C',0);
-	warn "bool for relaying=".unpack('H*',$x);
+	#warn "bool for relaying=".unpack('H*',$x);
 	$data .= $x;
 	return $data;
 }
+
+sub send_version {
+	my $this = shift;
+	return $this->write(CBitcoin::Message::serialize($this->our_version(),'version'));
+}
+
+
+
+=pod
+
+---++ handshake_sentverack
+
+
+=cut
+
+sub handshake_sentverack {
+	my $this = shift;
+	return shift->{'sent verack'};
+}
+
+=pod
+
+---++ handshake_sentversion
+
+
+=cut
+
+sub handshake_sentversion {
+	return shift->{'sent version'};
+}
+
+
+=pod
+
+---++ handshake_getverack
+
+
+=cut
+
+sub callback_gotverack {
+	my $this = shift;
+	
+	die "hand shake getverack";
+	
+	# should we be getting a verack
+}
+
+
+=pod
+
+---++ handshake_getversion
+
+
+=cut
+
+sub callback_gotversion {
+	my $this = shift;
+	
+	die "handshake get version";
+	# should we be getting a verack
+}
+
 
 =pod
 
@@ -167,17 +253,40 @@ sub version_serialize {
 
 sub read_data {
 	my $this = shift;
-	my $fh = $this->socket();
-	$this->{'bytes read'} = 0 unless defined $this->
-	my $buf,$n;
+	
+	$this->{'bytes'} = '' unless defined $this->{'bytes'};
+	
 	# read in magic
-	$this->bytes_read(sysread($fh,$this->{'bytes'},8192,length($this->{'bytes'})));
+	$this->bytes_read(sysread($this->socket(),$this->{'bytes'},8192,length($this->{'bytes'})));
 	warn "Read in ".$this->bytes_read()." bytes\n";
-	foreach my $key (keys %{$this->{'message definition'}},'payload size'){
-		return 0 unless $this->read_data_alphah($key);
+	foreach my $key (@{$this->{'message definition order'}}){
+		#warn "reading in data for $key\n";
+		return 0 unless $this->read_data_alpha($key);
 	}
-	return 1;
+	# have a message
+	#foreach my $key (@{$this->{'message definition order'}}){
+	#	warn "$key => [".unpack('H*',$this->{'buffer'}->{$key})."]\n";	
+	#}
+	my $msg = CBitcoin::Message->new($this->{'buffer'});
+	
+	if($msg->command eq 'version'){
+		$this->callback_gotversion($msg);
+		return undef;
+	}
+	elsif($msg->command eq 'verack'){
+		$this->callback_gotverack($msg);
+		return undef;
+	}
+	elsif($this->handshake_finished()){
+		return $msg;
+	}
+	else{
+		die "bad client behavior";
+	}
+	
 }
+
+
 
 sub read_data_alpha {
 	my $this = shift;
@@ -189,8 +298,10 @@ sub read_data_alpha {
 	
 	if(!defined $this->{'buffer'}->{$key} &&  $this->{'bytes read'} >= $size){
 		$this->{'buffer'}->{$key} = substr($this->{'bytes'},0,$size);
-		substr($this->{'bytes'},0,$size) = ''; # delete  bytes we don't need
+		#warn "Pre $key=".unpack('H*',$this->{'buffer'}->{$key})."\n";
+		substr($this->{'bytes'},0,$size) = ""; # delete  bytes we don't need
 		$this->{'bytes read'} = $this->{'bytes read'} - $size;
+		die "sizes do not match" unless $this->{'bytes read'} == length($this->{'bytes'});
 		return 1;
 	}
 	else{
@@ -202,12 +313,45 @@ sub definition_size_mapper {
 	my $this = shift;
 	my $key = shift;
 	if($key eq 'payload'){
-		return $this->{'payload size'};
+		die "length not defined" unless defined $this->{'buffer'}->{'length'};
+		return unpack('L',$this->{'buffer'}->{'length'});
 	}
 	else{
 		return $this->{'message definition'}->{$key};
 	}
 }
 
+=pod
+
+---++ write($data)
+
+Add to the write queue.
+
+=cut
+
+sub write {
+	my $this = shift;
+	my $data = shift;
+	return undef unless defined $data && length($data) > 0;
+	$this->{'bytes to write'} .= $data;
+	
+}
+
+=pod
+
+---++ write_data()
+
+When we can write data, send out 8192 bytes.
+
+=cut
+
+sub write_data {
+	my $this = shift;
+	return undef unless defined $this->{'bytes to write'} && length($this->{'bytes to write'}) > 0;
+	
+	my $n = syswrite($this->socket(),$this->{'bytes to write'},8192);
+	substr($this->{'bytes to write'},0,$n) = "";
+	return $n;
+}
 
 1;

@@ -46,19 +46,72 @@ sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 
 
-=item new
+=pod
 
----++ new()
+---+ Objects
+
 
 =cut
 
 sub new {
-	use bigint;
 	my $package = shift;
-	my $this = bless({}, $package);
+	
+	my $options = shift;
+	
+	my $this = {
+		'command' => $options->{'command'},
+		'magic' => $options->{'magic'},
+		'payload' => $options->{'payload'}
+	};
+	bless($this,$package);
+	# do some checks
+	#..length
+	if(length($this->payload) != unpack('L',$options->{'length'})  ){
+		die "message payload is of the wrong length";
+	}
+	
+	if(substr(checksum_payload($this->payload),0,4) ne $options->{'checksum'}  ){
+		die "message payload checksum failed";
+	}	
+	
 
 	return $this;
 }
+
+=pod
+
+---+ Getters/Setters
+
+=cut
+
+sub payload {
+	return shift->{'payload'};
+}
+
+sub magic {
+	return shift->{'magic'};
+}
+
+sub command {
+	return deserialize_command(shift->{'command'});
+}
+
+
+=pod
+
+---+ Subroutines
+
+
+=cut
+
+
+=pod
+
+---++ net_magic
+
+Are we on mainnet, testnet or namecoin?
+
+=cut
 
 
 sub net_magic {
@@ -68,13 +121,6 @@ sub net_magic {
 	return $netmapper->{$x} if defined $netmapper->{$x};
 	return $netmapper->{'MAINNET'};
 }
-
-=pod
-
----+ Subroutines
-
-
-=cut
 
 =pod
 
@@ -135,6 +181,13 @@ sub serialize_command{
 	}
 	return join('',@bin);
 }
+
+sub deserialize_command {
+	my $command = shift;
+	$command =~ s/\x0+$//;
+	return $command
+}
+
 
 sub read_message {
 	my $fh = shift;

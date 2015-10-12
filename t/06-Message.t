@@ -26,29 +26,18 @@ my $socket = new IO::Socket::INET (
 	Proto => 'tcp',
 ) or die "ERROR in Socket Creation : $!\n";
 
+my @conn = ('10.19.202.164','8333');
 
-$spv->add_peer($socket,'10.19.202.164','8333');
+$spv->add_peer($socket,@conn);
 
-my $payload = $spv->peer('10.19.202.164','8333')->our_version();
-my $blob = CBitcoin::Message::serialize($payload,'version');
-#warn "Blob=".unpack('H*',$blob)."\n";
-my $y;
-
+my $n = $spv->peer(@conn)->write_data();
+print "Wrote $n to peer\n";
 
 
+my $msg = $spv->peer(@conn)->read_data();
 
-
-
-
-
-my $payload = $spv->peer('10.19.202.164','8333')->our_version();
-
-my $blob = CBitcoin::Message::serialize($payload,'version');
-warn "Blob=".unpack('H*',$blob)."\n";
-
-syswrite($socket,CBitcoin::Message::serialize($payload,'version'));
-
-$spv->peer('10.19.202.164','8333')->read_data();
+# what message do we have?
+print "We have got a ".$msg->command()." message \n";
 
 
 =pod
