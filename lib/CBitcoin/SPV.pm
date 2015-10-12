@@ -64,9 +64,10 @@ sub our_address {
 
 sub add_peer{
 	my $this = shift;
-	my ($addr_recv_ip,$addr_recv_port) = (shift,shift);
+	my ($socket, $addr_recv_ip,$addr_recv_port) = (shift,shift,shift);
 	my $ref = $this->our_address();
 	my $peer = CBitcoin::Peer->new({
+		'socket' => $socket,
 		'address' => $addr_recv_ip, 'port' => $addr_recv_port,
 		'our address' => $ref->[0], 'our port' => $ref->[1]
 	});

@@ -31,7 +31,10 @@ sub new {
 #		,$options->{'version'} # version
 #		,$options->{'block height'} # block ehight
 #	);
-	my $this = {};
+	my $this = {
+		'buffer'=> {},
+		'message definition' => {'magic' => 4,'command' => 12, 'length' => 4, 'checksum' => 4 }
+	};
 	bless($this,$package);
 	$this->{'handshake'}->{'our version'} = $this->version_serialize(
 		$options->{'address'},$options->{'port'},
@@ -72,12 +75,42 @@ sub our_version {
 	return shift->{'handshake'}->{'our version'};
 }
 
+sub socket {
+	return shift->{'socket'};
+}
+
+sub bytes_read{
+	my $this = shift;
+	my $newbytes = shift;
+	if(defined $newbytes ){
+		$this->{'bytes read'} += $newbytes;  #implies undefined means 0
+		return $this->{'bytes read'};
+	}
+	elsif(!defined $newbytes){
+		return $this->{'bytes read'};
+	}
+	else{
+		die "number of bytes in bad format";
+	}
+}
+
+sub bytes {
+	my $this = shift;
+	my $newbytes = shift;
+	if(defined $newbytes && length($newbytes) > 0){
+		$this->{'bytes'} .= $newbytes; 
+		return $this->{'bytes'};
+	}
+	else{
+		return $this->{'bytes'};
+	}
+}
+
 =pod
 
 ---+ Handshakes
 
 =cut
-
 
 sub version_serialize {
 	my $this = shift;
@@ -124,6 +157,56 @@ sub version_serialize {
 	warn "bool for relaying=".unpack('H*',$x);
 	$data .= $x;
 	return $data;
+}
+
+=pod
+
+---+ Read/Write
+
+=cut
+
+sub read_data {
+	my $this = shift;
+	my $fh = $this->socket();
+	$this->{'bytes read'} = 0 unless defined $this->
+	my $buf,$n;
+	# read in magic
+	$this->bytes_read(sysread($fh,$this->{'bytes'},8192,length($this->{'bytes'})));
+	warn "Read in ".$this->bytes_read()." bytes\n";
+	foreach my $key (keys %{$this->{'message definition'}},'payload size'){
+		return 0 unless $this->read_data_alphah($key);
+	}
+	return 1;
+}
+
+sub read_data_alpha {
+	my $this = shift;
+	my ($key) = (shift);
+	
+	my $size = $this->definition_size_mapper($key);
+	die "key not defined" unless defined $size;
+	
+	
+	if(!defined $this->{'buffer'}->{$key} &&  $this->{'bytes read'} >= $size){
+		$this->{'buffer'}->{$key} = substr($this->{'bytes'},0,$size);
+		substr($this->{'bytes'},0,$size) = ''; # delete  bytes we don't need
+		$this->{'bytes read'} = $this->{'bytes read'} - $size;
+		return 1;
+	}
+	else{
+		return 0;
+	}
+}
+
+sub definition_size_mapper {
+	my $this = shift;
+	my $key = shift;
+	if($key eq 'payload'){
+		return $this->{'payload size'};
+	}
+	else{
+		return $this->{'message definition'}->{$key};
+	}
 }
 
 

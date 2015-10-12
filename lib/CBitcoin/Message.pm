@@ -136,6 +136,15 @@ sub serialize_command{
 	return join('',@bin);
 }
 
+sub read_message {
+	my $fh = shift;
+	
+	# ignore blocks
+	
+		
+}
+
+
 
 
 

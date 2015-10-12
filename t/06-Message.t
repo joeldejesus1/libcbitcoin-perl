@@ -17,14 +17,6 @@ my $spv = CBitcoin::SPV->new({
 	
 });
 
-$spv->add_peer('10.19.202.164','8333');
-
-my $payload = $spv->peer('10.19.202.164','8333')->our_version();
-my $blob = CBitcoin::Message::serialize($payload,'version');
-#warn "Blob=".unpack('H*',$blob)."\n";
-my $y;
-
-
 
 
 my $socket = new IO::Socket::INET (
@@ -35,6 +27,19 @@ my $socket = new IO::Socket::INET (
 ) or die "ERROR in Socket Creation : $!\n";
 
 
+$spv->add_peer($socket,'10.19.202.164','8333');
+
+my $payload = $spv->peer('10.19.202.164','8333')->our_version();
+my $blob = CBitcoin::Message::serialize($payload,'version');
+#warn "Blob=".unpack('H*',$blob)."\n";
+my $y;
+
+
+
+
+
+
+
 
 my $payload = $spv->peer('10.19.202.164','8333')->our_version();
 
@@ -43,13 +48,9 @@ warn "Blob=".unpack('H*',$blob)."\n";
 
 syswrite($socket,CBitcoin::Message::serialize($payload,'version'));
 
-=pod
-my $buf;
-while(sysread($socket,$buf,8192)){
-	warn "Buf=$buf\n";
-	close($socket);
-}
-=cut
+$spv->peer('10.19.202.164','8333')->read_data();
+
+
 =pod
 
 eval{
