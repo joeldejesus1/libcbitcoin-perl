@@ -67,14 +67,15 @@ sub add_peer{
 	my ($socket, $addr_recv_ip,$addr_recv_port) = (shift,shift,shift);
 	my $ref = $this->our_address();
 	my $peer = CBitcoin::Peer->new({
+		'spv' => $this,
 		'socket' => $socket,
 		'address' => $addr_recv_ip, 'port' => $addr_recv_port,
 		'our address' => $ref->[0], 'our port' => $ref->[1]
 	});
+	# go by fileno, it is friendly to IO::Epoll
+	$this->{'peers'}->{fileno($socket)} = $peer;
+	$this->{'peers by address:port'}->{$addr_recv_ip}->{$addr_recv_port} = $peer;
 	
-	
-	
-	$this->{'peers'}->{$addr_recv_ip}->{$addr_recv_port} = $peer;
 	
 	return 1;
 }
@@ -82,11 +83,18 @@ sub add_peer{
 sub peer{
 	my $this = shift;
 	my ($ipaddress, $port) = (shift,shift);
-	if(defined $this->{'peers'}->{$ipaddress}){
-		return  $this->{'peers'}->{$ipaddress}->{$port};
+	if(defined $this->{'peers by address:port'}->{$ipaddress}){
+		return  $this->{'peers by address:port'}->{$ipaddress}->{$port};
 	}
 	return undef;
 }
+
+sub peer_by_fileno {
+	my $this = shift;
+	my $fileno = shift;
+	return $this->{'peers'}->{$fileno};
+}
+
 
 
 1;

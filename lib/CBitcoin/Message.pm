@@ -188,7 +188,7 @@ sub serialize_command{
 
 sub deserialize_command {
 	my $command = shift;
-	$command =~ s/\x0+$//;
+	$command =~ tr/\0//d;
 	return $command
 }
 

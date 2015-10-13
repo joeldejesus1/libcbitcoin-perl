@@ -6,7 +6,7 @@ use CBitcoin::Message; # out of laziness, all c functions get referenced out of 
 use CBitcoin::Utilities;
 use constant BUFFSIZE => 8192;
 
-
+our $callback_mapper;
 
 sub new {
 	my $package = shift;
@@ -14,7 +14,9 @@ sub new {
 	my $options = shift;
 	die "no options given" unless defined $options && ref($options) eq 'HASH' && defined $options->{'address'} && defined $options->{'port'} 
 		&& defined $options->{'our address'} && defined $options->{'our port'} && defined $options->{'socket'} && fileno($options->{'socket'}) > 0;
-		
+	
+	die "need spv base" unless defined $options->{'spv'};
+	
 	$options->{'block height'} ||= 0;
 	$options->{'version'} ||= 70002; 
 	$options->{'magic'} = 'MAINNET' unless defined $options->{'magic'};
@@ -36,6 +38,7 @@ sub new {
 	my $this = {
 		'handshake finished' => 0,'sent version' => 0, 'sent verack' => 0, 'received version' => 0, 'received verack' => 0,
 		'buffer'=> {},
+		'spv' => $options->{'spv'},
 		'socket' => $options->{'socket'},
 		'message definition' => {'magic' => 4,'command' => 12, 'length' => 4, 'checksum' => 4 },
 		'message definition order' => ['magic','command', 'length', 'checksum','payload' ]
@@ -74,6 +77,7 @@ sub handshake_finished{
 	
 	if($this->sent_version && $this->sent_verack && $this->received_version && $this->received_verack){
 		warn "handshake is finished\n";
+		
 		return 1;
 	}
 	else{
@@ -101,6 +105,12 @@ sub address {
 sub port {
 	return shift->{'port'};
 }
+
+sub spv {
+	return shift->{'spv'};
+}
+
+
 sub magic {
 	return shift->{'magic'};
 }
@@ -315,6 +325,37 @@ sub received_verack {
 
 =pod
 
+---++ callback_gotaddr
+
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'addr'} = {
+		'subroutine' => \&callback_gotaddr
+	}
+};
+
+sub callback_gotaddr {
+	my $this = shift;
+	my $msg = shift;
+	
+	open(my $fh,'<',\$msg->{'payload'});
+	my $addr_ref = CBitcoin::Utilities::deserialize_addr($fh);
+	close($fh);
+	
+	if(defined $addr_ref && ref($addr_ref) eq 'ARRAY'){
+		warn "Got ".scalar(@{$addr_ref})." new addresses\n";
+	}
+	else{
+		warn "Got no new addresses\n";
+	}
+	
+}
+
+
+=pod
+
 ---++ callback_gotversion
 
 
@@ -347,8 +388,6 @@ sub callback_gotversion {
 	$this->send_verack();
 	
 }
-
-
 
 
 =pod
@@ -386,7 +425,7 @@ sub callback_gotverack {
 sub callback_gotping {
 	my $this = shift;
 	my $msg = shift;
-	
+	warn "Got ping\n";
 	$this->send_pong($msg->payload());
 	
 }
@@ -457,6 +496,21 @@ sub read_data {
 	}
 	elsif($this->handshake_finished()){
 		warn "Got message of type=".$msg->command()."\n";
+		if(
+			defined $callback_mapper->{'command'}->{$msg->command()}
+			&&  ref($callback_mapper->{'command'}->{$msg->command()}) eq 'HASH'
+			&& defined $callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}
+			&& ref($callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}) eq 'CODE'
+		){
+			warn "Running subroutine for ".$msg->command()."\n";
+			return $callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}->($this,$msg);
+		}
+		else{
+			warn "Not running subroutine for ".$msg->command()."\n";
+			return $msg;
+		}
+		
+		
 		return $msg;
 	}
 	else{
@@ -513,6 +567,7 @@ sub write {
 	my $data = shift;
 	return length($this->{'bytes to write'}) unless defined $data && length($data) > 0;
 	$this->{'bytes to write'} .= $data;
+	warn "Added ".length($data)." bytes to the write queue\n";
 	return length($this->{'bytes to write'});
 }
 

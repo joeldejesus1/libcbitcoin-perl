@@ -38,28 +38,28 @@ use IO::Epoll;
 
 my $epfd = epoll_create(10);
 
-epoll_ctl($epfd, EPOLL_CTL_ADD, fileno($spv->peer(@conn)->socket()), EPOLLIN | EPOLLOUT ) >= 0 || die "epoll_ctl: $!\n";
+epoll_ctl($epfd, EPOLL_CTL_ADD, fileno($socket), EPOLLIN | EPOLLOUT ) >= 0 || die "epoll_ctl: $!\n";
 
 
 while(my $events = epoll_wait($epfd, 10, -1)){
 	foreach my $event (@{$events}){
-		my $n = 0;
+		warn "sockets match" if fileno($socket) eq $event->[0];
 		if($event->[1] & EPOLLIN){
 			# time to read
-			$spv->peer(@conn)->read_data();
+			$spv->peer_by_fileno($event->[0])->read_data();
 			
-			if($spv->peer(@conn)->write() > 0){
+			if($spv->peer_by_fileno($event->[0])->write() > 0){
 				warn "setting eventmask to read/write\n";
-				epoll_ctl($epfd, EPOLL_CTL_MOD, fileno($spv->peer(@conn)->socket()), EPOLLIN | EPOLLOUT ) >= 0 || die "epoll_ctl: $!\n";
+				epoll_ctl($epfd, EPOLL_CTL_MOD, $event->[0], EPOLLIN | EPOLLOUT ) >= 0 || die "epoll_ctl: $!\n";
 			}
 		}
 		if($event->[1] & EPOLLOUT ){
-			if($spv->peer(@conn)->write() > 0){
-				$spv->peer(@conn)->write_data();
+			if($spv->peer_by_fileno($event->[0])->write() > 0){
+				$spv->peer_by_fileno($event->[0])->write_data();
 			}
 			else{
 				warn "setting eventmask to just read\n";
-				epoll_ctl($epfd, EPOLL_CTL_MOD, fileno($spv->peer(@conn)->socket()), EPOLLIN ) >= 0 || die "epoll_ctl: $!\n";
+				epoll_ctl($epfd, EPOLL_CTL_MOD, $event->[0], EPOLLIN ) >= 0 || die "epoll_ctl: $!\n";
 			}
 			
 		}
