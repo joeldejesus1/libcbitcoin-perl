@@ -354,7 +354,7 @@ sub callback_gotaddr {
 		
 		foreach my $addr (@{$addr_ref}){
 			# timestamp, services, ipaddress, port
-			$this->spv->add_peer_to_pool(
+			$this->spv->add_peer_to_db(
 				$addr->{'services'},
 				$addr->{'ipaddress'},
 				$addr->{'port'}

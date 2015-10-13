@@ -5,12 +5,18 @@ use warnings;
 use CBitcoin::Message;
 use CBitcoin::SPV;
 use IO::Socket::INET;
+use IO::Epoll;
 $| = 1;
+
+my $epfd = epoll_create(10);
 
 #use Test::More tests => 1;
 
 # set umask so that files/directories will be 0700 or 0600
+
 umask(077);
+`rm -r /tmp/spv`;
+
 
 my $spv = CBitcoin::SPV->new({
 	'address' => '192.168.122.67',
@@ -20,33 +26,67 @@ my $spv = CBitcoin::SPV->new({
 });
 
 
+my $connectsub = sub{
+	my ($this,$ipaddress,$port) = @_;
+	my $sck1;
+	my $epfd_inside = $epfd;
+	warn "Doing connection now, part 1\n";
+	eval{
+		$sck1 = new IO::Socket::INET (
+			PeerHost => $ipaddress,
+			PeerPort => $port,
+			Proto => 'tcp',
+		) or die "ERROR in Socket Creation : $!\n";
+		warn "Doing connection now, part 2\n";
+		epoll_ctl($epfd_inside, EPOLL_CTL_ADD, fileno($sck1), EPOLLIN | EPOLLOUT ) >= 0 || die "epoll_ctl: $!\n";
+	};
+	my $error = $@;
+	if($error){
+		warn "bad connection, error=$error";
+		return undef;
+	}
+	else{
+		warn "Doing connection now, part 3\n";
+		return $sck1;
+	}
+};
 
-my $socket = new IO::Socket::INET (
-	PeerHost => '10.19.202.164',
-	#PeerHost => '10.27.18.198',
-	PeerPort => '8333',
-	Proto => 'tcp',
-) or die "ERROR in Socket Creation : $!\n";
+
+#my $socket = new IO::Socket::INET (
+#	PeerHost => '10.19.202.164',
+#	#PeerHost => '10.27.18.198',
+#	PeerPort => '8333',
+#	Proto => 'tcp',
+#) or die "ERROR in Socket Creation : $!\n";
 
 my @conn = ('10.19.202.164','8333');
 
 
-$spv->add_peer($socket,@conn);
+
+
+$spv->add_peer_to_db(pack('Q',1),@conn);
+$spv->activate_peer($connectsub);
+
+
+#$spv->add_peer($socket,@conn);
+
+
 
 
 
 ############################# EPoll stuff for quick testing ########################
 
-use IO::Epoll;
 
-my $epfd = epoll_create(10);
 
-epoll_ctl($epfd, EPOLL_CTL_ADD, fileno($socket), EPOLLIN | EPOLLOUT ) >= 0 || die "epoll_ctl: $!\n";
+
+
+
 
 
 while(my $events = epoll_wait($epfd, 10, -1)){
 	foreach my $event (@{$events}){
-		warn "sockets match" if fileno($socket) eq $event->[0];
+		#warn "sockets match" if fileno($socket) eq $event->[0];
+		warn "Top of epoll loop\n";
 		if($event->[1] & EPOLLIN){
 			# time to read
 			$spv->peer_by_fileno($event->[0])->read_data();

@@ -27,6 +27,8 @@ sub new {
 	bless($this,$package);
 	
 	$this->{'db path'} = '/tmp/spv';
+	$this->make_directories();
+	
 	
 	# config settings
 	
@@ -40,6 +42,8 @@ sub new {
 	else{
 		die "bad max connection setting";
 	}
+	
+	
 	
 	
 	return $this;
@@ -145,9 +149,8 @@ Find a peer in a pool, and turn it on
 sub activate_peer {
 	my $this = shift;
 	my $connect_sub = shift;
-	
 	# if we are maxed out on connections, then exit
-	return undef unless $this->max_connections() < scalar(keys %{$this->{'peers'}});
+	return undef unless scalar(keys %{$this->{'peers'}}) < $this->max_connections();
 	
 	die "not given connection sub" unless defined $connect_sub && ref($connect_sub) eq 'CODE';
 	
@@ -232,17 +235,21 @@ port
 sub add_peer_to_db{
 	
 	my ($this,$services, $addr_recv_ip,$addr_recv_port) = (shift,shift,shift,shift);
+	warn "Adding peer to db\n";
 	
 	my $filename = Digest::SHA::sha256_hex("$addr_recv_ip:$addr_recv_port");
+	warn "Filepath =".$this->db_path().'/peers/pool/'.$filename."\n";
 	
 	return undef if -f $this->db_path().'/peers/pool/'.$filename || -f $this->db_path().'/peers/active/'.$filename 
 		|| -f $this->db_path().'/peers/banned/'.$filename;
 	
+	warn "adding peer 2\n";
 	my $fh;
-	if($this->db_path().'/peers/pool/'.$filename =~ m/^(.*)$/){
-		open($fh, '>',$1) || die "cannot open file for peer\n";
-	}
-	
+	#if($this->db_path().'/peers/pool/'.$filename =~ m/^(.*)$/){
+		
+	#}
+	open($fh, '>',$this->db_path().'/peers/pool/'.$filename) || die "cannot open file for peer\n";
+	warn "adding peer 3\n";
 	if($services & pack('Q',1)){
 		warn "adding peer offering full blocks, not just headers\n";
 		print $fh "FULLBLOCKS\n";
@@ -251,8 +258,10 @@ sub add_peer_to_db{
 		warn "adding peer offering just headers\n";
 		print $fh "HEADERSONLY\n";		
 	}
+	warn "adding peer 4\n";
 	print $fh "$addr_recv_ip\n$addr_recv_port\n";
 	close($fh);
+	warn "adding peer 5\n";
 	return 1;
 }
 
