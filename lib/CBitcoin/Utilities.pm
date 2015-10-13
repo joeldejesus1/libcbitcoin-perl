@@ -90,6 +90,14 @@ sub network_address_deserialize_forversion {
 	};
 }
 
+=pod
+
+---++ network_address_deserialize($file_handle)
+
+Get timestamp, services, ipaddress, port.
+
+=cut
+
 sub network_address_deserialize {
 	my $fh = shift;
 	my $ans = {};

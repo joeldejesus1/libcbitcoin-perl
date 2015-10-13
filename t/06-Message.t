@@ -9,6 +9,8 @@ $| = 1;
 
 #use Test::More tests => 1;
 
+# set umask so that files/directories will be 0700 or 0600
+umask(077);
 
 my $spv = CBitcoin::SPV->new({
 	'address' => '192.168.122.67',
@@ -27,6 +29,7 @@ my $socket = new IO::Socket::INET (
 ) or die "ERROR in Socket Creation : $!\n";
 
 my @conn = ('10.19.202.164','8333');
+
 
 $spv->add_peer($socket,@conn);
 

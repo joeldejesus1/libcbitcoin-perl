@@ -75,9 +75,14 @@ sub new {
 sub handshake_finished{
 	my $this = shift;
 	
+	if($this->{'handshake finished'}){
+		warn "handhsake is finished\n";
+		return 1;
+	}
+	
 	if($this->sent_version && $this->sent_verack && $this->received_version && $this->received_verack){
+		$this->{'handshake finished'} = 1;
 		warn "handshake is finished\n";
-		
 		return 1;
 	}
 	else{
@@ -130,7 +135,7 @@ sub last_pinged {
 sub bytes_read{
 	my $this = shift;
 	my $newbytes = shift;
-	if(defined $newbytes ){
+	if(defined $newbytes && $newbytes > 0){
 		$this->{'bytes read'} += $newbytes;  #implies undefined means 0
 		return $this->{'bytes read'};
 	}
@@ -346,6 +351,15 @@ sub callback_gotaddr {
 	
 	if(defined $addr_ref && ref($addr_ref) eq 'ARRAY'){
 		warn "Got ".scalar(@{$addr_ref})." new addresses\n";
+		
+		foreach my $addr (@{$addr_ref}){
+			# timestamp, services, ipaddress, port
+			$this->spv->add_peer_to_pool(
+				$addr->{'services'},
+				$addr->{'ipaddress'},
+				$addr->{'port'}
+			);
+		}
 	}
 	else{
 		warn "Got no new addresses\n";
@@ -462,40 +476,62 @@ sub callback_gotpong {
 
 =cut
 
+
+=pod
+
+---++ read_data
+
+=cut
+
 sub read_data {
 	my $this = shift;
 	
 	$this->{'bytes'} = '' unless defined $this->{'bytes'};
 	
-	# read in magic
 	$this->bytes_read(sysread($this->socket(),$this->{'bytes'},8192,length($this->{'bytes'})));
-	warn "Read in ".$this->bytes_read()." bytes\n";
+	warn "Have ".$this->bytes_read()." bytes read into the buffer\n";
+	
+	while($this->read_data_parse_msg()){
+		warn "Trying to parse another message\n";
+	}
+	
+}
+
+=pod
+
+---++ read_data_parse_msg()->0/1
+
+Parse the bytes we have till we can't parse anymore.
+
+=cut
+
+sub read_data_parse_msg {
+	my $this = shift;
+	
+	
 	foreach my $key (@{$this->{'message definition order'}}){
 		#warn "reading in data for $key\n";
-		return 0 unless $this->read_data_alpha($key);
+		return 0 unless $this->read_data_single_msg_item($key);
 	}
-	# have a message
-	#foreach my $key (@{$this->{'message definition order'}}){
-	#	warn "$key => [".unpack('H*',$this->{'buffer'}->{$key})."]\n";	
-	#}
+
 	my $msg = CBitcoin::Message->new($this->{'buffer'});
 	$this->{'buffer'} = {};
 	
 	if($msg->command eq 'version'){
 		warn "Getting Message=".ref($msg)."\n";
 		$this->callback_gotversion($msg);
-		return undef;
+		return 1;
 	}
 	elsif($msg->command eq 'verack'){
 		$this->callback_gotverack($msg);
-		return undef;
+		return 1;
 	}
 	elsif($msg->command eq 'ping'){
 		$this->callback_gotping($msg);
-		return undef;
+		return 1;
 	}
 	elsif($this->handshake_finished()){
-		warn "Got message of type=".$msg->command()."\n";
+		warn "Got message of type=".$msg->command."\n";
 		if(
 			defined $callback_mapper->{'command'}->{$msg->command()}
 			&&  ref($callback_mapper->{'command'}->{$msg->command()}) eq 'HASH'
@@ -503,15 +539,13 @@ sub read_data {
 			&& ref($callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}) eq 'CODE'
 		){
 			warn "Running subroutine for ".$msg->command()."\n";
-			return $callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}->($this,$msg);
+			$callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}->($this,$msg);
+			return 1;
 		}
 		else{
 			warn "Not running subroutine for ".$msg->command()."\n";
-			return $msg;
+			return 1;
 		}
-		
-		
-		return $msg;
 	}
 	else{
 		die "bad client behavior";
@@ -519,9 +553,15 @@ sub read_data {
 	
 }
 
+=pod
 
+---++ read_data_single_msg_item->0/1
 
-sub read_data_alpha {
+Return 1 for keep going, return 0 for stop since we don't have any more bytes to read.
+
+=cut
+
+sub read_data_single_msg_item {
 	my $this = shift;
 	my ($key) = (shift);
 	
@@ -535,6 +575,10 @@ sub read_data_alpha {
 		substr($this->{'bytes'},0,$size) = ""; # delete  bytes we don't need
 		$this->{'bytes read'} = $this->{'bytes read'} - $size;
 		die "sizes do not match" unless $this->{'bytes read'} == length($this->{'bytes'});
+		return 1;
+	}
+	elsif(defined $this->{'buffer'}->{$key}){
+		# skip this
 		return 1;
 	}
 	else{
