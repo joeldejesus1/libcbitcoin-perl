@@ -70,7 +70,15 @@ sub new {
 =cut
 
 sub handshake_finished{
-	return shift->{'handshake finished'};
+	my $this = shift;
+	
+	if($this->sent_version && $this->sent_verack && $this->received_version && $this->received_verack){
+		warn "handshake is finished\n";
+		return 1;
+	}
+	else{
+		return 0;
+	}
 }
 
 sub sent_version {
@@ -105,6 +113,10 @@ sub socket {
 	return shift->{'socket'};
 }
 
+sub last_pinged {
+	return shift->{'last pinged'};
+}
+
 sub bytes_read{
 	my $this = shift;
 	my $newbytes = shift;
@@ -137,6 +149,73 @@ sub bytes {
 ---+ Handshakes
 
 =cut
+
+sub version_deserialize {
+	my $this = shift;
+	my $msg = shift;
+	open(my $fh,'<',\$msg->{'payload'}) || die "cannot read versio payload";
+	my $version = {};
+	my @ver_order = ('version','services','timestamp','addr_recv','addr_from','nonce','user_agent','block_height','relay');
+	my $vers_size = {
+		'version' => 4, 'services' => 8, 'timestamp' => 8, 'addr_recv' => 26, 'addr_from' => 26,
+		'nonce' => 8,'user_agent' => -2, 'block_height' => 4, 'relay' => 1
+	};
+	my ($n,$buf);
+	foreach my $key (@ver_order){
+		my $size = $vers_size->{$key};
+		
+		if($size == -2){
+			# need to read var_str
+			$version->{$key} = CBitcoin::Utilities::deserialize_varstr($fh);
+			warn "Reading var string with result=".$version->{$key}."\n";
+			next;
+		}
+		
+		$n = read($fh,$buf,$vers_size->{$key});
+		$version->{$key} = $buf;
+		warn "For $key, got n=$n and value=".unpack('H*',$buf)."\n";
+		die "bad bytes" unless $n == $vers_size->{$key};
+	}
+	
+	# version, should be in this range
+	unless(70000 < unpack('l',$version->{'version'}) && unpack('l',$version->{'version'}) < 80000 ){
+		die "peer supplied bad version number";
+	}
+	# services
+	if($version->{'services'} & pack('Q',1)){
+		warn "NODE_NETWORK \n";
+	}
+	else{
+		warn "Just provides headers\n";
+	}
+	# timestamp, should not be more than 5 minutes old
+	my $timediff = time () - unpack('q',$version->{'timestamp'});
+	if(abs($timediff) < 1*60 ){
+		warn "peer time is within error bound, diff=$timediff seconds\n";
+	}
+	else{
+		warn "peer time is too far off, diff=$timediff seconds\n";
+	}
+	# addr_recv
+	$version->{'addr_recv'} = CBitcoin::Utilities::network_address_deserialize_forversion($version->{'addr_recv'});
+	# addr_from
+	$version->{'addr_from'} = CBitcoin::Utilities::network_address_deserialize_forversion($version->{'addr_from'});
+	# nonce
+	# make sure we don't have another peer with the same nonce?
+	
+	# blockheight (do sanity check)
+	$version->{'block_height'} = unpack('l',$version->{'block_height'});
+	unless(0 <= $version->{'block_height'}){
+		die "bad block height of ".$version->{'block_height'}."\n";
+	}
+	# bool for relaying, should we relay
+	warn "Relay=".unpack('C',$version->{'relay'})."\n";
+	close($fh);
+	
+	$this->{'version'} = $version;
+	return $this->{'version'};
+}
+
 
 sub version_serialize {
 	my $this = shift;
@@ -197,8 +276,21 @@ sub send_verack {
 	return $this->write(CBitcoin::Message::serialize('','verack',$this->magic));
 }
 
+sub send_ping {
+	my $this = shift;
+	warn "Sending ping\n";
+	$this->{'sent ping nonce'} = CBitcoin::Utilities::generate_random(8);
+	
+	return $this->write(CBitcoin::Message::serialize($this->{'sent ping nonce'},'ping',$this->magic));
+}
 
-
+sub send_pong {
+	my $this = shift;
+	my $nonce = shift;
+	die "bad nonce" unless defined $nonce && length($nonce) == 8;
+	warn "Sending pong\n";
+	return $this->write(CBitcoin::Message::serialize($nonce,'pong',$this->magic));
+}
 
 =pod
 
@@ -230,7 +322,7 @@ sub received_verack {
 
 sub callback_gotversion {
 	my $this = shift;
-	
+	my $msg = shift;
 	
 	# handshake should not be finished
 	if($this->handshake_finished()){
@@ -241,10 +333,16 @@ sub callback_gotversion {
 	if($this->received_version()){
 		die "peer already sent a version";
 	}
+
+
+	# parse version	
+	unless($this->version_deserialize($msg)){
+		die "peer sent bad version";
+	}
 	
-	# parse version
+	
 	#open(my)
-	
+	$this->{'received version'} = 1;
 	
 	$this->send_verack();
 	
@@ -263,9 +361,56 @@ sub callback_gotversion {
 sub callback_gotverack {
 	my $this = shift;
 	
-	die "hand shake getverack";
 	
-	# should we be getting a verack
+	# we should not have already received a verack
+	if($this->received_verack()){
+		die "bad peer, already received verack";
+	}
+	
+	# we should have sent a version
+	if(!$this->sent_version()){
+		die "no version sent, so we should not be getting a verack";
+	}
+	
+	$this->{'received verack'} = 1;
+	
+	$this->send_ping();
+}
+
+=pod
+
+---++ callback_ping
+
+=cut
+
+sub callback_gotping {
+	my $this = shift;
+	my $msg = shift;
+	
+	$this->send_pong($msg->payload());
+	
+}
+
+=pod
+
+---++ callback_pong
+
+=cut
+
+sub callback_gotpong {
+	my $this = shift;
+	my $msg = shift;
+	
+	if($this->{'sent ping nonce'} eq $msg->payload() ){
+		warn "got pong and it matches";
+		$this->{'sent ping nonce'} = undef;
+		$this->{'last pinged'} = time();
+		return undef;
+	}
+	else{
+		die "bad pong received";
+	}
+	
 }
 
 
@@ -295,8 +440,10 @@ sub read_data {
 	#	warn "$key => [".unpack('H*',$this->{'buffer'}->{$key})."]\n";	
 	#}
 	my $msg = CBitcoin::Message->new($this->{'buffer'});
+	$this->{'buffer'} = {};
 	
 	if($msg->command eq 'version'){
+		warn "Getting Message=".ref($msg)."\n";
 		$this->callback_gotversion($msg);
 		return undef;
 	}
@@ -304,7 +451,12 @@ sub read_data {
 		$this->callback_gotverack($msg);
 		return undef;
 	}
+	elsif($msg->command eq 'ping'){
+		$this->callback_gotping($msg);
+		return undef;
+	}
 	elsif($this->handshake_finished()){
+		warn "Got message of type=".$msg->command()."\n";
 		return $msg;
 	}
 	else{
@@ -359,9 +511,9 @@ Add to the write queue.
 sub write {
 	my $this = shift;
 	my $data = shift;
-	return undef unless defined $data && length($data) > 0;
+	return length($this->{'bytes to write'}) unless defined $data && length($data) > 0;
 	$this->{'bytes to write'} .= $data;
-	
+	return length($this->{'bytes to write'});
 }
 
 =pod

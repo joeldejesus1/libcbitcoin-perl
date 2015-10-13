@@ -47,9 +47,21 @@ while(my $events = epoll_wait($epfd, 10, -1)){
 		if($event->[1] & EPOLLIN){
 			# time to read
 			$spv->peer(@conn)->read_data();
+			
+			if($spv->peer(@conn)->write() > 0){
+				warn "setting eventmask to read/write\n";
+				epoll_ctl($epfd, EPOLL_CTL_MOD, fileno($spv->peer(@conn)->socket()), EPOLLIN | EPOLLOUT ) >= 0 || die "epoll_ctl: $!\n";
+			}
 		}
 		if($event->[1] & EPOLLOUT ){
-			$spv->peer(@conn)->write_data();
+			if($spv->peer(@conn)->write() > 0){
+				$spv->peer(@conn)->write_data();
+			}
+			else{
+				warn "setting eventmask to just read\n";
+				epoll_ctl($epfd, EPOLL_CTL_MOD, fileno($spv->peer(@conn)->socket()), EPOLLIN ) >= 0 || die "epoll_ctl: $!\n";
+			}
+			
 		}
 	}
 }

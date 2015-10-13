@@ -80,6 +80,17 @@ sub network_address_serialize_forversion {
 	return $data;
 }
 
+sub network_address_deserialize_forversion {
+	my $data = shift;
+	die "bad data with length=".length($data) unless length($data) == 26;
+	return {
+		'services' => substr($data,0,8),
+		'ipaddress' => ip_convert_to_string(substr($data,8,16)),
+		'port' => unpack('n',substr($data,24,2))
+	};
+}
+
+
 
 sub generate_random {
 	my $bytes = shift;
@@ -89,6 +100,58 @@ sub generate_random {
 	sysread($fh,$buf,$bytes);
 	close($fh);
 	return $buf;
+}
+
+=pod
+
+---++ deserialize_varstr($file_handle)
+
+=cut
+sub deserialize_varstr {
+	my $fh = shift;
+	my ($buf,$n);
+	# length
+	my $length = deserialize_varint($fh);
+	$n = read($fh,$buf,$length);
+	die "bad varstr, too short" unless $n == $length;
+	return $buf;
+}
+
+=pod
+
+---++ deserialize_varint($fh)
+
+=cut
+
+sub deserialize_varint {
+	my $fh = shift;
+	my ($n,$buf,$total,$prefix);
+
+	$n = read($fh,$buf,1);
+	die "varint too short" unless $n == 1;
+	$prefix = unpack('C',$buf);
+	if($prefix < 0xfd){
+		return $prefix;
+	}
+	elsif($prefix == 0xfd ){
+		$n = read($fh,$buf,2);
+		die "varint too short for uint16_t" unless $n == 2;
+		return unpack('S',$buf);
+	}
+	elsif($prefix == 0xfe ){
+		$n = read($fh,$buf,4);
+		die "varint too short for uint32_t" unless $n == 4;
+		return unpack('L',$buf);
+	}
+	elsif($prefix == 0xff ){
+		$n = read($fh,$buf,8);
+		die "varint too short for uint64_t" unless $n == 8;
+		return unpack('Q',$buf);
+	}
+	else{
+		die "we should not be here, logically";
+	}
+	
 }
 
 
