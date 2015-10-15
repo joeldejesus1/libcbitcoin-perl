@@ -8,6 +8,17 @@ use constant BUFFSIZE => 8192;
 
 our $callback_mapper;
 
+
+=pod
+
+--++ new($options)
+
+   * Required: 'address', 'port', 'socket', 'our address', 'our port'
+      * 'socket' must be an already open socket
+   * Optional: 'block height', 'version', 'magic'
+
+=cut
+
 sub new {
 	my $package = shift;
 	
@@ -41,7 +52,8 @@ sub new {
 		'spv' => $options->{'spv'},
 		'socket' => $options->{'socket'},
 		'message definition' => {'magic' => 4,'command' => 12, 'length' => 4, 'checksum' => 4 },
-		'message definition order' => ['magic','command', 'length', 'checksum','payload' ]
+		'message definition order' => ['magic','command', 'length', 'checksum','payload' ],
+		'command buffer' => {}
 	};
 	# to have some human readable stuff for later 
 	$this->{'address'} = $options->{'address'};
@@ -63,6 +75,45 @@ sub new {
 	#warn "XO=$xo\n";
 	
 	return $this;
+}
+
+
+=pod
+
+---++ finish
+
+Call this subroutine to disconnect and delete this peer.
+
+=cut
+
+sub finish {
+	my $this = shift;
+	$this->spv->close_peer(fileno($this->socket()));
+	return 1;
+}
+
+=pod
+
+---++ is_marked_finished
+
+Has this peer been mark finished?
+
+=cut
+
+sub is_marked_finished {
+	return shift->{'is marked finished'};
+}
+
+=pod
+
+---++ mark_finished
+
+Do this to passively terminate peer.
+
+=cut
+
+sub mark_finished {
+	shift->{'is marked finished'} = 1;
 }
 
 
@@ -115,6 +166,20 @@ sub spv {
 	return shift->{'spv'};
 }
 
+sub block_height {
+	my $this = shift;
+	my $new_height = shift;
+	if(defined $new_height && $new_height =~ m/^(\d+)$/){
+		$this->{'block height'} += $1;
+		return $this->{'block height'};
+	}
+	elsif(!defined $new_height){
+		return $this->{'block height'};
+	}
+	else{
+		die "bad block height";
+	}
+}
 
 sub magic {
 	return shift->{'magic'};
@@ -131,6 +196,11 @@ sub socket {
 sub last_pinged {
 	return shift->{'last pinged'};
 }
+
+sub command_buffer {
+	return shift->{'commands'}->{shift};
+}
+
 
 sub bytes_read{
 	my $this = shift;
@@ -189,12 +259,18 @@ sub version_deserialize {
 		$n = read($fh,$buf,$vers_size->{$key});
 		$version->{$key} = $buf;
 		warn "For $key, got n=$n and value=".unpack('H*',$buf)."\n";
-		die "bad bytes" unless $n == $vers_size->{$key};
+		
+		unless($n == $vers_size->{$key}){
+			warn "bad bytes, size does not match";
+			return undef;
+		}
+		
 	}
 	
 	# version, should be in this range
 	unless(70000 < unpack('l',$version->{'version'}) && unpack('l',$version->{'version'}) < 80000 ){
-		die "peer supplied bad version number";
+		warn "peer supplied bad version number\n";
+		return undef;
 	}
 	# services
 	if($version->{'services'} & pack('Q',1)){
@@ -221,13 +297,19 @@ sub version_deserialize {
 	# blockheight (do sanity check)
 	$version->{'block_height'} = unpack('l',$version->{'block_height'});
 	unless(0 <= $version->{'block_height'}){
-		die "bad block height of ".$version->{'block_height'}."\n";
+		warn "bad block height of ".$version->{'block_height'}."\n";
+		return undef;
 	}
+	$this->block_height($version->{'block_height'});
+	
 	# bool for relaying, should we relay
 	warn "Relay=".unpack('C',$version->{'relay'})."\n";
 	close($fh);
 	
 	$this->{'version'} = $version;
+	
+	
+	
 	return $this->{'version'};
 }
 
@@ -364,6 +446,7 @@ sub callback_gotaddr {
 	else{
 		warn "Got no new addresses\n";
 	}
+	return 1;
 	
 }
 
@@ -381,18 +464,24 @@ sub callback_gotversion {
 	
 	# handshake should not be finished
 	if($this->handshake_finished()){
-		die "bad peer";
+		warn "peer already finished handshake, but received another version\n";
+		$this->mark_finished();
+		return undef;
 	}
 	
 	# we should not already have a version
 	if($this->received_version()){
-		die "peer already sent a version";
+		warn "peer already sent a version\n";
+		$this->mark_finished();
+		return undef;
 	}
 
 
 	# parse version	
 	unless($this->version_deserialize($msg)){
-		die "peer sent bad version";
+		warn "peer sent bad version\n";
+		$this->mark_finished();
+		return undef;
 	}
 	
 	
@@ -400,7 +489,7 @@ sub callback_gotversion {
 	$this->{'received version'} = 1;
 	
 	$this->send_verack();
-	
+	return 1;
 }
 
 
@@ -417,17 +506,22 @@ sub callback_gotverack {
 	
 	# we should not have already received a verack
 	if($this->received_verack()){
-		die "bad peer, already received verack";
+		warn "bad peer, already received verack";
+		$this->mark_finished();
+		return undef;
 	}
 	
 	# we should have sent a version
 	if(!$this->sent_version()){
-		die "no version sent, so we should not be getting a verack";
+		warn "no version sent, so we should not be getting a verack\n";
+		$this->mark_finished();
+		return undef;
 	}
 	
 	$this->{'received verack'} = 1;
 	
 	$this->send_ping();
+	return 1;
 }
 
 =pod
@@ -440,8 +534,13 @@ sub callback_gotping {
 	my $this = shift;
 	my $msg = shift;
 	warn "Got ping\n";
+	unless($this->handshake_finished()){
+		warn "got ping before handshek finsihed\n";
+		$this->mark_finished();
+		return undef;
+	}
 	$this->send_pong($msg->payload());
-	
+	return 1;
 }
 
 =pod
@@ -458,14 +557,15 @@ sub callback_gotpong {
 		warn "got pong and it matches";
 		$this->{'sent ping nonce'} = undef;
 		$this->{'last pinged'} = time();
-		return undef;
+		return 1;
 	}
 	else{
-		die "bad pong received";
+		warn "bad pong received\n";
+		$this->mark_finished();
+		return undef;
 	}
 	
 }
-
 
 
 
@@ -481,19 +581,40 @@ sub callback_gotpong {
 
 ---++ read_data
 
+Take an opportunity after processing to see if there is a need to close this connection based on bad data from the peer.
+
 =cut
 
 sub read_data {
+	use POSIX qw(:errno_h);
+	
 	my $this = shift;
 	
 	$this->{'bytes'} = '' unless defined $this->{'bytes'};
-	
-	$this->bytes_read(sysread($this->socket(),$this->{'bytes'},8192,length($this->{'bytes'})));
-	warn "Have ".$this->bytes_read()." bytes read into the buffer\n";
-	
-	while($this->read_data_parse_msg()){
-		warn "Trying to parse another message\n";
+	my $n = sysread($this->socket(),$this->{'bytes'},8192,length($this->{'bytes'}));
+
+	if (!defined($n) && $! == EAGAIN) {
+		# would block
+		warn "socket is blocking, so skip\n";
 	}
+	elsif($n == 0){
+		warn "Closing peer, socket was closed from the other end.\n";
+		$this->finish();
+	}
+	else{
+		$this->bytes_read($n);
+		warn "Have ".$this->bytes_read()." bytes read into the buffer\n";
+
+		
+		while($this->read_data_parse_msg()){
+			warn "Trying to parse another message\n";
+		}
+		
+		if($this->is_marked_finished()){
+			$this->finish();
+		}
+	}
+	return undef;
 	
 }
 
@@ -519,16 +640,16 @@ sub read_data_parse_msg {
 	
 	if($msg->command eq 'version'){
 		warn "Getting Message=".ref($msg)."\n";
-		$this->callback_gotversion($msg);
-		return 1;
+		return $this->callback_gotversion($msg);
+		
 	}
 	elsif($msg->command eq 'verack'){
-		$this->callback_gotverack($msg);
-		return 1;
+		return $this->callback_gotverack($msg);
+		
 	}
 	elsif($msg->command eq 'ping'){
-		$this->callback_gotping($msg);
-		return 1;
+		return $this->callback_gotping($msg);
+		
 	}
 	elsif($this->handshake_finished()){
 		warn "Got message of type=".$msg->command."\n";
@@ -539,8 +660,8 @@ sub read_data_parse_msg {
 			&& ref($callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}) eq 'CODE'
 		){
 			warn "Running subroutine for ".$msg->command()."\n";
-			$callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}->($this,$msg);
-			return 1;
+			return $callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}->($this,$msg);
+			
 		}
 		else{
 			warn "Not running subroutine for ".$msg->command()."\n";
@@ -548,7 +669,8 @@ sub read_data_parse_msg {
 		}
 	}
 	else{
-		die "bad client behavior";
+		warn "bad client behavior\n";
+		return 0;
 	}
 	
 }

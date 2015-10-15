@@ -30,15 +30,7 @@
 //int
 
 
-/*
-int x(CBByteArray * data){
-	
-	CBBlockHeaders *self = CBNewBlockHeadersFromData(data);
-	uint32_t length = CBBlockHeadersDeserialise(self);
-	
-	
-}
-*/
+
 
 
 

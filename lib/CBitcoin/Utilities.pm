@@ -46,6 +46,7 @@ sub ip_convert_to_string {
 	
 	my $stripv6 = unpack('H*',$binipv6);
 	
+	
 	if(substr($stripv6,0,24) eq '00000000000000000000ffff'){
 		warn "ipv4 with full=$stripv6\n";
 		return hex2ip(substr($stripv6,24,8));
@@ -226,9 +227,10 @@ sub deserialize_addr{
 		my @addrs;
 		while($count){
 			$count = $count -1;
-			
+			# what about null addresses? 00000000000000000000ffff00000000
 			my $newaddr = network_address_deserialize($fh);
-			push(@addrs, $newaddr) if defined $newaddr;
+			push(@addrs, $newaddr) if defined $newaddr && $newaddr->{'ipaddress'} ne '00000000000000000000ffff00000000';
+			
 			warn "adding address to pool\n";
 		}
 		return \@addrs;

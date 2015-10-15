@@ -1,22 +1,5 @@
-use 5.014002;
 use strict;
 use warnings;
-
-
-use CBitcoin::Block;
-
-use Test::More tests => 1;
-
-my $gen_block = CBitcoin::Block->genesis_block();
-warn "Hash=".$gen_block->hash_hex."\n";
-warn "prevBlockHash=".$gen_block->prevBlockHash_hex."\n";
-
-ok(1) || print "Bail out!";
-
-#my $newblock = block_BlockFromData(,0);
-
-
-__END__
 
 use CBitcoin::Message;
 use CBitcoin::SPV;
@@ -36,8 +19,6 @@ my $epfd = epoll_create(10);
 
 umask(077);
 `mv /tmp/spv/active/* /tmp/spv/pool/`;
-
-
 
 
 
@@ -116,7 +97,7 @@ while(my $events = epoll_wait($epfd, 10, -1)){
 		}
 		# the connection may have been cut during the read section, so check if the $peer is still around
 		if(defined $spv->peer_by_fileno($event->[0]) && $event->[1] & EPOLLOUT ){
-			if(defined $spv->peer_by_fileno($event->[0])$spv->peer_by_fileno($event->[0])->write() > 0){
+			if(defined $spv->peer_by_fileno($event->[0]) && $spv->peer_by_fileno($event->[0])->write() > 0){
 				$spv->peer_by_fileno($event->[0])->write_data();
 			}
 			else{
@@ -130,5 +111,3 @@ while(my $events = epoll_wait($epfd, 10, -1)){
 }
 
 warn "no more connections, add peers and try again\n";
-
-#ok(1) || print "Bail out!";

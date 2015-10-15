@@ -63,6 +63,18 @@ sub make_directories{
 	mkdir("$base/peers/banned") unless -d "$base/peers/banned";
 	mkdir("$base/peers/pending") unless -d "$base/peers/pending";
 	
+	# ./pending
+	mkdir("$base/pending") unless -d "$base/pending";
+	
+	# ./locators
+	mkdir("$base/locators") unless -d "$base/locators";
+	
+	# ./headers
+	mkdir("$base/headers") unless -d "$base/headers";	
+	
+	# ./blocks
+	mkdir("$base/blocks") unless -d "$base/blocks";
+	
 	
 }
 
@@ -293,6 +305,33 @@ sub peer_by_fileno {
 	return $this->{'peers'}->{$fileno};
 }
 
+=pod
+
+---++ close_peer($fileno_of_socket)
+
+=cut
+
+sub close_peer {
+	my $this = shift;
+	my $fileno = shift;
+	
+	my $peer = $this->{'peers'}->{$fileno};
+	
+	close($peer->socket());
+	delete  $this->{'peers'}->{$fileno};
+	
+	my $filename = Digest::SHA::sha256_hex($peer->address.':'.$peer->port);
+	my $path_active = $this->db_path().'/peers/active/'.$filename;
+	my $path_banned = $this->db_path().'/peers/banned/'.$filename;
+	rename($path_active,$path_banned);
+	
+	delete $this->{'peers by address:port'}->{$peer->address}->{$peer->port};
+	delete $this->{'peers by address:port'}->{$peer->address};
+	
+	
+	
+	warn "Peer of ".$peer->address." and ".$peer->port." with filename=$filename has been closed and deleted.\n";
+}
 
 =pod
 
@@ -302,8 +341,34 @@ Here, these subroutines figure out what data we need to get from peers based on 
 
 =cut
 
+=pod
 
+---++ get_block_locator
 
+Get the latest block locator.
+
+=cut
+
+sub get_block_locator {
+	my  $this = shift;
+	my $dir_locators = $this->db_path().'/locators';
+	
+	
+	opendir(my $fh,$dir_locators) || die "cannot open directory";
+	my @files = grep { $_ ne '.' && $_ ne '..' } readdir $fh;
+	closedir($fh);
+	
+	# need to sort by block height
+	my ($lasthash,$blockheight) = (undef,-1);
+	foreach my $file (@files){
+		if($file =~ m/([0-9a-zA-Z]+)\.(\d+)/){
+			my $x = $1;
+			my $y = $2;
+		}
+	}
+	
+	
+}
 
 
 1;
