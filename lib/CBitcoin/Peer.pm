@@ -793,6 +793,7 @@ sub hook_getheaders {
 	# $this->block_height $this->spv->block_height;
 	
 	if(!defined $this->{'getheaders'} || 10*60 < (time() - $this->{'getheaders'}->{'time'})){
+		$this->{'getheaders'}->{'time'} = time();
 		return $this->spv->calculate_block_locator();
 	}
 	else{
