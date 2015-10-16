@@ -6,6 +6,7 @@ use warnings;
 use CBitcoin::Message;
 use CBitcoin::Utilities;
 use CBitcoin::Peer;
+use CBitcoin::Block;
 use Net::IP;
 
 
@@ -24,11 +25,17 @@ sub new {
 	$options ||= {};
 	#my $this = CBitcoin::Message::spv_initialize(ip_convert_to_binary('0.0.0.0'),0);
 	my $this = $options;
+	
+	die "no mark write sub" unless defined $this->{'mark write sub'} && ref($this->{'mark write sub'}) eq 'CODE';
+	die "no connect sub" unless defined $this->{'connect sub'} && ref($this->{'connect sub'}) eq 'CODE';
+	
 	bless($this,$package);
+	
+	$this->{'version'} = 70002 unless defined $this->{'version'};
 	
 	$this->{'db path'} = '/tmp/spv';
 	$this->make_directories();
-	
+
 	
 	# config settings
 	
@@ -43,8 +50,25 @@ sub new {
 		die "bad max connection setting";
 	}
 	
+	# start block chain at 0
+	$this->{'headers'} = [];
+	$this->{'transactions'} = {};
+	$this->initialize_chain();
 	
 	
+	# brain
+	$this->{'inv'} = {
+		'error' => {},
+		'tx' => {},
+		'block' => {},
+		'filtered block' => {}
+	};
+	$this->{'inv search'} = {
+		'error' => {},
+		'tx' => {},
+		'block' => {},
+		'filtered block' => {} 
+	};
 	
 	return $this;
 	
@@ -69,6 +93,7 @@ sub make_directories{
 	# ./locators
 	mkdir("$base/locators") unless -d "$base/locators";
 	
+	
 	# ./headers
 	mkdir("$base/headers") unless -d "$base/headers";	
 	
@@ -77,6 +102,124 @@ sub make_directories{
 	
 	
 }
+
+
+=pod
+
+---++ initialize_chain
+
+Save the genesis block into block headers.  Also, create the first block locator for use in getheaders.
+
+=cut
+
+sub initialize_chain{
+	my $this = shift;
+	my $base = $this->db_path();
+	warn "initialize chain 1\n";
+	opendir(my $fh, $base.'/headers') || die "cannot open directory to headers";
+	warn "initialize chain 1.2\n";
+	my @files = grep { $_ ne '.' && $_ ne '..' } readdir $fh;
+	warn "initialize chain 1.3\n";
+	closedir($fh);
+	unless(0 == scalar(@files)){
+		#die "no files?=".scalar(@files)."\n";
+		return $this->initialize_chain_scan_files();	
+	}
+	warn "initialize chain 2\n";
+	# must get genesis block
+	my $gen_block = CBitcoin::Block->genesis_block();
+	warn "Genesis hash=".$gen_block->hash_hex."\n";
+	warn "Genesis prevBlockHash=".$gen_block->prevBlockHash_hex."\n";
+
+	my @path = CBitcoin::Utilities::HashToFilepath($gen_block->hash_hex);
+	warn "initialize chain 3\n";
+	CBitcoin::Utilities::recursive_mkdir("$base/headers/".join('/',@path)) 
+		unless -d "$base/headers/".join('/',@path);
+	my $n;
+	open($fh,'>',"$base/headers/".join('/',@path).'/prevBlockHash') || die "cannot save prevblock hash";
+	$n = syswrite($fh,$gen_block->prevBlockHash);
+	die "could not save hash" unless $n == length($gen_block->prevBlockHash) && $n > 1;
+	close($fh);
+	warn "initialize chain 4\n";
+	open($fh,'>',"$base/headers/".join('/',@path).'/data') || die "cannot save block data";
+	$n = syswrite($fh,$gen_block->data);
+	die "could not save data" unless $n == length($gen_block->data) && $n > 1;
+	close($fh);
+	
+	warn "initialize chain 5 hash=".unpack('H*',$gen_block->hash)."\n";
+	#$this->{'headers'}->[0] = $gen_block->hash;
+	push(@{$this->{'headers'}},$gen_block->hash);
+	
+	#require Data::Dumper;
+	#my $xo = Data::Dumper::Dumper($this->{'headers'});
+	#warn "XO1=$xo\n"; 
+	
+	$this->block_height(0);
+	
+	
+	return 1;
+}
+
+sub initialize_chain_scan_files {
+	my $this = shift;
+}
+
+=pod
+
+---++ add_header_to_chain($block)
+
+=cut
+
+sub add_header_to_chain {
+	my $this = shift;
+	my $block = shift;
+	die "block is null" unless defined $block;
+	
+	my $base = $this->db_path();
+	my $fh;
+	
+	my @path = CBitcoin::Utilities::HashToFilepath($block->hash_hex);
+	unless(-d "$base/headers/".join('/',@path)){
+		CBitcoin::Utilities::recursive_mkdir("$base/headers/".join('/',@path));	
+		my $n;
+		open($fh,'>',"$base/headers/".join('/',@path).'/prevBlockHash') || die "cannot save prevblock hash";
+		$n = syswrite($fh,$block->prevBlockHash);
+		die "could not save hash" unless $n == length($block->prevBlockHash) && $n > 1;
+		close($fh);
+		open($fh,'>',"$base/headers/".join('/',@path).'/data') || die "cannot save block data";
+		$n = syswrite($fh,$block->data);
+		die "could not save data" unless $n == length($block->data) && $n > 1;
+		close($fh);
+	}
+	push(@{$this->{'headers'}},$block->hash);
+	return $this->block_height(1);
+}
+
+
+=pod
+
+---++ calculate_block_locator($hash_stop)
+
+Go through the in-memory chain, and create the block_locator hash array.  Return a serialized message.
+
+=cut
+
+sub calculate_block_locator {
+	my $this = shift;
+	my $hash_stop = shift;
+	
+	# 32 bytes of null
+	$hash_stop = pack('H*','0000000000000000000000000000000000000000000000000000000000000000') unless defined $hash_stop;
+	
+	my @ans;
+	foreach my $i (CBitcoin::Utilities::block_locator_indicies($this->block_height())){
+		my $hash = $this->block($i);
+		die "bad index, rebuild block header database" unless defined $hash;
+		push(@ans,$hash);
+	}
+	return pack('L',$this->version).CBitcoin::Utilities::serialize_varint(scalar(@ans)).join('',@ans).$hash_stop;
+}
+
 
 =pod
 
@@ -88,12 +231,52 @@ sub db_path {
 	return shift->{'db path'};
 }
 
+sub version {
+	return shift->{'version'};
+}
+
 sub peers_path {
 	return shift->{'db path'}.'/peers';
 }
 
 sub max_connections {
 	return shift->{'max connections'};
+}
+
+sub mark_write {
+	my $this = shift;
+	my $socket = shift;
+	warn "doing mark write\n";
+	return $this->{'mark write sub'}->($socket);
+}
+
+
+
+sub block{
+	my ($this,$index) = (shift,shift);
+	die "bad index given" unless
+		$index =~ m/^(\d+)$/ && 0 <= $index;
+	#require Data::Dumper;
+	#my $xo = Data::Dumper::Dumper($this->{'headers'});
+	#warn "XO=$xo\n"; 
+	warn "Returning block i=$index v=".unpack('H*',$this->{'headers'}->[$index])."\n";
+	return $this->{'headers'}->[$index];
+}
+
+
+sub block_height {
+	my $this = shift;
+	my $new_height = shift;
+	if(defined $new_height && $new_height =~ m/^(\d+)$/){
+		$this->{'block height'} += $1;
+		return $this->{'block height'};
+	}
+	elsif(!defined $new_height){
+		return $this->{'block height'};
+	}
+	else{
+		die "bad block height";
+	}
 }
 
 =pod
@@ -192,13 +375,14 @@ sub activate_peer {
 		
 		
 		eval{
+			warn "part 1\n";
 			rename($dir_pool.'/'.$latest,$dir_pending.'/'.$latest) || die "alpha";
 			
 			# create connection
 			open($fh,'<',$dir_pending.'/'.$latest) || die "beta";
 			my @guts = <$fh>;
 			close($fh);
-			
+			warn "part 2\n";
 			die "charlie" unless scalar(@guts) == 3;
 			
 			# connect with ip address and port
@@ -206,6 +390,7 @@ sub activate_peer {
 			# perhaps the end user wants to use tor, or a proxy to connect
 			# so, let that logic be elsewhere, just send an anonymous subroutine
 			$socket = $connect_sub->($this,$guts[1],$guts[2]);
+			warn "part 3\n";
 			unless(defined $socket && fileno($socket) > 0){
 				rename($dir_pending.'/'.$latest,$dir_banned.'/'.$latest);
 				die "delta";
@@ -213,7 +398,7 @@ sub activate_peer {
 			
 			# we have a socket, ready to go
 			$this->add_peer($socket,$guts[1],$guts[2]);
-			
+			warn "part 4\n";
 			rename($dir_pending.'/'.$latest,$dir_active.'/'.$latest);
 			
 		};
@@ -333,6 +518,7 @@ sub close_peer {
 	warn "Peer of ".$peer->address." and ".$peer->port." with filename=$filename has been closed and deleted.\n";
 }
 
+
 =pod
 
 ---+ Brain
@@ -343,32 +529,95 @@ Here, these subroutines figure out what data we need to get from peers based on 
 
 =pod
 
----++ get_block_locator
 
-Get the latest block locator.
+---++ peer_hook_handshake_finished()
+
+This is called when a handshake is finished.
 
 =cut
 
-sub get_block_locator {
-	my  $this = shift;
-	my $dir_locators = $this->db_path().'/locators';
-	
-	
-	opendir(my $fh,$dir_locators) || die "cannot open directory";
-	my @files = grep { $_ ne '.' && $_ ne '..' } readdir $fh;
-	closedir($fh);
-	
-	# need to sort by block height
-	my ($lasthash,$blockheight) = (undef,-1);
-	foreach my $file (@files){
-		if($file =~ m/([0-9a-zA-Z]+)\.(\d+)/){
-			my $x = $1;
-			my $y = $2;
-		}
-	}
-	
+sub peer_hook_handshake_finished{
+	my $this = shift;
+	my $peer = shift;
 	
 }
+
+=pod
+
+---++ getdata($type,$hash)
+
+Add the pair to the list of inventory_vectors that need to be fetched
+
+=cut
+
+sub getdata {
+	my $this = shift;
+	my ($type,$hash) = @_;
+	return undef unless defined $type && ($type eq 'error' || $type eq 'tx' || $type eq 'block' ) && defined $hash && length($hash) > 0;
+	# length($hash) should be equal to 32 (256bits), but in the future that might change.
+	
+	unless(defined $this->{'inv search'}->{$type}->{$hash}){
+		$this->{'inv search'}->{$type}->{$hash} = [0];
+	}
+}
+
+=pod
+
+---++ hook_getdata()
+
+This is called by a peer when it is ready to write.  Max count= 500 per peer.  The timeout is 60 seconds.
+
+=cut
+
+sub hook_getdata {
+	my $this = shift;
+	my @response;
+	
+	my ($i,$max_count_per_peer) = (0,500);
+	#warn "hook_getdata part 1 \n";
+	foreach my $hash (keys %{$this->{'inv search'}->{'error'}}){
+		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->{'error'}->{$hash}->[0] )){
+			push(@response,pack('L',0).$hash);
+			$i += 1;	
+		}
+		elsif($max_count_per_peer < $i){
+			last;
+		}
+	}
+	#warn "hook_getdata part 2 \n";
+	foreach my $hash (keys %{$this->{'inv search'}->{'tx'}}){
+		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->{'tx'}->{$hash}->[0] )){
+			push(@response,pack('L',1).$hash);
+			$i += 1;	
+		}
+		elsif($max_count_per_peer < $i){
+			last;
+		}
+	}
+	#warn "hook_getdata part 3 \n";
+	foreach my $hash (keys %{$this->{'inv search'}->{'block'}}){
+		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->{'block'}->{$hash}->[0] )){
+			push(@response,pack('L',2).$hash);
+			$i += 1;	
+		}
+		elsif($max_count_per_peer < $i){
+			last;
+		}
+	}
+	#warn "hook_getdata part 4 \n";
+	foreach my $hash (keys %{$this->{'inv search'}->{'filtered block'}}){
+		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->{'filtered block'}->{$hash}->[0] )){
+			push(@response,pack('L',3).$hash);
+			$i += 1;	
+		}
+		elsif($max_count_per_peer < $i){
+			last;
+		}
+	}
+	warn "hook_getdata size is ".scalar(@response)."\n";
+	return CBitcoin::Utilities::serialize_varint(scalar(@response)).join('',@response);
+}
+
 
 
 1;

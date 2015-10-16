@@ -212,6 +212,30 @@ sub deserialize_varint {
 	
 }
 
+=pod
+
+---++ serialize_varint($integer)
+
+=cut
+
+sub serialize_varint {
+	my $integer = shift;
+	die "bad integer" unless defined $integer && $integer =~ m/^(\d+)$/;
+	if($integer < 0xfd ){
+		return pack('C',$integer);
+	}
+	elsif($integer <= 0xffff){
+		return pack('C',0xfd).pack('S',$integer);
+	}
+	elsif($integer <= 0xffffffff){
+		return pack('C',0xfe).pack('L',$integer);
+	}
+	else{
+		return pack('C',0xff).pack('Q',$integer);
+	}
+}
+
+
 
 =pod
 
@@ -273,5 +297,78 @@ sub serialize_getheaders {
 	
 	return pack('L',$version).serialize_varint(scalar(@{$blocklocatorref})).join('',@{$blocklocatorref}).$hashstop;
 }
+
+
+=pod
+
+---++ HashToFilepath
+
+=cut
+
+sub HashToFilepath {
+	my $x = shift;
+	return substr($x,0,1).'/'.substr($x,1,3).'/'.substr($x,4);
+}
+
+=pod
+
+---++ FilepathToHash
+
+=cut
+
+sub FilepathToHash {
+	my $path  = shift;
+	$path =~ s/\///g;
+	return $path;
+}
+
+=pod
+
+---++ recursive_mkdir($path)
+
+=cut
+
+sub recursive_mkdir {
+    my $path = shift;
+    
+    my @parts = split /\//, $path;
+    for my $num (1..$#parts) {
+        my $check = join('/', @parts[0..$num]);
+        unless (-d $check) {
+            mkdir( $check );
+        }
+    }
+}
+
+=pod
+
+---++ block_locator_indicies($top_depth)->@indexes
+
+To create the block locator hashes, keep pushing hashes until you go back to the genesis block.  After pushing 10 hashes back, the step backwards doubles every loop.
+
+For $top_depth, put the currently confirmed block height.
+
+=cut
+
+sub block_locator_indicies{
+	my $top_depth = shift;
+	$top_depth = 10 unless defined $top_depth && $top_depth =~ m/^\d+$/ && 0 <= $top_depth;
+	
+	my @ans;
+	
+	my ($step,$start,$i) = (1,0,$top_depth);
+	
+	while($i > 0){
+		if(10 <= $start ){
+			$step *= 2; 
+		}
+		push(@ans,$i);
+		$i -= $step;
+		$start += 1;
+	}
+	push(@ans,0);
+	return @ans;
+}
+
 
 1;

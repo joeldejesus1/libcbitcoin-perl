@@ -139,7 +139,9 @@ sub hash_hex {
 	return unpack('H*',shift->{'hash'});
 }
 
-
+sub data {
+	return shift->{'data'};
+}
 
 
 

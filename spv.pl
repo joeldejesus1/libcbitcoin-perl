@@ -28,16 +28,20 @@ my $connectsub = sub{
 	my $epfd_inside = $epfd;
 	warn "Doing connection now, part 1\n";
 	eval{
+		local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
+		alarm 5;
 		$sck1 = new IO::Socket::INET (
 			PeerHost => $ipaddress,
 			PeerPort => $port,
 			Proto => 'tcp',
 		) or die "ERROR in Socket Creation : $!\n";
+		alarm 0;
 		warn "Doing connection now, part 2\n";
 		epoll_ctl($epfd_inside, EPOLL_CTL_ADD, fileno($sck1), EPOLLIN | EPOLLOUT ) >= 0 || die "epoll_ctl: $!\n";
 	};
 	my $error = $@;
 	if($error){
+		alarm 0;
 		warn "bad connection, error=$error";
 		return undef;
 	}
@@ -47,11 +51,19 @@ my $connectsub = sub{
 	}
 };
 
+my $markwritesub = sub{
+	my ($sck1) = (shift);
+	my $epfd_inside = $epfd;
+	epoll_ctl($epfd_inside, EPOLL_CTL_MOD, fileno($sck1), EPOLLIN | EPOLLOUT ) >= 0 || die "epoll_ctl: $!\n";
+};
+
 
 my $spv = CBitcoin::SPV->new({
 	'address' => '192.168.122.67',
 	'port' => 8333,
-	'isLocal' => 1
+	'isLocal' => 1,
+	'connect sub' => $connectsub,
+	'mark write sub' => $markwritesub 
 });
 
 

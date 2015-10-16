@@ -127,13 +127,13 @@ sub handshake_finished{
 	my $this = shift;
 	
 	if($this->{'handshake finished'}){
-		warn "handhsake is finished\n";
+		warn "handhsake is already finished\n";
 		return 1;
 	}
 	
 	if($this->sent_version && $this->sent_verack && $this->received_version && $this->received_verack){
 		$this->{'handshake finished'} = 1;
-		warn "handshake is finished\n";
+		warn "handshake is finished, ready to run hooks\n";
 		return 1;
 	}
 	else{
@@ -724,16 +724,30 @@ sub definition_size_mapper {
 
 ---++ write($data)
 
-Add to the write queue.
+Add to the write queue.  Also adds a write flag to the event mask on the socket via the sub passed in the $spv constructor.
 
 =cut
 
 sub write {
 	my $this = shift;
 	my $data = shift;
+
+	if($this->handshake_finished()){
+		warn "Running peer getheader hooks\n";
+		$data .= $this->hook_getheaders();
+		warn "Running spv getdata hooks\n";
+		$data .= $this->spv->hook_getdata();		
+	}
+
 	return length($this->{'bytes to write'}) unless defined $data && length($data) > 0;
 	$this->{'bytes to write'} .= $data;
+	
 	warn "Added ".length($data)." bytes to the write queue\n";
+	
+	if(length($this->{'bytes to write'}) > 0){
+		$this->spv->mark_write($this->socket);
+	}
+
 	return length($this->{'bytes to write'});
 }
 
@@ -753,5 +767,39 @@ sub write_data {
 	substr($this->{'bytes to write'},0,$n) = "";
 	return $n;
 }
+
+=pod
+
+---+ Brain
+
+The logic used to figure out what needs to be uploaded and downloaded is stored here.
+
+=cut
+
+
+=pod
+
+---++ hook_getheaders
+
+Compare the spv's block height with the peer's.  Use that as a condition as to whether or not to fetch blocks/headers.
+
+The timeout on this command is 10 minutes.
+
+=cut
+
+sub hook_getheaders {
+	my $this = shift;
+	
+	# $this->block_height $this->spv->block_height;
+	
+	if(!defined $this->{'getheaders'} || 10*60 < (time() - $this->{'getheaders'}->{'time'})){
+		return $this->spv->calculate_block_locator();
+	}
+	else{
+		return undef;
+	}
+	
+}
+
 
 1;

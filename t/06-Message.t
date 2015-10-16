@@ -10,7 +10,7 @@ use Test::More tests => 1;
 my $gen_block = CBitcoin::Block->genesis_block();
 warn "Hash=".$gen_block->hash_hex."\n";
 warn "prevBlockHash=".$gen_block->prevBlockHash_hex."\n";
-
+warn "Data=".unpack('H*',$gen_block->data)."\n";
 ok(1) || print "Bail out!";
 
 #my $newblock = block_BlockFromData(,0);

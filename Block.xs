@@ -53,6 +53,12 @@ HV* block_GenesisBlock(void){
 	
 	CBBlock * x = CBNewBlockGenesis();
 	HV * rh = block_block_to_hash(x);
+	if(CBGetMessage(x)->serialised){
+		hv_store(rh, "data", 4, newSVpv(CBByteArrayGetData(CBGetMessage(x)->bytes),CBGetMessage(x)->bytes->length), 0);
+	}
+	else{
+		hv_store(rh, "data", 4, newSViv(0), 0);
+	}
 	CBDestroyBlock(x);
 	
 	return rh;
@@ -80,6 +86,14 @@ HV* block_BlockFromData(SV* data,int AreThereTx){
 		return nullrh;
 	}
 	HV * rh = block_block_to_hash(block);
+	
+	if(CBGetMessage(block)->serialised){
+		hv_store(rh, "data", 4, newSVpv(CBByteArrayGetData(CBGetMessage(block)->bytes),CBGetMessage(block)->bytes->length), 0);
+	}
+	else{
+		hv_store(rh, "data", 4, newSViv(0), 0);
+	}
+	
 	CBDestroyBlock(block);
 	hv_store(rh, "result", 6, newSViv(1), 0);
 	return rh;
