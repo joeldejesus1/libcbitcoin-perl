@@ -21,7 +21,16 @@ our $callback_mapper;
 
 sub new {
 	my $package = shift;
+	bless($this,$package);
+	$this->init(shift);
 	
+	
+	return $this;
+}
+
+
+sub init {
+	my $this = shift;
 	my $options = shift;
 	die "no options given" unless defined $options && ref($options) eq 'HASH' && defined $options->{'address'} && defined $options->{'port'} 
 		&& defined $options->{'our address'} && defined $options->{'our port'} && defined $options->{'socket'} && fileno($options->{'socket'}) > 0;
@@ -29,7 +38,7 @@ sub new {
 	die "need spv base" unless defined $options->{'spv'};
 	
 	$options->{'block height'} ||= 0;
-	$options->{'version'} ||= 70002; 
+	$options->{'version'} ||= 70001; 
 	$options->{'magic'} = 'MAINNET' unless defined $options->{'magic'};
 	
 	die "no good ip address given" unless CBitcoin::Utilities::ip_convert_to_binary($options->{'address'})
@@ -46,7 +55,8 @@ sub new {
 #		,$options->{'version'} # version
 #		,$options->{'block height'} # block ehight
 #	);
-	my $this = {
+	my $ref = ref($this);
+	$this = {
 		'handshake finished' => 0,'sent version' => 0, 'sent verack' => 0, 'received version' => 0, 'received verack' => 0,
 		'buffer'=> {},
 		'spv' => $options->{'spv'},
@@ -55,11 +65,11 @@ sub new {
 		'message definition order' => ['magic','command', 'length', 'checksum','payload' ],
 		'command buffer' => {}
 	};
+	bless($this,$ref);
 	# to have some human readable stuff for later 
 	$this->{'address'} = $options->{'address'};
 	$this->{'port'} = $options->{'port'};
 	
-	bless($this,$package);
 	$this->{'handshake'}->{'our version'} = $this->version_serialize(
 		$options->{'address'},$options->{'port'},
 		$options->{'our address'},$options->{'our port'},
@@ -127,7 +137,7 @@ sub handshake_finished{
 	my $this = shift;
 	
 	if($this->{'handshake finished'}){
-		warn "handhsake is already finished\n";
+		#warn "handhsake is already finished\n";
 		return 1;
 	}
 	
@@ -593,15 +603,12 @@ sub read_data {
 	$this->{'bytes'} = '' unless defined $this->{'bytes'};
 	my $n = sysread($this->socket(),$this->{'bytes'},8192,length($this->{'bytes'}));
 
-	if (!defined($n) && $! == EAGAIN) {
-		# would block
-		warn "socket is blocking, so skip\n";
-	}
-	elsif($n == 0){
+	
+	if(defined $n && $n == 0){
 		warn "Closing peer, socket was closed from the other end.\n";
 		$this->finish();
 	}
-	else{
+	elsif(defined $n && $n > 0){
 		$this->bytes_read($n);
 		warn "Have ".$this->bytes_read()." bytes read into the buffer\n";
 
@@ -614,6 +621,11 @@ sub read_data {
 			$this->finish();
 		}
 	}
+	else{
+		# would block
+		warn "socket is blocking, so skip, error=".$!."\n";
+	}
+	
 	return undef;
 	
 }
@@ -652,21 +664,7 @@ sub read_data_parse_msg {
 		
 	}
 	elsif($this->handshake_finished()){
-		warn "Got message of type=".$msg->command."\n";
-		if(
-			defined $callback_mapper->{'command'}->{$msg->command()}
-			&&  ref($callback_mapper->{'command'}->{$msg->command()}) eq 'HASH'
-			&& defined $callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}
-			&& ref($callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}) eq 'CODE'
-		){
-			warn "Running subroutine for ".$msg->command()."\n";
-			return $callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}->($this,$msg);
-			
-		}
-		else{
-			warn "Not running subroutine for ".$msg->command()."\n";
-			return 1;
-		}
+		return $this->hook_callback($msg);
 	}
 	else{
 		warn "bad client behavior\n";
@@ -674,6 +672,36 @@ sub read_data_parse_msg {
 	}
 	
 }
+
+=pod
+
+---++ hook_callback($msg)
+
+Overload this subroutine.
+
+=cut
+
+sub hook_callback{
+	my $this = shift;
+	my $msg = shift;
+	
+	warn "Got message of type=".$msg->command."\n";
+	if(
+		defined $callback_mapper->{'command'}->{$msg->command()}
+		&&  ref($callback_mapper->{'command'}->{$msg->command()}) eq 'HASH'
+		&& defined $callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}
+		&& ref($callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}) eq 'CODE'
+	){
+		warn "Running subroutine for ".$msg->command()."\n";
+		return $callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}->($this,$msg);
+		
+	}
+	else{
+		warn "Not running subroutine for ".$msg->command()."\n";
+		return 1;
+	}
+}
+
 
 =pod
 
@@ -732,11 +760,17 @@ sub write {
 	my $this = shift;
 	my $data = shift;
 
+	$data = '' unless defined $data;
+
 	if($this->handshake_finished()){
-		warn "Running peer getheader hooks\n";
+		#my $x = length($data);
 		$data .= $this->hook_getheaders();
-		warn "Running spv getdata hooks\n";
-		$data .= $this->spv->hook_getdata();		
+		#$x = length($data) - $x;
+		#warn "Running peer getheader hooks, got $x\n";
+		#$x = length($data);
+		$data .= $this->spv->hook_getdata();
+		#$x = length($data) - $x;
+		#warn "Running spv getdata hooks, got $x\n";
 	}
 
 	return length($this->{'bytes to write'}) unless defined $data && length($data) > 0;
@@ -744,10 +778,11 @@ sub write {
 	
 	warn "Added ".length($data)." bytes to the write queue\n";
 	
-	if(length($this->{'bytes to write'}) > 0){
+	if($this->write_data() == 0 && fileno($this->socket) > 0){
 		$this->spv->mark_write($this->socket);
+		return 0;
 	}
-
+	
 	return length($this->{'bytes to write'});
 }
 
@@ -760,12 +795,30 @@ When we can write data, send out 8192 bytes.
 =cut
 
 sub write_data {
+	use POSIX qw(:errno_h);
+	
 	my $this = shift;
 	return undef unless defined $this->{'bytes to write'} && length($this->{'bytes to write'}) > 0;
 	
 	my $n = syswrite($this->socket(),$this->{'bytes to write'},8192);
-	substr($this->{'bytes to write'},0,$n) = "";
-	return $n;
+
+	if (!defined($n) && $! == EAGAIN) {
+		# would block
+		warn "socket is blocking, so skip\n";
+		return 0;
+	}
+	elsif($n == 0){
+		warn "Closing peer, socket was closed from the other end.\n";
+		$this->finish();
+		return 0;
+	}
+	else{
+		substr($this->{'bytes to write'},0,$n) = "";
+		return $n;		
+	}
+	
+	
+
 }
 
 =pod
@@ -794,10 +847,14 @@ sub hook_getheaders {
 	
 	if(!defined $this->{'getheaders'} || 10*60 < (time() - $this->{'getheaders'}->{'time'})){
 		$this->{'getheaders'}->{'time'} = time();
-		return $this->spv->calculate_block_locator();
+		return CBitcoin::Message::serialize(
+			$this->spv->calculate_block_locator(),
+			'getheaders',
+			CBitcoin::Message::net_magic($this->magic)  # defaults as MAINNET
+		);
 	}
 	else{
-		return undef;
+		return '';
 	}
 	
 }

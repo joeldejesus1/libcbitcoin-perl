@@ -31,7 +31,7 @@ sub new {
 	
 	bless($this,$package);
 	
-	$this->{'version'} = 70002 unless defined $this->{'version'};
+	$this->{'version'} = 70001 unless defined $this->{'version'};
 	
 	$this->{'db path'} = '/tmp/spv';
 	$this->make_directories();
@@ -209,7 +209,14 @@ sub calculate_block_locator {
 	my $hash_stop = shift;
 	
 	# 32 bytes of null
-	$hash_stop = pack('H*','0000000000000000000000000000000000000000000000000000000000000000') unless defined $hash_stop;
+	unless(defined $hash_stop){
+		$hash_stop = pack('x');
+		foreach my $i (2..32){
+			$hash_stop .= pack('x');
+		}
+	}
+	
+	#$hash_stop = pack('H*','0000000000000000000000000000000000000000000000000000000000000000') unless defined $hash_stop;
 	
 	my @ans;
 	foreach my $i (CBitcoin::Utilities::block_locator_indicies($this->block_height())){
@@ -217,6 +224,15 @@ sub calculate_block_locator {
 		die "bad index, rebuild block header database" unless defined $hash;
 		push(@ans,$hash);
 	}
+	warn "Have index of n=".scalar(@ans)."\n";
+	# pack('L',$this->version) 
+#	if(scalar(@ans) == 1){
+#		# need to download whole chain
+#		#push(@ans,pack('H*','5c3e6403d40837110a2e8afb602b1c01714bda7ce23bea0a0000000000000000'));
+#		push(@ans,pack('H*','6c3e6403d40837110a2e8afb602b1c01714bda7ce23bea0a0000000000000000'));
+#	}
+	
+	
 	return pack('L',$this->version).CBitcoin::Utilities::serialize_varint(scalar(@ans)).join('',@ans).$hash_stop;
 }
 
@@ -311,11 +327,13 @@ sub our_address {
 
 Mark that a peer has been connected to and that it is ready to do a handshake.
 
+
 =cut
 
 sub add_peer{
 	my $this = shift;
-	my ($socket, $addr_recv_ip,$addr_recv_port) = (shift,shift,shift);
+	
+	my ($socket, $addr_recv_ip,$addr_recv_port) = (shift,shift,shift,shift);
 	my $ref = $this->our_address();
 	my $peer = CBitcoin::Peer->new({
 		'spv' => $this,
@@ -332,6 +350,25 @@ sub add_peer{
 	
 	return 1;
 }
+
+=pod
+
+---++ add_peer_obj($peer)
+
+Same as add_peer, but feed in a Peer object.
+
+=cut
+
+sub add_peer_obj{
+	my ($this,$peer) = (shift,shift);
+	
+	$this->{'peers'}->{fileno($peer->socket)} = $peer;
+	$this->{'peers by address:port'}->{$peer->address}->{$peer->port} = $peer;
+	
+	return 1;
+}
+
+
 
 =pod
 
@@ -614,8 +651,9 @@ sub hook_getdata {
 			last;
 		}
 	}
-	warn "hook_getdata size is ".scalar(@response)."\n";
-	return CBitcoin::Utilities::serialize_varint(scalar(@response)).join('',@response);
+	#warn "hook_getdata size is ".scalar(@response)."\n";
+	return CBitcoin::Utilities::serialize_varint(scalar(@response)).join('',@response) if scalar(@response) > 0;
+	return '';
 }
 
 

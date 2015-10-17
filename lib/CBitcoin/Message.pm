@@ -126,6 +126,7 @@ sub net_magic {
 	return $netmapper->{'MAINNET'};
 }
 
+
 =pod
 
 ---++ serialize($payload,$command,$magic)

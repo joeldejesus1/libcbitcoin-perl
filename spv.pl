@@ -77,9 +77,11 @@ my $spv = CBitcoin::SPV->new({
 my @conn = ('10.19.202.164','8333');
 
 
+foreach my $node ('10.19.202.164','69.164.218.197','46.214.15.40','89.69.168.15','218.161.44.5'){
+	$spv->add_peer_to_db(pack('Q',1),$node,'8333');		
+}
 
 
-$spv->add_peer_to_db(pack('Q',1),@conn);
 $spv->activate_peer($connectsub);
 
 
@@ -93,10 +95,13 @@ $spv->activate_peer($connectsub);
 
 
 while(my $events = epoll_wait($epfd, 10, -1)){
+	warn "Top of epoll loop\n";
+	$spv->activate_peer($connectsub);
+	
 	foreach my $event (@{$events}){
 		#warn "sockets match" if fileno($socket) eq $event->[0];
-		warn "Top of epoll loop\n";
-		$spv->activate_peer($connectsub);
+		
+		
 		if($event->[1] & EPOLLIN){
 			# time to read
 			$spv->peer_by_fileno($event->[0])->read_data();
