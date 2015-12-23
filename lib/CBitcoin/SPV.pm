@@ -33,7 +33,7 @@ sub new {
 	
 	$this->{'version'} = 70001 unless defined $this->{'version'};
 	
-	$this->{'db path'} = '/tmp/spv';
+	$this->{'db path'} = '/tmp/spv' unless defined $this->{'db path'};
 	$this->make_directories();
 
 	
