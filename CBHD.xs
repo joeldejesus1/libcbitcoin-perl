@@ -13,7 +13,7 @@
 #include <CBWIF.h>
 #include <CBByteArray.h>
 #include <CBBase58.h>
-
+#include <errno.h>
 
 CBHDKey* CBHDKey_serializeddata_to_obj(char* privstring){
 	CBByteArray * masterString = CBNewByteArrayFromString(privstring, true);
@@ -58,6 +58,68 @@ char* newMasterKey(int arg){
 	CBReleaseObject(checksumBytes);
 	return (char *)CBByteArrayGetData(str);
 }
+// hard parent to soft child
+char* deriveChildPublicExtended(char* privstring,int child){
+	CBHDKey* masterkey = importDataToCBHDKey(privstring);
+
+	//fprintf(stderr,"hello - 1");
+	// generate child key that does not contain private bits
+	CBHDKey * childkey = CBNewHDKey(true);
+	//fprintf(stderr,"hello - 1.1");
+	CBHDKeyChildID childID = { false, child};
+	//fprintf(stderr,"hello - 1.2");
+	CBHDKeyDeriveChild(masterkey, childID, childkey);
+	//fprintf(stderr,"hello - 1.3");
+	free(masterkey);
+	
+	// delete the private bits from childkey by setting versionBytes to PUBLIC
+	// when the childkey is serialized, the private bits will be skipped
+	childkey->versionBytes = CB_HD_KEY_VERSION_PROD_PUBLIC;
+	
+	//fprintf(stderr,"hello - 2");
+	
+	uint8_t * keyData = malloc(CB_HD_KEY_STR_SIZE);
+	CBHDKeySerialise(childkey, keyData);
+	free(childkey);
+	//fprintf(stderr,"hello - 3");
+	CBChecksumBytes * checksumBytes = CBNewChecksumBytesFromBytes(keyData, 82, false);
+	// need to figure out how to free keyData memory
+	CBByteArray * str = CBChecksumBytesGetString(checksumBytes);
+	CBReleaseObject(checksumBytes);
+	return (char *)CBByteArrayGetData(str);
+}
+
+// soft parent to soft child
+char* deriveChildPublicExtended2(char* pubextstring,int child){
+	CBHDKey* masterkey = importDataToCBHDKey(pubextstring);
+
+	//fprintf(stderr,"hello - 1");
+	// generate child key that does not contain private bits
+	CBHDKey * childkey = CBNewHDKey(false);
+	//fprintf(stderr,"hello - 1.1");
+	CBHDKeyChildID childID = { false, child};
+	//fprintf(stderr,"hello - 1.2");
+	CBHDKeyDeriveChild(masterkey, childID, childkey);
+	//fprintf(stderr,"hello - 1.3");
+	free(masterkey);
+	
+	// delete the private bits from childkey by setting versionBytes to PUBLIC
+	// when the childkey is serialized, the private bits will be skipped
+	//childkey->versionBytes = CB_HD_KEY_VERSION_PROD_PUBLIC;
+	
+	//fprintf(stderr,"hello - 2");
+	
+	uint8_t * keyData = malloc(CB_HD_KEY_STR_SIZE);
+	CBHDKeySerialise(childkey, keyData);
+	free(childkey);
+	//fprintf(stderr,"hello - 3");
+	CBChecksumBytes * checksumBytes = CBNewChecksumBytesFromBytes(keyData, 82, false);
+	// need to figure out how to free keyData memory
+	CBByteArray * str = CBChecksumBytesGetString(checksumBytes);
+	CBReleaseObject(checksumBytes);
+	return (char *)CBByteArrayGetData(str);
+}
+
 
 char* deriveChildPrivate(char* privstring,bool private,int child){
 	CBHDKey* masterkey = importDataToCBHDKey(privstring);
@@ -205,6 +267,18 @@ deriveChildPrivate (privstring, private, child)
 	bool	private
 	int	child
 
+	
+
+char *
+deriveChildPublicExtended (privstring, child)
+	char *	privstring
+	int	child
+
+char *
+deriveChildPublicExtended2 (pubextstring, child)
+	char *	pubextstring
+	int	child
+	
 char *
 exportWIFFromCBHDKey (privstring)
 	char *	privstring

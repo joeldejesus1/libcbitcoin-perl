@@ -29,7 +29,7 @@ require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::Message::VERSION = '0.01';
+$CBitcoin::Message::VERSION = '0.2';
 
 DynaLoader::bootstrap CBitcoin::Message $CBitcoin::Message::VERSION;
 

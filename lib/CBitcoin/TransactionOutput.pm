@@ -20,7 +20,7 @@ require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::TransactionOutput::VERSION = '0.01';
+$CBitcoin::TransactionOutput::VERSION = '0.2';
 
 DynaLoader::bootstrap CBitcoin::TransactionOutput $CBitcoin::TransactionOutput::VERSION;
 

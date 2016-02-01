@@ -11,7 +11,7 @@ CBitcoin::CBHD - The great new CBitcoin::CBHD!
 
 =head1 VERSION
 
-Version 0.01
+Version 0.2
 
 =cut
 
@@ -21,7 +21,7 @@ require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::CBHD::VERSION = '0.01';
+$CBitcoin::CBHD::VERSION = '0.2';
 
 #XSLoader::load('CBitcoin::CBHD',$CBitcoin::CBHD::VERSION );
 DynaLoader::bootstrap CBitcoin::CBHD $CBitcoin::CBHD::VERSION;
@@ -140,6 +140,68 @@ sub deriveChild {
 	return $childkey;
 	
 }
+
+
+=item deriveChildPubExt
+
+---++ deriveChildPubExt($childid)
+
+If you want to take an CBHD key with private key and create a soft child that does not have the private bits, then use this function.
+
+From Hard to Soft.
+
+=cut
+
+sub deriveChildPubExt {
+	my $this = shift;
+	my $childid = shift;
+	my $childkey = new CBitcoin::CBHD;
+	eval{
+
+		unless($childid > 0 && $childid < 2**31){
+			die "The child id is not in the correct range.\n";
+		}
+		die "no private key" unless $this->serialized_data;
+		$childkey->serialized_data(CBitcoin::CBHD::deriveChildPublicExtended($this->serialized_data(),$childid));
+		
+	};
+	if($@){
+		warn "Error:$@";
+		return undef;
+	}
+	return $childkey;
+	
+}
+
+=item deriveChildPubExt2
+
+---++ deriveChildPubExt2($childid)
+
+Defunct, don't use.
+
+=cut
+
+sub deriveChildPubExt2 {
+	my $this = shift;
+	my $childid = shift;
+	my $childkey = new CBitcoin::CBHD;
+	eval{
+
+		unless($childid > 0 && $childid < 2**31){
+			die "The child id is not in the correct range.\n";
+		}
+		die "no private key" unless $this->serialized_data;
+		$childkey->serialized_data(CBitcoin::CBHD::deriveChildPublicExtended2($this->serialized_data(),$childid));
+		
+	};
+	if($@){
+		warn "Error:$@";
+		return undef;
+	}
+	return $childkey;
+	
+}
+
 
 =item WIF
 
