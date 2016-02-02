@@ -87,7 +87,7 @@ sub generate {
 
 ---+ serialized_data
 
-hi
+
 =cut
 
 
@@ -104,6 +104,18 @@ sub serialized_data {
 	else{
 		die "no arguments to create CBitcoin::CBHD data";
 	}
+}
+
+=item is_soft_child
+
+---+ is_soft_child
+
+Returns true if yes, false if soft.
+=cut
+
+
+sub is_soft_child {
+	return shift->{'is soft child'};
 }
 
 =item deriveChild
@@ -126,6 +138,7 @@ sub deriveChild {
 		}
 		else{
 			$hardbool = 0;
+			$childkey->{'is soft child'} = 1;
 		}
 		unless($childid > 0 && $childid < 2**31){
 			die "The child id is not in the correct range.\n";
@@ -163,7 +176,7 @@ sub deriveChildPubExt {
 		}
 		die "no private key" unless $this->serialized_data;
 		$childkey->serialized_data(CBitcoin::CBHD::deriveChildPublicExtended($this->serialized_data(),$childid));
-		
+		$childkey->{'is soft child'} = 1;
 	};
 	if($@){
 		warn "Error:$@";
@@ -171,6 +184,58 @@ sub deriveChildPubExt {
 	}
 	return $childkey;
 	
+}
+
+=item exportPublicExtendedCBHD
+
+---++ exportPublicExtendedCBHD
+
+=cut
+
+
+sub exportPublicExtendedCBHD {
+	my $this = shift;
+	# better make sure we have the private bits
+	return ref($this)->new(exportPublicExtendedKey($this->serialized_data()));
+}
+
+=item network_bytes
+
+---++ network_bytes
+
+=cut
+
+sub network_bytes {
+	my $ans = exportNetworkBytes(shift->serialized_data());
+	if($ans == 1){
+		return 'production';
+	}
+	elsif($ans == 2){
+		return 'test';
+	}
+	else{
+		return 'unknown';
+	}
+}
+
+
+=item cbhd_type
+
+---++ cbhd_type
+
+=cut
+
+sub cbhd_type {
+	my $ans = exportCBHDType(shift->serialized_data());
+	if($ans == 1){
+		return 'private';
+	}
+	elsif($ans == 2){
+		return 'public';
+	}
+	else{
+		return 'unknown';
+	}
 }
 
 

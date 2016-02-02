@@ -25,10 +25,12 @@ $s1 = $root->deriveChild(0,1);
 #warn "Root->(soft,1):".$s1->address()."\n... and public key=".$s1->publickey()."\n";
 #warn "...serialized data=".$s1->serialized_data()."\n";
 $s1s2 = $s1->deriveChild(0,323);
+warn "network=".$s1s2->network_bytes()." and type=".$s1s2->cbhd_type()."\n";
 
-$s1s2 = exportPublicExtendedKeyFromCBHDSoftKey($s1s2->serialized_data());
+$s1s2 = $s1s2->exportPublicExtendedCBHD($s1s2->serialized_data());
 warn "Root->(soft,1)->(soft,323):".$s1s2->address()."\n... and public key=".$s1s2->publickey()."\n";
 warn "...serialized data=".$s1s2->serialized_data()."\n";
+
 
 # strip private parts from soft child
 
@@ -40,6 +42,6 @@ $s1 = $root->deriveChildPubExt(1);
 $s1s2 = $s1->deriveChildPubExt(323);
 warn "Root->(soft,1)->(soft,323) with no private parts:".$s1s2->address()."\n... and public key=".$s1s2->publickey()."\n";
 warn "...serialized data=".$s1s2->serialized_data()."\n";
-
+warn "network=".$s1s2->network_bytes()." and type=".$s1s2->cbhd_type()."\n";
 
 ok ($address, 'get address');

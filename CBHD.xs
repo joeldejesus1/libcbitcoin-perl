@@ -13,6 +13,7 @@
 #include <CBWIF.h>
 #include <CBByteArray.h>
 #include <CBBase58.h>
+#include <CBByteArray.h>
 #include <errno.h>
 
 CBHDKey* CBHDKey_serializeddata_to_obj(char* privstring){
@@ -89,7 +90,7 @@ char* deriveChildPublicExtended(char* privstring,int child){
 	return (char *)CBByteArrayGetData(str);
 }
 
-char* exportPublicExtendedKeyFromCBHDSoftKey(char* privstring){
+char* exportPublicExtendedKey(char* privstring){
 	CBHDKey* childkey = importDataToCBHDKey(privstring);
 	childkey->versionBytes = CB_HD_KEY_VERSION_PROD_PUBLIC;
 	uint8_t * keyData = malloc(CB_HD_KEY_STR_SIZE);
@@ -101,6 +102,36 @@ char* exportPublicExtendedKeyFromCBHDSoftKey(char* privstring){
 	return (char *)CBByteArrayGetData(str);
 }
 
+int exportNetworkBytes(char* privstring){
+	CBHDKey* childkey = importDataToCBHDKey(privstring);
+	CBNetwork networkbytes = CBHDKeyGetNetwork(childkey->versionBytes);
+	free(childkey);
+
+	if(networkbytes == CB_NETWORK_PRODUCTION){
+		return 1;
+	}
+	else if(networkbytes == CB_NETWORK_TEST){
+		return 2;
+	}
+	else{
+		return 3;
+	}
+}
+
+int exportCBHDType(char* privstring){
+	CBHDKey* childkey = importDataToCBHDKey(privstring);
+	CBHDKeyType type = CBHDKeyGetType(childkey->versionBytes);
+	free(childkey);
+	if(type == CB_HD_KEY_TYPE_PRIVATE){
+		return 1;
+	}
+	else if(type == CB_HD_KEY_TYPE_PUBLIC){
+		return 2;
+	}
+	else{
+		return 3;
+	}	
+}
 
 
 char* deriveChildPrivate(char* privstring,bool private,int child){
@@ -239,6 +270,18 @@ MODULE = CBitcoin::CBHD	PACKAGE = CBitcoin::CBHD
 PROTOTYPES: DISABLED
 
 
+int 
+exportNetworkBytes(privstring)
+	char * privstring
+
+int
+exportCBHDType(privstring)
+	char * privstring
+	
+char *
+exportPublicExtendedKey(privstring)
+	char * privstring
+
 char *
 newMasterKey (arg)
 	int	arg
@@ -254,11 +297,6 @@ deriveChildPrivate (privstring, private, child)
 char *
 deriveChildPublicExtended (privstring, child)
 	char *	privstring
-	int	child
-
-char *
-deriveChildPublicExtended2 (pubextstring, child)
-	char *	pubextstring
 	int	child
 	
 char *
