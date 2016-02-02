@@ -173,35 +173,6 @@ sub deriveChildPubExt {
 	
 }
 
-=item deriveChildPubExt2
-
----++ deriveChildPubExt2($childid)
-
-Defunct, don't use.
-
-=cut
-
-sub deriveChildPubExt2 {
-	my $this = shift;
-	my $childid = shift;
-	my $childkey = new CBitcoin::CBHD;
-	eval{
-
-		unless($childid > 0 && $childid < 2**31){
-			die "The child id is not in the correct range.\n";
-		}
-		die "no private key" unless $this->serialized_data;
-		$childkey->serialized_data(CBitcoin::CBHD::deriveChildPublicExtended2($this->serialized_data(),$childid));
-		
-	};
-	if($@){
-		warn "Error:$@";
-		return undef;
-	}
-	return $childkey;
-	
-}
-
 
 =item WIF
 
