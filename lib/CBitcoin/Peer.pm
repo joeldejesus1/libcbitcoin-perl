@@ -21,6 +21,7 @@ our $callback_mapper;
 
 sub new {
 	my $package = shift;
+	my $this = {};
 	bless($this,$package);
 	$this->init(shift);
 	
@@ -38,7 +39,7 @@ sub init {
 	die "need spv base" unless defined $options->{'spv'};
 	
 	$options->{'block height'} ||= 0;
-	$options->{'version'} ||= 70001; 
+	$options->{'version'} ||= 70002; 
 	$options->{'magic'} = 'MAINNET' unless defined $options->{'magic'};
 	
 	die "no good ip address given" unless CBitcoin::Utilities::ip_convert_to_binary($options->{'address'})
@@ -597,7 +598,7 @@ Take an opportunity after processing to see if there is a need to close this con
 
 sub read_data {
 	use POSIX qw(:errno_h);
-	
+	warn "can read from peer";
 	my $this = shift;
 	
 	$this->{'bytes'} = '' unless defined $this->{'bytes'};
@@ -796,7 +797,7 @@ When we can write data, send out 8192 bytes.
 
 sub write_data {
 	use POSIX qw(:errno_h);
-	
+	#warn "can write data\n";
 	my $this = shift;
 	return undef unless defined $this->{'bytes to write'} && length($this->{'bytes to write'}) > 0;
 	
@@ -813,6 +814,7 @@ sub write_data {
 		return 0;
 	}
 	else{
+		warn "wrote $n bytes";
 		substr($this->{'bytes to write'},0,$n) = "";
 		return $n;		
 	}

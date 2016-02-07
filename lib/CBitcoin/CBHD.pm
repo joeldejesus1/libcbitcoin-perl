@@ -115,6 +115,8 @@ Returns true if yes, false if soft.
 
 
 sub is_soft_child {
+	my $this = shift;
+	exportPrivChildIDFromCBHDKey();
 	return shift->{'is soft child'};
 }
 

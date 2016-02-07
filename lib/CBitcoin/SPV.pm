@@ -12,7 +12,7 @@ use Net::IP;
 
 =pod
 
----+ new
+---+ new({'})
 
 Create a new SPV client.
 
@@ -449,7 +449,7 @@ sub activate_peer {
 		}
 
 	}
-
+	
 	
 }
 
@@ -654,6 +654,22 @@ sub hook_getdata {
 	#warn "hook_getdata size is ".scalar(@response)."\n";
 	return CBitcoin::Utilities::serialize_varint(scalar(@response)).join('',@response) if scalar(@response) > 0;
 	return '';
+}
+
+
+=pod
+
+---++ loop($loopsub, $connectsub)
+
+Run an infinite loop
+
+=cut
+
+sub loop {
+	my ($this,$loopsub,$connectsub) = (shift,shift,shift);
+	die "no loop sub" unless defined $loopsub && ref($loopsub) eq 'CODE';
+	die "no connect sub" unless defined $connectsub && ref($connectsub) eq 'CODE';
+	$loopsub->($this,$connectsub);
 }
 
 

@@ -27,6 +27,9 @@ WriteMakefile(
 	,'PREREQ_PM' => {
 		'Test::More' => 0,
 	}
+	,'EXE_FILES' => [
+		'scripts/spv'	
+	]
 	#,'LDDLFLAGS' => ' -fstack-protector '
 	#,'LDFLAGS' => ' -fstack-protector '
 	,'MAKEFILE_OLD' => ''
