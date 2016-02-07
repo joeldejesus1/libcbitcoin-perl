@@ -23,7 +23,7 @@ sub new {
 	my $package = shift;
 	my $this = {};
 	bless($this,$package);
-	$this->init(shift);
+	$this = $this->init(shift);
 	
 	
 	return $this;
@@ -78,13 +78,8 @@ sub init {
 	); 
 	$this->send_version();
 	
+	#die "Socket=".fileno($options->{'socket'})."\n";
 
-	
-	
-	#require Data::Dumper;
-	#my $xo = Data::Dumper::Dumper($this);
-	#warn "XO=$xo\n";
-	
 	return $this;
 }
 
@@ -201,7 +196,13 @@ sub our_version {
 }
 
 sub socket {
-	return shift->{'socket'};
+	my $this = shift;
+	require Data::Dumper;
+	my $xo = Data::Dumper::Dumper($this);
+	open(my $fhout,'>','/tmp/bonus');
+	print $fhout $xo;
+	close($fhout);
+	return $this->{'socket'};
 }
 
 sub last_pinged {
@@ -598,10 +599,12 @@ Take an opportunity after processing to see if there is a need to close this con
 
 sub read_data {
 	use POSIX qw(:errno_h);
-	warn "can read from peer";
+	#warn "can read from peer";
 	my $this = shift;
 	
 	$this->{'bytes'} = '' unless defined $this->{'bytes'};
+	my $socket = $this->socket();
+	warn "Socket=$socket\n";
 	my $n = sysread($this->socket(),$this->{'bytes'},8192,length($this->{'bytes'}));
 
 	
