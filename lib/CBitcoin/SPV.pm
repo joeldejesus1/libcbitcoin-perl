@@ -382,18 +382,18 @@ Find a peer in a pool, and turn it on
 sub activate_peer {
 	my $this = shift;
 	my $connect_sub = shift;
-	warn "activating peer - 1\n";
+	#warn "activating peer - 1\n";
 	# if we are maxed out on connections, then exit
 	return undef unless scalar(keys %{$this->{'peers'}}) < $this->max_connections();
-	warn "activating peer - 1.1\n";
+	#warn "activating peer - 1.1\n";
 	die "not given connection sub" unless defined $connect_sub && ref($connect_sub) eq 'CODE';
-	warn "activating peer - 2\n";
+	#warn "activating peer - 2\n";
 
 	my $dir_pool = $this->db_path().'/peers/pool';
 	my $dir_active = $this->db_path().'/peers/active';
 	my $dir_pending = $this->db_path().'/peers/pending';
 	my $dir_banned = $this->db_path().'/peers/banned';
-	warn "activating peer - 2\n";
+	#warn "activating peer - 2\n";
 	opendir(my $fh,$dir_pool) || die "cannot open directory";
 	my @files = grep { $_ ne '.' && $_ ne '..' } readdir $fh;
 	closedir($fh);
@@ -403,7 +403,7 @@ sub activate_peer {
 	
 	
 	my ($latest,$socket);
-	warn "activating peer - 3\n";
+	#warn "activating peer - 3\n";
 	while(scalar(@peer_files)>0){
 		$latest = shift(@peer_files);
 		warn "Latest peer to try to connect to is hash=$latest\n";
@@ -471,21 +471,21 @@ port
 sub add_peer_to_db{
 	
 	my ($this,$services, $addr_recv_ip,$addr_recv_port) = (shift,shift,shift,shift);
-	warn "Adding peer to db\n";
+	#warn "Adding peer to db\n";
 	
 	my $filename = Digest::SHA::sha256_hex("$addr_recv_ip:$addr_recv_port");
-	warn "Filepath =".$this->db_path().'/peers/pool/'.$filename."\n";
+	#warn "Filepath =".$this->db_path().'/peers/pool/'.$filename."\n";
 	
 	return undef if -f $this->db_path().'/peers/pool/'.$filename || -f $this->db_path().'/peers/active/'.$filename 
 		|| -f $this->db_path().'/peers/banned/'.$filename;
 	
-	warn "adding peer 2\n";
+	#warn "adding peer 2\n";
 	my $fh;
 	#if($this->db_path().'/peers/pool/'.$filename =~ m/^(.*)$/){
 		
 	#}
 	open($fh, '>',$this->db_path().'/peers/pool/'.$filename) || die "cannot open file for peer\n";
-	warn "adding peer 3\n";
+	#warn "adding peer 3\n";
 	if($services & pack('Q',1)){
 		warn "adding peer offering full blocks, not just headers\n";
 		print $fh "FULLBLOCKS\n";
@@ -494,10 +494,10 @@ sub add_peer_to_db{
 		warn "adding peer offering just headers\n";
 		print $fh "HEADERSONLY\n";		
 	}
-	warn "adding peer 4\n";
+	#warn "adding peer 4\n";
 	print $fh "$addr_recv_ip\n$addr_recv_port\n";
 	close($fh);
-	warn "adding peer 5\n";
+	#warn "adding peer 5\n";
 	return 1;
 }
 
@@ -526,7 +526,7 @@ sub peer{
 sub peer_by_fileno {
 	my $this = shift;
 	my $fileno = shift;
-	warn "peer_by_fileno=$fileno\n with glob=".ref($this->{'peers'}->{$fileno})."\n";
+	#warn "peer_by_fileno=$fileno\n with glob=".ref($this->{'peers'}->{$fileno})."\n";
 	
 	require Data::Dumper;
 	my $xo = Data::Dumper::Dumper($this->{'peers'});
@@ -586,6 +586,7 @@ This is called when a handshake is finished.
 sub peer_hook_handshake_finished{
 	my $this = shift;
 	my $peer = shift;
+	
 	
 }
 

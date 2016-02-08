@@ -17,13 +17,6 @@ warn "prevBlockHash=".$gen_block->prevBlockHash_hex."\n";
 warn "Data=".unpack('H*',$gen_block->data)."\n";
 ok(1) || print "Bail out!";
 
-
-
-
-
-
-
-
 # set umask so that files/directories will be 0700 or 0600
 
 umask(077);
@@ -33,14 +26,77 @@ umask(077);
 
 
 my $fn_to_watcher = {};
-# $fn_to_watcher{X}
+
+my $config = {
+	'timeout' => 60
+};
+
+
+my $mode = 0;
+my $mode_setting = sub{
+	my $x = shift;
+	my $m1 = \$mode;
+	if(defined $x && $x == 0){
+		# waiting for pong
+		${$m1} = 0; 
+	}
+	elsif(defined $x){
+		# time to send ping
+		${$m1} = 1;
+	}
+	else{
+		return ${$m1};
+	}
+};
+
+# $resettimeout->($spv,$socket)
+my $resettimeout = sub{
+	my ($spv,$sck1) = @_;
+	my $internal_fn_watcher = $fn_to_watcher;
+	my $c1 = $config;
+	
+
+	$mode_setting->(1);
+	
+	# callback sub
+	my $callback = sub {
+		warn "is called after ".$config->{'timeout'}."s";
+		my $c2 = $c1;
+		my $spv_in = $spv;
+		my $sck2 = $sck1;	
+		my $ms = $mode_setting;
+		my $ifw = $internal_fn_watcher;
+		my $cb2 = $callback;
+		
+		if($ms->()){
+			# 1 first time out, send ping
+			$ms->(0);
+			$spv_in->peer_by_fileno(fileno($sck2))->send_ping();
+			delete $ifw->{fileno($sck2).'timer'};
+			$ifw->{fileno($sck2).'timer'} = EV::timer 30, 0, $cb2;
+		}
+		else{
+			warn "connection timed out\n";
+			$spv_in->close_peer(fileno($sck2));
+		}
+		
+		
+	};
+	
+	delete $internal_fn_watcher->{fileno($sck1).'timer'};
+	$internal_fn_watcher->{fileno($sck1).'timer'} = EV::timer $c1->{'timeout'}, 0, $callback;
+
+};
+
+
 
 my $connectsub = sub{
 	my ($spv,$ipaddress,$port) = @_;
 	my $sck1;
-	warn "Doing connection now, part 1\n";
+	#warn "Doing connection now, part 1\n";
 	
 	my $internal_fn_watcher = $fn_to_watcher;
+	my $rst1 = $resettimeout;
 	
 	eval{
 		local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
@@ -51,39 +107,45 @@ my $connectsub = sub{
 			Proto => 'tcp',
 		) or die "ERROR in Socket Creation : $!\n";
 		alarm 0;
-		warn "Doing connection now, part 2\n";
+		#warn "Doing connection now, part 2\n";
 		
-		$internal_fn_watcher->{fileno($sck1)} = EV::io $sck1, EV::READ, sub {
+		# I/O watcher
+		$internal_fn_watcher->{fileno($sck1)} = EV::io $sck1, EV::READ | EV::WRITE, sub {
 			my ($w, $revents) = @_; # all callbacks receive the watcher and event mask
 			my $sck2 = $sck1;
 			my $sfn = fileno($sck2);
-			warn "in callback with socket=$sfn\n";
+			my $spv2 = $spv;
+			my $rst2 = $rst1;
+			#warn "in callback with socket=$sfn\n";
 			if(!defined $sfn || $sfn < 1){
-				warn "socket has closed";
+				warn "socket has closed\n";
 				my $ifw2 = $internal_fn_watcher;
 				delete $ifw2->{fileno($sck1)};
 				return undef;
 			}
 			else{
-				warn "socket=$sfn\n";
+				#warn "socket=$sfn\n";
 			}
 			
 			# on read
 			if($revents & EV::READ){
-				$spv->peer_by_fileno($sfn)->read_data();
-				if(defined $spv->peer_by_fileno($sfn) && $spv->peer_by_fileno($sfn)->write() > 0){
-					warn "setting eventmask to read/write\n";
+				$spv2->peer_by_fileno($sfn)->read_data();
+				if(defined $spv2->peer_by_fileno($sfn) && $spv2->peer_by_fileno($sfn)->write() > 0){
+					#warn "setting eventmask to read/write\n";
 					$w->events(EV::READ | EV::WRITE);
 				}
+				
+				# reset timeout
+				$rst2->($spv2,$sck2):
 			}
 			
 			# on write
-			if(defined $spv->peer_by_fileno($sfn) && $revents & EV::WRITE ){
-				if(defined $spv->peer_by_fileno($sfn) && $spv->peer_by_fileno($sfn)->write() > 0){
-					$spv->peer_by_fileno($sfn)->write_data();
+			if(defined $spv2->peer_by_fileno($sfn) && $revents & EV::WRITE ){
+				if(defined $spv2->peer_by_fileno($sfn) && $spv2->peer_by_fileno($sfn)->write() > 0){
+					$spv2->peer_by_fileno($sfn)->write_data();
 				}
 				else{
-					warn "setting eventmask to just read\n";
+					#warn "setting eventmask to just read\n";
 					$w->events(EV::READ );
 				}				
 			}
@@ -97,7 +159,7 @@ my $connectsub = sub{
 		return undef;
 	}
 	else{
-		warn "Doing connection now, part 3\n";
+		#warn "Doing connection now, part 3\n";
 		return $sck1;
 	}
 };
