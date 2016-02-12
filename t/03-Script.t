@@ -53,4 +53,13 @@ foreach my $in (@inputs,@outputs){
 
 
 
+my $script = 'OP_2 0xa0e4e90048f5de00f0dfc600d850d300982cd800902bd800385ad300f8afde00b8 0x8863ea00b4e4e900000000008a4d63980f000000666561747572655f756e69636f OP_2 OP_CHECKMULTISIG';
+
+my $x = CBitcoin::Script::serializeP2SH($script);
+my @pieces = split(' ',$x);
+# OP_HASH160 0x3dbcec384e5b32bb426cc011382c4985990a1895 OP_EQUAL
+my $y = CBitcoin::Script::newAddressFromRIPEMD160Hash($pieces[1]);
+if($y =~ m/^1(.*)/){ $y = '3'.$1;}
+warn "Script=$script\nX=$x\nY=$y\n";
+
 

@@ -90,6 +90,11 @@ char* whatTypeOfScript(char* scriptstring){
 
 }
 
+char* serializeP2SH(char* scriptstring){
+	CBScript * script = CBNewScriptP2SHOutput(CBNewScriptFromString(scriptstring));
+	return CBScript_obj_to_serializeddata(script);
+}
+
 
 
 char* addressToScript(char* addressString){
@@ -160,6 +165,10 @@ MODULE = CBitcoin::Script	PACKAGE = CBitcoin::Script
 
 PROTOTYPES: DISABLE
 
+
+char*
+serializeP2SH(scriptstring)
+	char* scriptstring
 
 char *
 newAddressFromRIPEMD160Hash (hexstring)
