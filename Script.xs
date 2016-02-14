@@ -14,7 +14,7 @@
 #include <CBByteArray.h>
 #include <CBBase58.h>
 #include <CBScript.h>
-
+#include <CBBigInt.h>
 
 //bool CBInitScriptFromString(CBScript * self, char * string)
 char* scriptToString(CBScript* script){
@@ -54,9 +54,10 @@ CBScript* CBScript_serializeddata_to_obj(char* scriptstring){
 
 
 // 20 byte hex string (Hash160) to address
-char* newAddressFromRIPEMD160Hash(char* hexstring){
+char* newAddressFromRIPEMD160Hash(char* hexstring, int prefix){
 	CBByteArray* array = hexstring_to_bytearray(hexstring);
-	CBAddress * address = CBNewAddressFromRIPEMD160Hash(CBByteArrayGetData(array),CB_PREFIX_PRODUCTION_ADDRESS, true);
+	fprintf(stderr,"Array Length=%d\n",array->length);
+	CBAddress * address = CBNewAddressFromRIPEMD160Hash(CBByteArrayGetData(array), prefix, true);
 	CBByteArray * addressstring = CBChecksumBytesGetString(CBGetChecksumBytes(address));
 	CBReleaseObject(address);
 	return (char *)CBByteArrayGetData(addressstring);
@@ -82,7 +83,7 @@ char* whatTypeOfScript(char* scriptstring){
 		return "pubkey";
 	}
 	else if(CBScriptIsKeyHash(script)){
-		return "keyhash";
+		return "p2pkh";
 	}
 	else{
 		return "FAILED";
@@ -90,25 +91,66 @@ char* whatTypeOfScript(char* scriptstring){
 
 }
 
-char* serializeP2SH(char* scriptstring){
+char* script_to_p2sh(char* scriptstring){
 	CBScript * script = CBNewScriptP2SHOutput(CBNewScriptFromString(scriptstring));
-	return CBScript_obj_to_serializeddata(script);
-}
-
-
-
-char* addressToScript(char* addressString){
-    CBByteArray * addrStr = CBNewByteArrayFromString(addressString, true);
-    CBAddress * addr = CBNewAddressFromString(addrStr, false);
-
-    CBScript * script = CBNewScriptPubKeyHashOutput(CBByteArrayGetData(CBGetByteArray(addr)) + 1);
-
     char* answer = (char *)malloc(CBScriptStringMaxSize(script)*sizeof(char));
     CBScriptToString(script, answer);
     CBFreeScript(script);
-    //printf("Script = %s\n", answer);
-
     return answer;
+}
+
+/*char* serializeP2SH(char* scriptstring){
+	CBScript * script = CBNewScriptP2SHOutput(CBNewScriptFromString(scriptstring));
+	return CBScript_obj_to_serializeddata(script);
+}*/
+
+
+
+char* addressToHex(char* addressString){
+    CBByteArray * addrStr = CBNewByteArrayFromString(addressString, true);
+    CBAddress * addr = CBNewAddressFromString(addrStr, false);
+    
+    uint8_t * pubKeyHash = CBByteArrayGetData(CBGetByteArray(addr)) + 1;
+    
+    int prefix = (int) CBChecksumBytesGetPrefix(addr);
+    
+    
+    CBScript *script;
+    char *answer;
+    
+    if(prefix == 0x00){
+    	return bytearray_to_hexstring(CBGetByteArray(addr),CBGetByteArray(addr)->length);
+    	//return "p2pkh";
+    }
+    else if(prefix == 0x05){
+    	// see CBInitChecksumBytesFromString for details
+    	return bytearray_to_hexstring(CBGetByteArray(addr),CBGetByteArray(addr)->length);
+	
+    	uint8_t hash[32];
+		uint32_t keylength = 20;
+		//CBSha256(pubKeyHash, keylength, hash);
+
+		
+		script = (CBScript *) CBNewByteArrayOfSize(
+			1 + 1 + keylength + 1
+		);
+		CBByteArraySetByte(script, 0, CB_SCRIPT_OP_HASH160);
+		// indicates 20 bytes follow, see https://github.com/bitcoin/bips/blob/master/bip-0016.mediawiki
+		CBByteArraySetByte(script, 1, 0x14);
+		CBByteArraySetBytes(script, 2, pubKeyHash, keylength);
+		CBByteArraySetByte(script,
+			2 + keylength , 
+			CB_SCRIPT_OP_EQUAL
+		);
+    	
+    }
+    else{
+    	return "unknown";
+    }
+    //return bytearray_to_hexstring(CBGetByteArray(addr), 20);
+    //CBFreeAddress(addr);
+    return CBScript_obj_to_serializeddata(script);
+	//return "crap";
 }
 
 // CBScript * CBNewScriptPubKeyOutput(uint8_t * pubKey);
@@ -160,26 +202,26 @@ char* multisigToScript(SV* pubKeyArray,int mKeysInt, int nKeysInt) {
 
 
 
-
 MODULE = CBitcoin::Script	PACKAGE = CBitcoin::Script	
 
 PROTOTYPES: DISABLE
 
 
 char*
-serializeP2SH(scriptstring)
+script_to_p2sh(scriptstring)
 	char* scriptstring
 
 char *
-newAddressFromRIPEMD160Hash (hexstring)
+newAddressFromRIPEMD160Hash (hexstring,prefix)
 	char *	hexstring
+	int		prefix
 
 char *
 whatTypeOfScript (scriptstring)
 	char *	scriptstring
 
 char *
-addressToScript (addressString)
+addressToHex (addressString)
 	char *	addressString
 
 char *

@@ -48,6 +48,35 @@ sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 =cut
 
+=pod
+
+---++ prefix('p2sh')
+
+Map prefixes to integer.
+
+See https://en.bitcoin.it/wiki/List_of_address_prefixes.
+
+=cut
+
+sub prefix {
+	my $type = shift;
+	
+	my $mapper = {
+		'p2pkh' => 0x00, 'p2sh' => 0x05,
+		0x00 => 'p2pkh', 0x05 => 'p2sh'
+	};
+
+	if(defined $type && defined $mapper->{$type}){
+		return $mapper->{$type};
+	}
+	else{
+		die "invalid prefix of $type";
+	}
+	
+}
+
+
+
 =item address_to_script
 
 ---++ address_to_script
@@ -58,14 +87,24 @@ sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 sub address_to_script {
 	#use bigint;
 	my $x = shift;
-	if(defined $x && $x =~ m/^([0-9a-zA-Z]+)$/){
-		# addressToScript is a C function
-		return addressToScript($x);
+	die "bad address" unless defined $x && 0 < length($x);
+	$x = addressToHex($x);
+	
+	my $prefix = prefix(hex(substr($x,0,2)));
+	my $hash = substr($x,2,40);
+	
+	# change to hex	
+	if($prefix eq 'p2pkh'){
+		return 'OP_DUP OP_HASH160 0x'.$hash.' OP_EQUALVERIFY OP_CHECKSIG';
+	}
+	elsif($prefix eq 'p2sh'){
+		return 'OP_HASH160 0x'.$hash.' OP_EQUAL';
 	}
 	else{
-		die "this is not an address($x)";
-	}	
+		die "should not be here.";
+	}
 }
+
 
 =item script_to_address
 
@@ -76,14 +115,39 @@ sub address_to_script {
 sub script_to_address {
 	#use bigint;
 	my $x = shift;
+	die "no script given" unless defined $x && 0 < length($x);
+	
+	my $type = whatTypeOfScript($x);
+	
 	# this part only works for OP_HASH160
-	if(defined $x && $x =~ m/\s0x([0-9a-fA-F]{40}\s)/){
-		# this is a C function
-		return newAddressFromRIPEMD160Hash($1);
+	if($type eq 'multisig'){
+		# need to get p2sh 
+		$x = script_to_p2sh($x);
+		warn "P2SH Script=$x\n";
+		# then, get: OP_HASH160 0x3dbcec384e5b32bb426cc011382c4985990a1895 OP_EQUAL
+		my @y = split(' ',$x);
+		warn "Hash=".length(substr($y[1],2))."\n";
+		return newAddressFromRIPEMD160Hash(substr($y[1],2),prefix('p2sh'));
+	}
+	elsif($type eq 'p2sh'){
+		# we have: OP_HASH160 0x3dbcec384e5b32bb426cc011382c4985990a1895 OP_EQUAL
+		my @y = split(' ',$x);
+		warn "Hash=".substr($y[1],2)."\n";
+		return newAddressFromRIPEMD160Hash(substr($y[1],2),prefix('p2sh'));
+	}
+	elsif($type eq 'pubkey'){
+		die "cannot handle pubkey";
+	}
+	elsif($type eq 'p2pkh'){
+		# we have: OP_DUP OP_HASH160 0x3dbcec384e5b32bb426cc011382c4985990a1895 OP_EQUALVERIFY OP_CHECKSIG
+		my @y = split(' ',$x);
+		warn "Hash=".substr($y[2],2)."\n";
+		return newAddressFromRIPEMD160Hash(substr($y[2],2),prefix('p2pkh'));
 	}
 	else{
-		die "This is not a script($x).";
+		die "bad type";
 	}
+	
 }
 
 =item pubkeys_to_multisig_script
