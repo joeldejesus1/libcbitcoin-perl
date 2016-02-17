@@ -127,7 +127,7 @@ sub prevOutHash {
 	#use bigint;
 	my $this = shift;
 	# this is a C function
-	get_prevOutHash_from_obj($this->{'data'});
+	return get_prevOutHash_from_obj($this->{'data'});
 }
 
 =item prevOutIndex

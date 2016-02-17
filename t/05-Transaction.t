@@ -43,6 +43,7 @@ my @outputs = (
 
 
 
+my $script = 'OP_2 0x 0x OP_2 OP_CHECKMULTISIG';
 
 
 my @inputs = (
@@ -50,8 +51,8 @@ my @inputs = (
 		'data' => '3045022100e2a8aeffa78232e897d11e620649ca800d858f727785a55bf4c3c75464d4c29d0220184a698d48e94da4d5fe52fd293cbea31231d61e9bece1c080a6f4e54bc38d4e01'
 		,'hash' => '60163bdd79e0b67b33eb07dd941af5dfd9ca79b85866c9d69993d95488e71f2d'
 		,'index' => 0
-		,'address' => $multisig_address
-		,'script' => CBitcoin::Script::address_to_script($multisig_address)
+		,'address' => CBitcoin::Script::script_to_address($multisig_script)
+		,'script' => $multisig_script
 		,'value' => 0.01032173*100000000
 	}
 	,{
@@ -113,6 +114,23 @@ warn "XO=$xo\n";
 
 
 ok ( $tx->numOfInputs , 'Testing Tx: '.1) || print "Bail out!\n";
+
+=pod
+
+---++ Test Signing
+
+Sign this transaction.
+
+For p2sh, do the following:
+   1. do multisig signatures
+   1. Add the redeeming script to the end via:
+   	CBTransactionAddP2SHScript(CBTransaction * self, CBScript * p2shScript, uint32_t input)
+
+
+=cut
+
+
+
 
 __END__
 
