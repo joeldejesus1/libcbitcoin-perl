@@ -105,6 +105,21 @@ sub address_to_script {
 	}
 }
 
+=pod
+
+---++ address_type
+
+p2pkh or p2sh or unknown...
+
+=cut
+
+sub address_type {
+	my $x = shift;
+	$x = addressToHex($x);
+	return prefix(hex(substr($x,0,2)));
+}
+
+
 
 =item script_to_address
 

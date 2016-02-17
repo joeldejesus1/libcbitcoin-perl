@@ -52,6 +52,7 @@ sub new {
 	my $this = bless({}, $package);
 	$this->{'inputs'} = [];
 	$this->{'outputs'} = [];
+	$this->{'original scripts'} = {};
 	my $x = shift;
 	unless(ref($x) eq 'HASH'){
 		return $this;
@@ -70,8 +71,25 @@ sub new {
 		$x->{'version'} ||= 1;
 		my @inputs;
 		foreach my $i1 (@{$x->{'inputs'}}){
-			#warn "Input:".$i1->serialized_data."\n";
-			push(@inputs,$i1->serialized_data);
+			#warn "Input:".$i1->serialized_data."\n";			
+			# sometimes, we get non p2pkh scripts like multsig, etc
+			# ..so let's assume that this input is p2sh
+			my $tmpaddress = CBitcoin::Script::script_to_address($i1->script());
+			my $type = CBitcoin::Script::address_type($tmpaddress);
+			if($type eq 'p2sh'){
+				$this->{'original scripts'}->{$i1->prevOutHash().$i1->prevOutIndex()} =
+						$i1->script();
+				
+				# have to change the script
+				push(@inputs,CBitcoin::TransactionInput->new({
+					'prevOutHash' => $i1->prevOutHash()
+					,'prevOutIndex' => $i1->prevOutIndex()
+					,'script' => CBitcoin::Script::address_to_script($tmpaddress)
+				})->serialized_data);
+			}
+			else{
+				push(@inputs,$i1->serialized_data);	
+			}
 		}
 		my @outputs;
 		foreach my $i1 (@{$x->{'outputs'}}){
@@ -97,6 +115,21 @@ sub new {
 	
 	
 	return $this;
+}
+
+=pod
+
+---++ original_script($txhash,$txid)->script
+
+=cut
+
+sub original_script{
+	my $this = shift;
+	my ($txid,$index) = @_;
+	die "no txid or index ($txid,$index)" unless
+		defined $txid && defined $index;
+	return $this->{'original scripts'}->{$txid.$index};	
+	
 }
 
 =item serialized_data
@@ -193,6 +226,8 @@ sub sign_single_input {
 	# 	p2sh, pubkey, keyhash, multisig
 	#my $scripttype = CBitcoin::Script::whatTypeOfScript($prevOutInput->script() );
 	my $script = $prevOutInput->script();
+	my $script_type = CBitcoin::Script::script_type($script);
+	
 	#warn "My script:".$prevOutInput->script()."\n";
 	my $data;
 
