@@ -250,10 +250,33 @@ char* sign_tx_multisig(char* txString, char* keypairString, char* prevOutSubScri
 	return CBTransaction_obj_to_serializeddata(tx);
 }
 
+char* addredeemscript(char* txString, char* redeemScript,int input){
+	// CBTransactionAddP2SHScript(CBTransaction * self, CBScript * p2shScript, uint32_t input)
+	CBTransaction * self = CBTransaction_serializeddata_to_obj(txString);
+	//fprintf(stderr,"...part 3.1\n...script=%s\n",redeemScript);
+	CBScript * p2shScript = CBNewScriptFromString(redeemScript);
+	//CBTransactionAddP2SHScript(self, tx_stringToScript(redeemScript),(uint32_t) index);
+	//fprintf(stderr,"...part 3.2\n");
+	uint16_t offset = self->inputs[input]->scriptObject->length;
+	//fprintf(stderr,"...part 3.3 with offset=%d\n",offset);
+	CBScript * inScript = CBNewByteArrayOfSize(offset + p2shScript->length + CBScriptGetLengthOfPushOp(p2shScript->length));
+	//fprintf(stderr,"...part 4\n");
+	CBByteArrayCopyByteArray(inScript, 0, self->inputs[input]->scriptObject);
+	//fprintf(stderr,"...part 5\n");
+	CBReleaseObject(self->inputs[input]->scriptObject);
+	//fprintf(stderr,"...part 6\n");
+	self->inputs[input]->scriptObject = inScript;
+	//fprintf(stderr,"...part 7\n");
+	CBScriptWritePushOp(inScript, offset, CBByteArrayGetData(p2shScript), p2shScript->length);
+	return CBTransaction_obj_to_serializeddata(self);
+}
+
 
 MODULE = CBitcoin::Transaction	PACKAGE = CBitcoin::Transaction	
 
 PROTOTYPES: DISABLE
+
+
 
 
 char *
@@ -311,3 +334,8 @@ sign_tx_multisig (txString, keypairString, prevOutSubScriptString, input, signTy
 	int	input
 	char *	signTypeString
 
+char *
+addredeemscript(txString,redeemScript,input)
+	char * txString
+	char * redeemScript
+	int input
