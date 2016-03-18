@@ -140,6 +140,7 @@ sub handshake_finished{
 	if($this->sent_version && $this->sent_verack && $this->received_version && $this->received_verack){
 		$this->{'handshake finished'} = 1;
 		warn "handshake is finished, ready to run hooks\n";
+		$this->spv->peer_hook_handshake_finished($this);
 		return 1;
 	}
 	else{

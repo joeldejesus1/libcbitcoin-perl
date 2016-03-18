@@ -587,6 +587,7 @@ sub peer_hook_handshake_finished{
 	my $this = shift;
 	my $peer = shift;
 	
+	warn "Ready to go! with $peer\n";
 	
 }
 
