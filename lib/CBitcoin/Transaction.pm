@@ -44,6 +44,8 @@ sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 ---++ new()
 
+By default, all non-p2pkh scripts are converted to p2sh.
+
 =cut
 
 sub new {
@@ -53,6 +55,9 @@ sub new {
 	$this->{'inputs'} = [];
 	$this->{'outputs'} = [];
 	$this->{'original scripts'} = {};
+
+	$this->{'p2sh'} = 1 unless defined $this->{'p2sh'};
+
 	my $x = shift;
 	unless(ref($x) eq 'HASH'){
 		return $this;
@@ -72,24 +77,11 @@ sub new {
 		my @inputs;
 		foreach my $i1 (@{$x->{'inputs'}}){
 			#warn "Input:".$i1->serialized_data."\n";			
-			# sometimes, we get non p2pkh scripts like multsig, etc
-			# ..so let's assume that this input is p2sh
-			my $tmpaddress = CBitcoin::Script::script_to_address($i1->script());
-			my $type = CBitcoin::Script::address_type($tmpaddress);
-			if($type eq 'p2sh'){
-				$this->{'original scripts'}->{$i1->prevOutHash().$i1->prevOutIndex()} =
-						$i1->script();
-				
-				# have to change the script
-				push(@inputs,CBitcoin::TransactionInput->new({
-					'prevOutHash' => $i1->prevOutHash()
-					,'prevOutIndex' => $i1->prevOutIndex()
-					,'script' => CBitcoin::Script::address_to_script($tmpaddress)
-				})->serialized_data);
-			}
-			else{
-				push(@inputs,$i1->serialized_data);	
-			}
+
+
+			push(@inputs,$i1->serialized_data);	
+
+
 		}
 		my @outputs;
 		foreach my $i1 (@{$x->{'outputs'}}){
@@ -201,37 +193,40 @@ Sign the ith ($index) output with the private key corresponding to the inputs.  
 =cut
 
 sub sign_single_input {
-
-	#use bigint;
-	
 	my $this = shift;
-	my $OldData = $this->serialized_data();
-	#die "not correct Transaction type" unless ref($this) eq 'CBitcoin::Transaction';
-	my ($index,$keypair) = (shift,shift);
+	
+	my ($index,$keypair,$signtype) = @_;
+	
+	unless(defined $signtype){
+		$signtype = 'p2pkh';
+	}
+	
+	
 	unless($index =~ m/\d+/ && 0 <= $index && $index < $this->numOfInputs){
 		die "index is not in the proper range ($index).\n";
 	}
 	unless($keypair->address =~ m/^[0-9a-zA-Z]+$/){
 		die "keypair is not a CBitcoin::CBHD object.\n";
 	}
-
+	
 	unless($this->serialized_data()){
 		die "serialize the tx data first, before trying to sign prevOuts.\n";
 	}
+	my $OldData = $this->serialized_data();
 	
 	# get the input
 	my $prevOutInput = $this->input($index);
 	
-	# find out what type of script we are dealing with
-	# 	p2sh, pubkey, keyhash, multisig
-	#my $scripttype = CBitcoin::Script::whatTypeOfScript($prevOutInput->script() );
+
 	my $script = $prevOutInput->script();
-	my $script_type = CBitcoin::Script::script_type($script);
-	
-	#warn "My script:".$prevOutInput->script()."\n";
+
+	#my $address_type = CBitcoin::Script::address_type($script);
+
 	my $data;
 
-	if($script =~ m/OP_HASH160/){
+
+	if($signtype eq 'p2pkh'){
+		# this is a p2pkh script
 		$data = CBitcoin::Transaction::sign_tx_pubkeyhash(
 			$this->serialized_data()
 			,$keypair->serialized_data()
@@ -240,12 +235,12 @@ sub sign_single_input {
 			,'CB_SIGHASH_ALL'
 		);
 	}
-	elsif($script =~ m/OP_CHECKMULTISIG/ || $script =~ m/OP_CHECKMULTISIGVERIFY/ ){
-		# do multisig 
+	elsif($signtype eq 'multisig'){
+		# do multisig with the OP_HASH160 0x3289gfedcabc OP_EQUALVERIFY	
 		$data = CBitcoin::Transaction::sign_tx_multisig(
 			$this->serialized_data()
 			,$keypair->serialized_data()
-			,$prevOutInput->script()
+			,$prevOutInput->script() 
 			,$index
 			,'CB_SIGHASH_ALL'
 		);
@@ -256,8 +251,39 @@ sub sign_single_input {
 	# make sure that the new data contains something different
 	die "signature failed" if $data eq $OldData;
 	#warn "New Signature ($data)\n";
-	return $this->serialized_data($data);	
+	return $this->serialized_data($data);		
 }
+
+
+
+
+=pod
+
+---++ addRedeemScript($input_index,$script)
+
+This adds the redeem script to the end of the stack.
+
+=cut
+
+sub add_redeem_script {
+	my $this = shift;
+	my ($index,$redeem_script) = @_;
+	die "no redeem script" unless defined $redeem_script;
+	die "bad index" unless defined $index
+		&& $index =~ m/^(\d+)$/ && $index < $this->numOfInputs();
+	
+	my $OldData = $this->serialized_data();
+	#warn "redeem - part 1\n";
+	my $data = CBitcoin::Transaction::addredeemscript(
+		$OldData
+		,$redeem_script
+		,$index
+	);
+	#warn "redeem - part 2\n";
+	die "adding p2sh redeeming script failed" if $data eq $OldData;
+	return $this->serialized_data($data);
+}
+
 
 =item numOfInputs
 
