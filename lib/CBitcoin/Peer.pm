@@ -581,6 +581,41 @@ sub callback_gotpong {
 }
 
 
+=pod
+
+---++ callback_gotinv
+
+# https://en.bitcoin.it/wiki/Protocol_documentation#inv
+
+ ? 	count 	var_int 	Number of inventory entries 
+ 
+ 36x? 	inventory 	inv_vect[] 	Inventory vectors 
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'inv'} = {
+		'subroutine' => \&callback_gotinv
+	}
+};
+
+sub callback_gotinv {
+	my $this = shift;
+	my $msg = shift;
+	
+	open(my $fh,'<',\$msg->{'payload'});
+	
+	my $count = CBitcoin::Utilities::deserialize_varint($fh);
+	warn "we have gotten $count inventory vectors\n";
+	#my @vectors;
+	foreach my $i (1..$count){
+		my $ref = CBitcoin::Utilities::deserialize_invvector($fh);
+		$this->spv->getdata($ref->[0],$ref->[1]);
+	}
+	return 1;
+	
+}
+
 
 
 =pod
@@ -620,6 +655,8 @@ sub read_data {
 		
 		while($this->read_data_parse_msg()){
 			warn "Trying to parse another message\n";
+			# maybe use this opportunity to see if there is anything to write???
+			$this->write($this->spv->hook_getdata());
 		}
 		
 		if($this->is_marked_finished()){
@@ -767,16 +804,17 @@ sub write {
 
 	$data = '' unless defined $data;
 
-	if($this->handshake_finished()){
+	#if($this->handshake_finished()){
 		#my $x = length($data);
-		$data .= $this->hook_getheaders();
+		
+		#$data .= $this->hook_getheaders();
 		#$x = length($data) - $x;
 		#warn "Running peer getheader hooks, got $x\n";
 		#$x = length($data);
-		$data .= $this->spv->hook_getdata();
+		#$data .= $this->spv->hook_getdata();
 		#$x = length($data) - $x;
 		#warn "Running spv getdata hooks, got $x\n";
-	}
+	#}
 
 	return length($this->{'bytes to write'}) unless defined $data && length($data) > 0;
 	$this->{'bytes to write'} .= $data;
@@ -856,6 +894,36 @@ sub hook_getheaders {
 		return CBitcoin::Message::serialize(
 			$this->spv->calculate_block_locator(),
 			'getheaders',
+			CBitcoin::Message::net_magic($this->magic)  # defaults as MAINNET
+		);
+	}
+	else{
+		return '';
+	}
+	
+}
+
+=pod
+
+---++ hook_getblocks
+
+Compare the spv's block height with the peer's.  Use that as a condition as to whether or not to fetch blocks/headers.
+
+The timeout on this command is 10 minutes.
+
+=cut
+
+sub hook_getblocks {
+	my $this = shift;
+	
+	# $this->block_height $this->spv->block_height;
+	my $cmd = 'getblocks';
+	if(!defined $this->{$cmd} || 10*60 < (time() - $this->{$cmd}->{'time'})){
+		$this->{$cmd}->{'time'} = time();
+		warn "Doing getblocks\n";
+		return CBitcoin::Message::serialize(
+			$this->spv->calculate_block_locator(),
+			$cmd,
 			CBitcoin::Message::net_magic($this->magic)  # defaults as MAINNET
 		);
 	}

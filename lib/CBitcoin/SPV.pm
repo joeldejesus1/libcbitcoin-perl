@@ -588,7 +588,8 @@ sub peer_hook_handshake_finished{
 	my $peer = shift;
 	
 	warn "Ready to go! with $peer\n";
-	
+	#$this->hook_getdata();
+	$peer->write($peer->hook_getblocks());
 }
 
 =pod
@@ -602,9 +603,15 @@ Add the pair to the list of inventory_vectors that need to be fetched
 sub getdata {
 	my $this = shift;
 	my ($type,$hash) = @_;
+	
+	my $typemapper = ['error','tx','block','filtered_block'];
+	
+	# type is a number
+	$type = $typemapper->[$type];
+	
 	return undef unless defined $type && ($type eq 'error' || $type eq 'tx' || $type eq 'block' ) && defined $hash && length($hash) > 0;
 	# length($hash) should be equal to 32 (256bits), but in the future that might change.
-	
+	warn "Adding inv($type,".unpack('H*',$hash).")\n";
 	unless(defined $this->{'inv search'}->{$type}->{$hash}){
 		$this->{'inv search'}->{$type}->{$hash} = [0];
 	}
@@ -623,7 +630,7 @@ sub hook_getdata {
 	my @response;
 	
 	my ($i,$max_count_per_peer) = (0,500);
-	#warn "hook_getdata part 1 \n";
+	warn "hook_getdata part 1 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->{'error'}}){
 		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->{'error'}->{$hash}->[0] )){
 			push(@response,pack('L',0).$hash);
@@ -633,7 +640,7 @@ sub hook_getdata {
 			last;
 		}
 	}
-	#warn "hook_getdata part 2 \n";
+	warn "hook_getdata part 2 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->{'tx'}}){
 		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->{'tx'}->{$hash}->[0] )){
 			push(@response,pack('L',1).$hash);
@@ -643,7 +650,7 @@ sub hook_getdata {
 			last;
 		}
 	}
-	#warn "hook_getdata part 3 \n";
+	warn "hook_getdata part 3 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->{'block'}}){
 		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->{'block'}->{$hash}->[0] )){
 			push(@response,pack('L',2).$hash);
@@ -653,7 +660,7 @@ sub hook_getdata {
 			last;
 		}
 	}
-	#warn "hook_getdata part 4 \n";
+	warn "hook_getdata part 4 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->{'filtered block'}}){
 		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->{'filtered block'}->{$hash}->[0] )){
 			push(@response,pack('L',3).$hash);
@@ -663,7 +670,7 @@ sub hook_getdata {
 			last;
 		}
 	}
-	#warn "hook_getdata size is ".scalar(@response)."\n";
+	warn "hook_getdata size is ".scalar(@response)."\n";
 	return CBitcoin::Utilities::serialize_varint(scalar(@response)).join('',@response) if scalar(@response) > 0;
 	return '';
 }
