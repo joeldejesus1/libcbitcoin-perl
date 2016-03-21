@@ -607,28 +607,54 @@ sub getdata {
 	my $typemapper = ['error','tx','block','filtered_block'];
 	
 	# type is a number
-	$type = $typemapper->[$type];
+	my $typeENG = $typemapper->[$type];
 	
-	return undef unless defined $type && ($type eq 'error' || $type eq 'tx' || $type eq 'block' ) && defined $hash && length($hash) > 0;
+	return undef unless defined $typeENG && ($typeENG eq 'error' || $typeENG eq 'tx' || $typeENG eq 'block' ) && defined $hash && length($hash) == 32;
+	
 	# length($hash) should be equal to 32 (256bits), but in the future that might change.
 	warn "Adding inv($type,".unpack('H*',$hash).")\n";
+	
+	unless(defined $this->{'inv queue'}){
+		$this->{'inv queue'} = [];
+	}
+	
 	unless(defined $this->{'inv search'}->{$type}->{$hash}){
-		$this->{'inv search'}->{$type}->{$hash} = [0];
+		# mark when the inv was added
+		$this->{'inv search'}->{$type}->{$hash} = [time()];
+		push(@{$this->{'inv queue'}},[$type,$hash]);
 	}
 }
 
 =pod
 
----++ hook_getdata()
+---++ hook_getdata($peer)
 
 This is called by a peer when it is ready to write.  Max count= 500 per peer.  The timeout is 60 seconds.
+
+This subroutine is called in Peer::read_data via Peer::spv_hook_getdata
 
 =cut
 
 sub hook_getdata {
 	my $this = shift;
-	my @response;
+	my $peer = shift;
 	
+	my @response;
+	warn "hook_getdata part 1\n";
+	return undef unless defined $this->{'inv queue'} && ref($this->{'inv queue'}) eq 'ARRAY' && 0 < scalar(@{$this->{'inv queue'}});
+	
+	warn "hook_getdata part 2\n";
+	my $invref  = shift(@{$this->{'inv queue'}});
+	# mark when the getdata is going out 
+	$this->{'inv search'}->{$invref->[0]}->{$invref->[1]}->[1] = time();
+	# mark which peer is fetching this vector
+	$this->{'inv search'}->{$invref->[0]}->{$invref->[1]}->[2] = $peer;
+	
+	$peer->send_getdata([$invref]);
+
+	return 1; # return number of items sent
+	
+=pod
 	my ($i,$max_count_per_peer) = (0,500);
 	warn "hook_getdata part 1 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->{'error'}}){
@@ -672,6 +698,7 @@ sub hook_getdata {
 	}
 	warn "hook_getdata size is ".scalar(@response)."\n";
 	return CBitcoin::Utilities::serialize_varint(scalar(@response)).join('',@response) if scalar(@response) > 0;
+=cut
 	return '';
 }
 

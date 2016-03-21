@@ -386,6 +386,12 @@ sub send_verack {
 	return $this->write(CBitcoin::Message::serialize('','verack',$this->magic));
 }
 
+=pod
+
+---+++ send_ping()
+
+=cut
+
 sub send_ping {
 	my $this = shift;
 	warn "Sending ping\n";
@@ -394,12 +400,39 @@ sub send_ping {
 	return $this->write(CBitcoin::Message::serialize($this->{'sent ping nonce'},'ping',$this->magic));
 }
 
+=pod
+
+---+++ send_pong($nonce)
+
+=cut
+
 sub send_pong {
 	my $this = shift;
 	my $nonce = shift;
 	die "bad nonce" unless defined $nonce && length($nonce) == 8;
 	warn "Sending pong\n";
 	return $this->write(CBitcoin::Message::serialize($nonce,'pong',$this->magic));
+}
+
+=pod
+
+---+++ send_getdata(\@invs)
+
+=cut
+
+sub send_getdata {
+	my $this = shift;
+	my $array_ref = shift;
+	return undef unless defined $array_ref && ref($array_ref) eq 'ARRAY' && 0 < scalar(@{$array_ref});
+	
+	my $payload = '';
+	foreach my $invref (@{$array_ref}){
+		$payload .= pack('L',$invref->[0]).$invref->[1];
+		
+	}
+
+	warn "Sending getdata\n";
+	return $this->write(CBitcoin::Message::serialize(CBitcoin::Utilities::serialize_varint( scalar(@{$array_ref}) ).$payload,'getdata',$this->magic));
 }
 
 =pod
@@ -617,6 +650,75 @@ sub callback_gotinv {
 }
 
 
+=pod
+
+---++ callback_block
+
+# https://en.bitcoin.it/wiki/Protocol_documentation#inv
+
+ ? 	count 	var_int 	Number of inventory entries 
+ 
+ 36x? 	inventory 	inv_vect[] 	Inventory vectors 
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'block'} = {
+		'subroutine' => \&callback_block
+	}
+};
+
+sub callback_block {
+	my $this = shift;
+	my $msg = shift;
+	
+	my $type = 2;
+	
+	open(my $fh,'<',\$msg->{'payload'});
+	
+	my $count = CBitcoin::Utilities::deserialize_varint($fh);
+	warn "we have gotten $count inventory vectors\n";
+	#my @vectors;
+	foreach my $i (1..$count){
+		my $ref = CBitcoin::Utilities::deserialize_invvector($fh);
+		$this->spv->getdata($ref->[0],$ref->[1]);
+	}
+	return 1;
+	
+}
+
+=pod
+
+---++ callback_filteredblock
+
+# https://en.bitcoin.it/wiki/Protocol_documentation#inv
+
+ ? 	count 	var_int 	Number of inventory entries 
+ 
+ 36x? 	inventory 	inv_vect[] 	Inventory vectors 
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'filtered block'} = {
+		'subroutine' => \&callback_filteredblock
+	}
+};
+
+sub callback_filteredblock {
+	my $this = shift;
+	my $msg = shift;
+	
+	my $type = 2;
+	
+	open(my $fh,'<',\$msg->{'payload'});
+	
+	warn "not programmed yet!\n";
+	
+	return 1;
+	
+}
+
 
 =pod
 
@@ -655,8 +757,8 @@ sub read_data {
 		
 		while($this->read_data_parse_msg()){
 			warn "Trying to parse another message\n";
-			# maybe use this opportunity to see if there is anything to write???
-			$this->write($this->spv->hook_getdata());
+			# maybe use this opportunity to see if there is anything to write??? as it is an idle time
+			$this->spv_hook_getdata();
 		}
 		
 		if($this->is_marked_finished()){
@@ -714,6 +816,9 @@ sub read_data_parse_msg {
 	}
 	
 }
+
+
+
 
 =pod
 
@@ -933,5 +1038,27 @@ sub hook_getblocks {
 	
 }
 
+=pod
+
+---++ spv_hook_getdata()
+
+Take the opportunity to see if we need to ask for some inventory vectors. See SPV::hook_getdata.
+
+This subroutine is called in Peer::read_data via SPV::hook_getdata.
+
+=cut
+
+sub spv_hook_getdata{
+	my $this = shift;
+	warn "doing spv hook getdata";
+	if(defined $this->{'current inv'}){
+		warn "nothing to send back";
+		return undef;
+	}
+	else{
+		$this->{'current inv'} = 1 if $this->spv->hook_getdata($this);
+	}
+	
+}
 
 1;
