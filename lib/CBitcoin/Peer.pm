@@ -719,6 +719,8 @@ sub callback_block {
 	
 	$this->spv->add_block_to_db($block);
 
+	$this->spv->initialize_chain_scan_files();
+
 	#require Data::Dumper;
 	#my $xo = Data::Dumper::Dumper($d);
 	#warn "Block:$xo";
