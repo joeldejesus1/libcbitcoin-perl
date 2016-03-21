@@ -279,9 +279,19 @@ sub block{
 	return $this->{'headers'}->[$index];
 }
 
+=pod
+
+---+++ block($index)
+
+Get block by index number.
+
+=cut
 
 sub block_height {
 	my $this = shift;
+	
+	return $this->{'latest block'}->[0];
+	
 	my $new_height = shift;
 	if(defined $new_height && $new_height =~ m/^(\d+)$/){
 		$this->{'block height'} += $1;
@@ -293,6 +303,161 @@ sub block_height {
 	else{
 		die "bad block height";
 	}
+}
+
+=pod
+
+---+++ count_blocks()
+
+Go through the file system and map out the index.
+
+=cut
+
+sub count_blocks {
+	my $this = shift;
+
+	unless(defined $this->{'latest block'}){
+		$this->{'latest block'} = [-1,-1];
+	}
+
+#	my @path = CBitcoin::Utilities::HashToFilepath($block->hash_hex);
+	my $base = $this->db_path();
+	my $headersfp = "$base/headers";
+	
+	warn "link blocks\n";
+	my ($buf);
+	opendir(my $fh,$headersfp) || return;
+	my @x1 = readdir($fh);
+	closedir();
+	foreach my $y1 (@x1){
+		next if $y1 eq '.' || $y1 eq '..';
+		opendir($fh,$headersfp.'/'.$y1);
+		my @x2 = readdir($fh);
+		closedir($fh);
+		foreach my $y2 (@x2){
+			next if $y2 eq '.' || $y2 eq '..';
+			opendir($fh,$headersfp.'/'.$y1.'/'.$y2);
+			my @x3 = readdir($fh);
+			close($fh);
+			foreach my $y3 (@x3){
+				next if $y3 eq '.' || $y3 eq '..';
+				# finally got to block directories
+				my $blockfp = $headersfp.'/'.$y1.'/'.$y2.'/'.$y3;
+				next if defined $this->{'blocks'}->{pack('H*',$y1.$y2.$y3)};
+				
+				# get the previousHash
+				open($fh,'<',$headersfp.'/'.$y1.'/'.$y2.'/'.$y3.'/hash') || die "cannot read hash";
+				my $prevhash;
+				while(sysread($fh,$buf,8192)){ $prevhash .= $buf; }
+				close($fh);
+				my $hash = pack('H*',$y1.$y2.$y3);
+				# [$prevhash,$index_num,$nexthash]
+				$this->{'blocks'}->{$hash} = [$prevhash,-1,-1];
+				if(defined $this->{'blocks'}->{$prevhash}){
+					$this->{'blocks'}->{$prevhash}->[2] = $hash;
+					if(0 < $this->{'blocks'}->{$prevhash}->[1]){
+						$this->{'blocks'}->{$hash}->[1] = $this->{'blocks'}->{$prevhash}->[1] + 1;
+						$this->{'block index'}->[$this->{'blocks'}->{$hash}->[1]] = $hash;
+						# set the latest block to [$index,$hash]
+						$this->{'latest block'} = [$this->{'blocks'}->{$hash}->[1],$hash];
+							if $this->{'latest block'} < $this->{'blocks'}->{$hash}->[1];
+					}
+					elsif($prevhash eq pack('H*','0000000000000000000000000000000000000000000000000000000000000000')){
+						# this is the genesis block
+						$this->{'blocks'}->{$hash}->[1] = 0;
+						$this->{'block index'}->[$this->{'blocks'}->{$hash}->[1]] = $hash;
+					}
+				}
+			}
+		}
+	}
+	
+
+	
+	
+	# do one more loop to make sure links work
+	foreach my $h1 (keys %{$this->{'blocks'}}){
+		# prevhash   $this->{'blocks'}->{$h1}->[0]
+		# index      $this->{'blocks'}->{$h1}->[1]
+		# nexthash   $this->{'blocks'}->{$h1}->[2]
+
+		# set nexthash in previous block
+		$this->{'blocks'}->{$this->{'blocks'}->{$h1}->[0]}->[2] = $h1;
+		
+	}
+	
+	my $index = 0;
+	my ($ch);
+	$ch = $this->{'block index'}->[$index];
+	#$next_hash = $this->{'blocks'}->{$current_hash}->[2];
+	
+	while(1){
+		$index += 1;
+		$ch = $this->{'blocks'}->{$ch}->[2];
+		last if $ch == -1;
+		$this->{'block index'}->[$index] = $ch;	
+	}
+	
+	require Data::Dumper;
+	my $xo = Data::Dumper::Dumper($this->{'block index'});
+	warn "XO=$xo\n";
+	
+=pod
+	my $fh;
+	
+	my @path = CBitcoin::Utilities::HashToFilepath($block->hash_hex);
+	unless(-d "$base/headers/".join('/',@path)){
+		CBitcoin::Utilities::recursive_mkdir("$base/headers/".join('/',@path,'tx'));	
+		my $n;
+		open($fh,'>',"$base/headers/".join('/',@path).'/prevBlockHash') || die "cannot save prevblock hash";
+		$n = syswrite($fh,$block->prevBlockHash);
+		die "could not save hash" unless $n == length($block->prevBlockHash) && $n > 1;
+		close($fh);
+		open($fh,'>',"$base/headers/".join('/',@path).'/data') || die "cannot save block data";
+		$n = syswrite($fh,$block->data);
+		die "could not save data" unless $n == length($block->data) && $n > 1;
+		close($fh);
+	}
+=cut
+}
+
+=pod
+
+---+++ add_block_to_db($block)
+
+Store block header.
+
+=cut
+
+sub add_block_to_db{
+	my ($this,$block) = (shift,shift);
+	return undef unless defined $block && ref($block) eq 'CBitcoin::Block';
+
+	# store the block on disk
+	#$this->add_header_to_chain($block);
+	my @path = CBitcoin::Utilities::HashToFilepath($block->hash_hex);
+	my $base = $this->db_path();
+	my $fh;
+	
+	my @path = CBitcoin::Utilities::HashToFilepath($block->hash_hex);
+	unless(-d "$base/headers/".join('/',@path)){
+		CBitcoin::Utilities::recursive_mkdir("$base/headers/".join('/',@path,'tx'));	
+		my $n;
+		open($fh,'>',"$base/headers/".join('/',@path).'/prevBlockHash') || die "cannot save prevblock hash";
+		$n = syswrite($fh,$block->prevBlockHash);
+		die "could not save hash" unless $n == length($block->prevBlockHash) && $n > 1;
+		close($fh);
+		open($fh,'>',"$base/headers/".join('/',@path).'/data') || die "cannot save block data";
+		$n = syswrite($fh,$block->data);
+		die "could not save data" unless $n == length($block->data) && $n > 1;
+		close($fh);
+		
+		#open($fh,'>',"$base/headers/".join('/',@path).'/hash') || die "cannot save block hash";
+		#$n = syswrite($fh,$block->hash);
+		#die "could not save hash" unless $n == length($block->hash) && $n > 1;
+		#close($fh);
+	}
+	$this->count_blocks();
 }
 
 =pod

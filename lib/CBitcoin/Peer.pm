@@ -649,16 +649,51 @@ sub callback_gotinv {
 	
 }
 
+=pod
+
+---++ callback_tx
+
+inv type=1
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'tx'} = {
+		'subroutine' => \&callback_tx
+	}
+};
+
+sub callback_tx {
+	my $this = shift;
+	my $msg = shift;
+	
+	my $type = 3;
+	
+	open(my $fh,'<',\$msg->{'payload'});
+	
+	warn "not programmed yet!\n";
+	
+	# YES! serialize me mother fudger
+	
+	
+	return 1;
+	
+}
+
 
 =pod
 
 ---++ callback_block
 
-# https://en.bitcoin.it/wiki/Protocol_documentation#inv
+inv type=2
 
- ? 	count 	var_int 	Number of inventory entries 
- 
- 36x? 	inventory 	inv_vect[] 	Inventory vectors 
+4 	version 	int32_t 	Block version information (note, this is signed) 
+32 	prev_block 	char[32] 	The hash value of the previous block this particular block references 
+32 	merkle_root 	char[32] 	The reference to a Merkle tree collection which is a hash of all transactions related to this block 
+4 	timestamp 	uint32_t 	A timestamp recording when this block was created (Will overflow in 2106)
+4 	bits 	uint32_t 	The calculated difficulty target being used for this block 
+4 	nonce 	uint32_t 	The nonce used to generate this block
+1 	txn_count 	var_int 	Number of transaction entries, this value is always 0
 
 =cut
 
@@ -673,43 +708,43 @@ sub callback_block {
 	my $msg = shift;
 	
 	my $type = 2;
+	warn "Block size=".length($msg->{'payload'})."\n";
+	my $block = CBitcoin::Block->serialize_header($msg->{'payload'},1); # 1 means there are transactions
 	
-	open(my $fh,'<',\$msg->{'payload'});
+	warn "Got block with ref=".ref($block)."\n";
+	$block->error_print(sub{
+		my $msg = shift;
+		warn "$msg\n";
+	});
 	
-	my $count = CBitcoin::Utilities::deserialize_varint($fh);
-	warn "we have gotten $count inventory vectors\n";
-	#my @vectors;
-	foreach my $i (1..$count){
-		my $ref = CBitcoin::Utilities::deserialize_invvector($fh);
-		$this->spv->getdata($ref->[0],$ref->[1]);
-	}
-	return 1;
+	$this->spv->add_block_to_db($block);
+
+	#require Data::Dumper;
+	#my $xo = Data::Dumper::Dumper($d);
+	#warn "Block:$xo";
+	
 	
 }
 
 =pod
 
----++ callback_filteredblock
+---++ callback_merkleblock
 
-# https://en.bitcoin.it/wiki/Protocol_documentation#inv
-
- ? 	count 	var_int 	Number of inventory entries 
- 
- 36x? 	inventory 	inv_vect[] 	Inventory vectors 
+inv type=3
 
 =cut
 
 BEGIN{
-	$callback_mapper->{'command'}->{'filtered block'} = {
-		'subroutine' => \&callback_filteredblock
+	$callback_mapper->{'command'}->{'merkleblock'} = {
+		'subroutine' => \&callback_merkleblock
 	}
 };
 
-sub callback_filteredblock {
+sub callback_merkleblock {
 	my $this = shift;
 	my $msg = shift;
 	
-	my $type = 2;
+	my $type = 3;
 	
 	open(my $fh,'<',\$msg->{'payload'});
 	
