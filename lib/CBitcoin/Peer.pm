@@ -140,6 +140,7 @@ sub handshake_finished{
 	if($this->sent_version && $this->sent_verack && $this->received_version && $this->received_verack){
 		$this->{'handshake finished'} = 1;
 		warn "handshake is finished, ready to run hooks\n";
+		$this->spv->peer_hook_handshake_finished($this);
 		return 1;
 	}
 	else{
@@ -385,6 +386,12 @@ sub send_verack {
 	return $this->write(CBitcoin::Message::serialize('','verack',$this->magic));
 }
 
+=pod
+
+---+++ send_ping()
+
+=cut
+
 sub send_ping {
 	my $this = shift;
 	warn "Sending ping\n";
@@ -393,12 +400,39 @@ sub send_ping {
 	return $this->write(CBitcoin::Message::serialize($this->{'sent ping nonce'},'ping',$this->magic));
 }
 
+=pod
+
+---+++ send_pong($nonce)
+
+=cut
+
 sub send_pong {
 	my $this = shift;
 	my $nonce = shift;
 	die "bad nonce" unless defined $nonce && length($nonce) == 8;
 	warn "Sending pong\n";
 	return $this->write(CBitcoin::Message::serialize($nonce,'pong',$this->magic));
+}
+
+=pod
+
+---+++ send_getdata(\@invs)
+
+=cut
+
+sub send_getdata {
+	my $this = shift;
+	my $array_ref = shift;
+	return undef unless defined $array_ref && ref($array_ref) eq 'ARRAY' && 0 < scalar(@{$array_ref});
+	
+	my $payload = '';
+	foreach my $invref (@{$array_ref}){
+		$payload .= pack('L',$invref->[0]).$invref->[1];
+		
+	}
+
+	warn "Sending getdata\n";
+	return $this->write(CBitcoin::Message::serialize(CBitcoin::Utilities::serialize_varint( scalar(@{$array_ref}) ).$payload,'getdata',$this->magic));
 }
 
 =pod
@@ -580,6 +614,147 @@ sub callback_gotpong {
 }
 
 
+=pod
+
+---++ callback_gotinv
+
+# https://en.bitcoin.it/wiki/Protocol_documentation#inv
+
+ ? 	count 	var_int 	Number of inventory entries 
+ 
+ 36x? 	inventory 	inv_vect[] 	Inventory vectors 
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'inv'} = {
+		'subroutine' => \&callback_gotinv
+	}
+};
+
+sub callback_gotinv {
+	my $this = shift;
+	my $msg = shift;
+	
+	open(my $fh,'<',\$msg->{'payload'});
+	
+	my $count = CBitcoin::Utilities::deserialize_varint($fh);
+	warn "we have gotten $count inventory vectors\n";
+	#my @vectors;
+	foreach my $i (1..$count){
+		my $ref = CBitcoin::Utilities::deserialize_invvector($fh);
+		$this->spv->getdata($ref->[0],$ref->[1]);
+	}
+	return 1;
+	
+}
+
+=pod
+
+---++ callback_tx
+
+inv type=1
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'tx'} = {
+		'subroutine' => \&callback_tx
+	}
+};
+
+sub callback_tx {
+	my $this = shift;
+	my $msg = shift;
+	
+	my $type = 3;
+	
+	open(my $fh,'<',\$msg->{'payload'});
+	
+	warn "not programmed yet!\n";
+	
+	# YES! serialize me mother fudger
+	
+	
+	return 1;
+	
+}
+
+
+=pod
+
+---++ callback_block
+
+inv type=2
+
+4 	version 	int32_t 	Block version information (note, this is signed) 
+32 	prev_block 	char[32] 	The hash value of the previous block this particular block references 
+32 	merkle_root 	char[32] 	The reference to a Merkle tree collection which is a hash of all transactions related to this block 
+4 	timestamp 	uint32_t 	A timestamp recording when this block was created (Will overflow in 2106)
+4 	bits 	uint32_t 	The calculated difficulty target being used for this block 
+4 	nonce 	uint32_t 	The nonce used to generate this block
+1 	txn_count 	var_int 	Number of transaction entries, this value is always 0
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'block'} = {
+		'subroutine' => \&callback_block
+	}
+};
+
+sub callback_block {
+	my $this = shift;
+	my $msg = shift;
+	
+	my $type = 2;
+	warn "Block size=".length($msg->{'payload'})."\n";
+	my $block = CBitcoin::Block->serialize_header($msg->{'payload'},1); # 1 means there are transactions
+	
+	warn "Got block with ref=".ref($block)."\n";
+	$block->error_print(sub{
+		my $msg = shift;
+		warn "$msg\n";
+	});
+	
+	$this->spv->add_block_to_db($block);
+
+	$this->spv->initialize_chain_scan_files();
+
+	#require Data::Dumper;
+	#my $xo = Data::Dumper::Dumper($d);
+	#warn "Block:$xo";
+	
+	
+}
+
+=pod
+
+---++ callback_merkleblock
+
+inv type=3
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'merkleblock'} = {
+		'subroutine' => \&callback_merkleblock
+	}
+};
+
+sub callback_merkleblock {
+	my $this = shift;
+	my $msg = shift;
+	
+	my $type = 3;
+	
+	open(my $fh,'<',\$msg->{'payload'});
+	
+	warn "not programmed yet!\n";
+	
+	return 1;
+	
+}
 
 
 =pod
@@ -619,6 +794,8 @@ sub read_data {
 		
 		while($this->read_data_parse_msg()){
 			warn "Trying to parse another message\n";
+			# maybe use this opportunity to see if there is anything to write??? as it is an idle time
+			$this->spv_hook_getdata();
 		}
 		
 		if($this->is_marked_finished()){
@@ -676,6 +853,9 @@ sub read_data_parse_msg {
 	}
 	
 }
+
+
+
 
 =pod
 
@@ -766,16 +946,17 @@ sub write {
 
 	$data = '' unless defined $data;
 
-	if($this->handshake_finished()){
+	#if($this->handshake_finished()){
 		#my $x = length($data);
-		$data .= $this->hook_getheaders();
+		
+		#$data .= $this->hook_getheaders();
 		#$x = length($data) - $x;
 		#warn "Running peer getheader hooks, got $x\n";
 		#$x = length($data);
-		$data .= $this->spv->hook_getdata();
+		#$data .= $this->spv->hook_getdata();
 		#$x = length($data) - $x;
 		#warn "Running spv getdata hooks, got $x\n";
-	}
+	#}
 
 	return length($this->{'bytes to write'}) unless defined $data && length($data) > 0;
 	$this->{'bytes to write'} .= $data;
@@ -864,5 +1045,57 @@ sub hook_getheaders {
 	
 }
 
+=pod
+
+---++ hook_getblocks
+
+Compare the spv's block height with the peer's.  Use that as a condition as to whether or not to fetch blocks/headers.
+
+The timeout on this command is 10 minutes.
+
+=cut
+
+sub hook_getblocks {
+	my $this = shift;
+	
+	# $this->block_height $this->spv->block_height;
+	my $cmd = 'getblocks';
+	if(!defined $this->{$cmd} || 10*60 < (time() - $this->{$cmd}->{'time'})){
+		$this->{$cmd}->{'time'} = time();
+		warn "Doing getblocks\n";
+		return CBitcoin::Message::serialize(
+			$this->spv->calculate_block_locator(),
+			$cmd,
+			CBitcoin::Message::net_magic($this->magic)  # defaults as MAINNET
+		);
+	}
+	else{
+		return '';
+	}
+	
+}
+
+=pod
+
+---++ spv_hook_getdata()
+
+Take the opportunity to see if we need to ask for some inventory vectors. See SPV::hook_getdata.
+
+This subroutine is called in Peer::read_data via SPV::hook_getdata.
+
+=cut
+
+sub spv_hook_getdata{
+	my $this = shift;
+	warn "doing spv hook getdata";
+	if(defined $this->{'current inv'}){
+		warn "nothing to send back";
+		return undef;
+	}
+	else{
+		$this->{'current inv'} = 1 if $this->spv->hook_getdata($this);
+	}
+	
+}
 
 1;
