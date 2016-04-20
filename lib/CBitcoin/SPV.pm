@@ -57,18 +57,9 @@ sub new {
 	
 	
 	# brain
-	$this->{'inv'} = {
-		'error' => {},
-		'tx' => {},
-		'block' => {},
-		'filtered block' => {}
-	};
-	$this->{'inv search'} = {
-		'error' => {},
-		'tx' => {},
-		'block' => {},
-		'filtered block' => {} 
-	};
+	$this->{'inv'} = [{},{},{},{}];
+
+	$this->{'inv search'} = [{},{},{},{}];
 	
 	return $this;
 	
@@ -586,32 +577,55 @@ This is called when a handshake is finished.
 sub peer_hook_handshake_finished{
 	my $this = shift;
 	my $peer = shift;
-	
-	
+	warn "Running send getblocks since hand shake is finished\n";
+	$peer->send_getblocks();
+	#$peer->send_getheaders();
 }
 
 =pod
 
----++ getdata($type,$hash)
+---++ handle_inv($type,$hash)
 
 Add the pair to the list of inventory_vectors that need to be fetched
 
+0 	ERROR 	Any data of with this number may be ignored
+1 	MSG_TX 	Hash is related to a transaction
+2 	MSG_BLOCK 	Hash is related to a data block
+3 	MSG_FILTERED_BLOCK 	Hash of a block header; identical to MSG_BLOCK. When used in a getdata message, this
+
+---+++ Data Structure
+ 
+The following means that no getdata has been sent:
+$this->{'inv search'}->{$type}->{$hash} = [0]
+
+$this->{'inv search'}->{$type}->{$hash} = [timesent?,result?]
+
+When done, set result=1???
+
 =cut
 
-sub getdata {
-	my $this = shift;
-	my ($type,$hash) = @_;
-	return undef unless defined $type && ($type eq 'error' || $type eq 'tx' || $type eq 'block' ) && defined $hash && length($hash) > 0;
+sub handle_inv {
+	my ($this,$type,$hash) = @_;
+	warn "Got inv of type=$type with hash=".unpack('H*',$hash)."\n";
+	
+	return undef unless defined $type && (0 <= $type && $type <= 3 ) &&
+		 defined $hash && length($hash) > 0;
 	# length($hash) should be equal to 32 (256bits), but in the future that might change.
 	
-	unless(defined $this->{'inv search'}->{$type}->{$hash}){
-		$this->{'inv search'}->{$type}->{$hash} = [0];
+	
+	unless(defined $this->{'inv search'}->[$type]->{$hash}){
+		$this->{'inv search'}->[$type]->{$hash} = [0];
 	}
+	
+	# what do we do?
+	# nothing, everything gets handled in Peer::callback_gotinv
+	
+	
 }
 
 =pod
 
----++ hook_getdata()
+---++ hook_getdata($peer)
 
 This is called by a peer when it is ready to write.  Max count= 500 per peer.  The timeout is 60 seconds.
 
@@ -623,9 +637,11 @@ sub hook_getdata {
 	
 	my ($i,$max_count_per_peer) = (0,500);
 	#warn "hook_getdata part 1 \n";
-	foreach my $hash (keys %{$this->{'inv search'}->{'error'}}){
-		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->{'error'}->{$hash}->[0] )){
+	foreach my $hash (keys %{$this->{'inv search'}->[0]}){
+		# error
+		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->[0]->{$hash}->[0] )){
 			push(@response,pack('L',0).$hash);
+			$this->{'inv search'}->[0]->{$hash}->[0] = time();
 			$i += 1;	
 		}
 		elsif($max_count_per_peer < $i){
@@ -633,9 +649,11 @@ sub hook_getdata {
 		}
 	}
 	#warn "hook_getdata part 2 \n";
-	foreach my $hash (keys %{$this->{'inv search'}->{'tx'}}){
-		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->{'tx'}->{$hash}->[0] )){
+	foreach my $hash (keys %{$this->{'inv search'}->[1]}){
+		# tx
+		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->[1]->{$hash}->[0] )){
 			push(@response,pack('L',1).$hash);
+			$this->{'inv search'}->[1]->{$hash}->[0] = time();
 			$i += 1;	
 		}
 		elsif($max_count_per_peer < $i){
@@ -643,9 +661,11 @@ sub hook_getdata {
 		}
 	}
 	#warn "hook_getdata part 3 \n";
-	foreach my $hash (keys %{$this->{'inv search'}->{'block'}}){
-		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->{'block'}->{$hash}->[0] )){
+	foreach my $hash (keys %{$this->{'inv search'}->[2]}){
+		# block
+		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->[2]->{$hash}->[0] )){
 			push(@response,pack('L',2).$hash);
+			$this->{'inv search'}->[2]->{$hash}->[0] = time();
 			$i += 1;	
 		}
 		elsif($max_count_per_peer < $i){
@@ -653,18 +673,29 @@ sub hook_getdata {
 		}
 	}
 	#warn "hook_getdata part 4 \n";
-	foreach my $hash (keys %{$this->{'inv search'}->{'filtered block'}}){
-		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->{'filtered block'}->{$hash}->[0] )){
+	foreach my $hash (keys %{$this->{'inv search'}->[3]}){
+		# filtered block
+		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->[3]->{$hash}->[0] )){
 			push(@response,pack('L',3).$hash);
+			$this->{'inv search'}->[3]->{$hash}->[0] = time();
 			$i += 1;	
 		}
 		elsif($max_count_per_peer < $i){
 			last;
 		}
 	}
-	#warn "hook_getdata size is ".scalar(@response)."\n";
-	return CBitcoin::Utilities::serialize_varint(scalar(@response)).join('',@response) if scalar(@response) > 0;
-	return '';
+	warn "hook_getdata size is ".scalar(@response)."\n";
+	
+	
+	if(scalar(@response) > 0){
+		return CBitcoin::Utilities::serialize_varint(scalar(@response)).join('',@response);
+	}
+	else{
+		return '';	
+	}
+	 
+
+	
 }
 
 

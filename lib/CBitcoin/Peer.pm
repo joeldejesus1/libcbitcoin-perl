@@ -140,6 +140,7 @@ sub handshake_finished{
 	if($this->sent_version && $this->sent_verack && $this->received_version && $this->received_verack){
 		$this->{'handshake finished'} = 1;
 		warn "handshake is finished, ready to run hooks\n";
+		$this->spv->peer_hook_handshake_finished($this);
 		return 1;
 	}
 	else{
@@ -403,6 +404,47 @@ sub send_pong {
 
 =pod
 
+---++ send_getblocks()
+
+Calculate the block locator based on the block headers we have, then send a message out.
+
+=cut
+
+sub send_getblocks{
+	my ($this) = @_;
+
+	return $this->write(CBitcoin::Message::serialize(
+		$this->spv->calculate_block_locator(),
+		'getblocks',
+		$this->magic
+	));
+}
+
+
+
+
+=pod
+
+---++ send_getdata($payload)
+
+Given a payload, go get some data.  This is called in callback_gotinv
+
+=cut
+
+sub send_getdata{
+	my ($this,$payload) = @_;
+	
+	return undef unless defined $payload && 0 < length($payload);
+
+	return $this->write(CBitcoin::Message::serialize(
+		$payload,
+		'getdata',
+		$this->magic
+	));
+}
+
+=pod
+
 ---+ Callbacks
 
 
@@ -580,6 +622,44 @@ sub callback_gotpong {
 }
 
 
+=pod
+
+---++ callback_gotinv
+
+Have inventory vectors.
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'inv'} = {
+		'subroutine' => \&callback_gotinv
+	}
+};
+
+sub callback_gotinv {
+	my $this = shift;
+	my $msg = shift;
+	warn "Got inv\n";
+	unless($this->handshake_finished()){
+		warn "got inv before handshake finsihed\n";
+		$this->mark_finished();
+		return undef;
+	}
+	open(my $fh,'<',\($msg->payload()));
+	binmode($fh);
+	my $count = CBitcoin::Utilities::deserialize_varint($fh);
+	warn "gotinv: count=$count\n";
+	for(my $i=0;$i < $count;$i++){
+		$this->spv->handle_inv(@{CBitcoin::Utilities::deserialize_inv($fh)});
+	}
+	close($fh);
+	
+	#warn "precount=".scalar(@{$this->spv->{'inv search'}->[2]})."\n";
+	
+	# go fetch the data
+	$this->send_getdata($this->spv->hook_getdata());
+	
+}
 
 
 =pod
@@ -766,16 +846,16 @@ sub write {
 
 	$data = '' unless defined $data;
 
-	if($this->handshake_finished()){
+	#if($this->handshake_finished()){
 		#my $x = length($data);
-		$data .= $this->hook_getheaders();
+	#	$data .= $this->hook_getheaders();
 		#$x = length($data) - $x;
 		#warn "Running peer getheader hooks, got $x\n";
 		#$x = length($data);
-		$data .= $this->spv->hook_getdata();
+	#	$data .= $this->spv->hook_getdata();
 		#$x = length($data) - $x;
 		#warn "Running spv getdata hooks, got $x\n";
-	}
+	#}
 
 	return length($this->{'bytes to write'}) unless defined $data && length($data) > 0;
 	$this->{'bytes to write'} .= $data;
@@ -837,7 +917,7 @@ The logic used to figure out what needs to be uploaded and downloaded is stored 
 
 =pod
 
----++ hook_getheaders
+---++ send_getheaders
 
 Compare the spv's block height with the peer's.  Use that as a condition as to whether or not to fetch blocks/headers.
 
@@ -845,22 +925,13 @@ The timeout on this command is 10 minutes.
 
 =cut
 
-sub hook_getheaders {
+sub send_getheaders {
 	my $this = shift;
-	
-	# $this->block_height $this->spv->block_height;
-	
-	if(!defined $this->{'getheaders'} || 10*60 < (time() - $this->{'getheaders'}->{'time'})){
-		$this->{'getheaders'}->{'time'} = time();
-		return CBitcoin::Message::serialize(
+	return CBitcoin::Message::serialize(
 			$this->spv->calculate_block_locator(),
 			'getheaders',
 			CBitcoin::Message::net_magic($this->magic)  # defaults as MAINNET
-		);
-	}
-	else{
-		return '';
-	}
+	);
 	
 }
 

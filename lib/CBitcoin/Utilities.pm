@@ -214,6 +214,27 @@ sub deserialize_varint {
 
 =pod
 
+---++ deserialize_inv($fh)->[$type,$hash]
+
+Deserialize inventory vectors.
+
+=cut
+
+sub deserialize_inv{
+	my $fh = shift;
+	my ($n,$buf);
+	$n = read($fh,$buf,4);
+	die "not enough bytes to read type" unless $n == 4;
+	my $type = unpack('L',$buf);
+	
+	$n = read($fh,$buf,32);
+	die "not enough bytes to read hash" unless $n == 32;
+	
+	return [$type,$buf];
+}
+
+=pod
+
 ---++ serialize_varint($integer)
 
 =cut
