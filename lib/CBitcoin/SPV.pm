@@ -635,7 +635,7 @@ sub hook_getdata {
 	my $this = shift;
 	my @response;
 	
-	my ($i,$max_count_per_peer) = (0,500);
+	my ($i,$max_count_per_peer) = (0,2);
 	#warn "hook_getdata part 1 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[0]}){
 		# error

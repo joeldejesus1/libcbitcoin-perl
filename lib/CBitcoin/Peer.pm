@@ -664,6 +664,34 @@ sub callback_gotinv {
 
 =pod
 
+---++ callback_gotblock
+
+Got a block.
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'block'} = {
+		'subroutine' => \&callback_gotblock
+	}
+};
+
+sub callback_gotblock {
+	my $this = shift;
+	my $msg = shift;
+	
+	open(my $fh,'<',\($msg->payload()));
+	binmode($fh);
+	my $block = CBitcoin::Block->deserialize($fh);
+	
+	warn "Got block with hash=".$block->hash_hex().
+		" and transactionNum=".$block->transactionNum.
+		" and prevBlockHash=".$block->prevBlockHash_hex()."\n";
+}
+
+
+=pod
+
 ---+ Read/Write
 
 =cut
