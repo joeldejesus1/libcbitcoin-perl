@@ -687,6 +687,18 @@ sub callback_gotblock {
 	warn "Got block with hash=".$block->hash_hex().
 		" and transactionNum=".$block->transactionNum.
 		" and prevBlockHash=".$block->prevBlockHash_hex()."\n";
+	my $count = $block->transactionNum;
+	if(0 < $count){
+		for(my $i=0;$i<$count;$i++){
+			my $tx = CBitcoin::Transaction->deserialize($fh);
+		}
+	}
+	
+	
+	# delete it in inv search.
+	delete $this->spv->{'inv search'}->[2]->{$block->hash()};
+	
+	$this->spv->{'inv'}->[2]->{$block->hash()} = $block;
 }
 
 

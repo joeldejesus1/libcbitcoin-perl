@@ -18,6 +18,7 @@ use bigint;
 use CBitcoin::Script;
 use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
+use CBitcoin::Utilities;
 
 require Exporter;
 *import = \&Exporter::import;
@@ -107,6 +108,62 @@ sub new {
 
 =pod
 
+---++ deserialize($fh)
+
+=cut
+
+sub deserialize{
+	my ($package,$fh) = @_;
+	my ($tx,$count);
+	my ($n,$buf);
+	$n = read($fh,$buf,4);
+	die "not enough bytes to read tx" unless $n == 4;
+	$tx->{'version'} = $buf;
+	
+	# get tx inputs
+	my $txin_count = CBitcoin::Utilities::deserialize_varint($fh);
+	die "count is 0" unless 0 <=  $txin_count;
+	my @txinputs;
+	if(0 < $txin_count){
+		for(my $i=0;$i < $txin_count;$i++){
+			my $data;
+			# read previous output (txid,index)
+			$n = read($fh,$buf,36);
+			die "could not read tx" unless $n == 36;
+			# read script length
+			my $scriptlength = CBitcoin::Utilities::deserialize_varint($fh);
+			die "bad script length" unless 0 < $scriptlength;
+			$data .= CBitcoin::Utilities::serialize_varint($scriptlength);
+			# read script
+			$n = read($fh,$buf,$scriptlength);
+			die "bad read of tx" unless $n == $scriptlength;
+			$data .= $buf;
+			# read sequence
+			$n = read($fh,$buf,4);
+			die "bad read of tx" unless $n == 4;			
+			$data .= $buf;
+			
+			my $txinput = {'data' => $data};
+			bless($txinput,'CBitcoin::TransactionInput');
+			#die "Txinput hash=".$txinput->prevOutHash()."\n";
+			push(@txinputs,$txinput);		
+		}
+	}
+	
+	my $txout_count = CBitcoin::Utilities::deserialize_varint($fh);
+	die "count is 0" unless 0 <=  $txout_count;
+	my @txinputs;
+	if(0 < $txout_count){
+		for(my $i=0;$i < $txin_count;$i++){
+			my $data;	
+
+ 
+	
+}
+
+
+=pod
+
 ---++ original_script($txhash,$txid)->script
 
 =cut
@@ -141,6 +198,10 @@ sub serialized_data {
 	}
 
 }
+
+
+
+
 
 =item lockTime
 

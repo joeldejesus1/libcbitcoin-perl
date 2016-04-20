@@ -152,13 +152,6 @@ sub deserialize{
 	
 	$this->{'hash'} = Digest::SHA::sha256($shaobj->digest());
 	
-	
-	
-	if(0 < $count){
-		for(my $i=0;$i<$count;$i++){
-			#my $tx = {'data' => };
-		}
-	}
 	return $this;
 }
 
