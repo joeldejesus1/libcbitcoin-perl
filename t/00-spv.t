@@ -28,7 +28,7 @@ umask(077);
 my $fn_to_watcher = {};
 
 my $config = {
-	'timeout' => 60
+	'timeout' => 15
 };
 
 
@@ -49,6 +49,7 @@ my $mode_setting = sub{
 	}
 };
 
+
 # $resettimeout->($spv,$socket)
 my $resettimeout = sub{
 	my ($spv,$sck1) = @_;
@@ -62,6 +63,7 @@ my $resettimeout = sub{
 	my $cbhash = {'x' => 1};
 	$cbhash->{'x'} = sub {
 		warn "is called after ".$config->{'timeout'}."s";
+		
 		my $c2 = $c1;
 		my $spv_in = $spv;
 		my $sck2 = $sck1;	
@@ -69,7 +71,7 @@ my $resettimeout = sub{
 		my $ifw = $internal_fn_watcher;
 		my $cbh = $cbhash;
 		my $cb2 = $cbh->{'x'};
-		
+		$spv_in->activate_peer();
 		if($ms->()){
 			# 1 first time out, send ping
 			$ms->(0);
@@ -80,6 +82,7 @@ my $resettimeout = sub{
 		else{
 			warn "connection timed out\n";
 			$spv_in->close_peer(fileno($sck2));
+			
 		}
 		
 		
@@ -133,7 +136,7 @@ my $connectsub = sub{
 			if($revents & EV::READ){
 				$spv2->peer_by_fileno($sfn)->read_data();
 				if(defined $spv2->peer_by_fileno($sfn) && $spv2->peer_by_fileno($sfn)->write() > 0){
-					#warn "setting eventmask to read/write\n";
+					warn "setting eventmask to read/write\n";
 					$w->events(EV::READ | EV::WRITE);
 				}
 				
@@ -181,8 +184,8 @@ my $loopsub = sub{
 	my ($spv,$connectsub) = (shift,shift);
 	
 	#my $w = EV::idle(sub{
-	#	warn "hello mate";
-	#	$spv->activate_peer($connectsub);
+		#warn "activating peer\n";
+		#$spv->activate_peer($connectsub);
 	#});
 	#$w->events(EV::MINPRI);
 	
@@ -206,6 +209,7 @@ Create an spv object and have it connect to one peer.
 
 q6m5jhenk33wm4j4.onion
 10.19.202.164
+
 =cut
 
 my $spv = CBitcoin::SPV->new({
@@ -237,7 +241,7 @@ foreach my $node ('66.43.209.193','174.31.94.104','184.107.155.82',
 =cut
 
 
-$spv->activate_peer($connectsub);
+$spv->activate_peer();
 
 
 $spv->loop($loopsub,$connectsub);

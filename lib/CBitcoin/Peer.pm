@@ -422,6 +422,24 @@ sub send_getblocks{
 
 
 
+=pod
+
+---++ send_getaddr()
+
+Ask for info on more peers.
+
+=cut
+
+sub send_getaddr{
+	my ($this) = @_;
+	warn "sending getaddr\n";
+	return $this->write(CBitcoin::Message::serialize(
+		'',
+		'getaddr',
+		$this->magic
+	));
+}
+
 
 =pod
 
@@ -480,7 +498,7 @@ BEGIN{
 sub callback_gotaddr {
 	my $this = shift;
 	my $msg = shift;
-	
+	warn "gotaddr\n";
 	open(my $fh,'<',\$msg->{'payload'});
 	my $addr_ref = CBitcoin::Utilities::deserialize_addr($fh);
 	close($fh);
@@ -700,32 +718,40 @@ sub callback_gotblock {
 		open($fh,'<',$fp) || die "cannot read from disk";		
 	}
 	
-
-	my $block = CBitcoin::Block->deserialize($fh);
-	
-	warn "Got block with hash=".$block->hash_hex().
-		" and transactionNum=".$block->transactionNum.
-		" and prevBlockHash=".$block->prevBlockHash_hex()."\n";
-	my $count = $block->transactionNum;
-	return undef;
-	
-	if(0 < $count){
+	eval{
 		
-		for(my $i=0;$i<$count;$i++){
-			warn "looping\n";
+		my $block = CBitcoin::Block->deserialize($fh);
+		
+		warn "Got block with hash=".$block->hash_hex().
+			" and transactionNum=".$block->transactionNum.
+			" and prevBlockHash=".$block->prevBlockHash_hex()."\n";
+		my $count = $block->transactionNum;
+		#die "let us finish early\n";
+		$this->spv->add_header_to_chain($block);
+		
+		
+		if(0 < $count){
 			
-			# TODO: bug with deserialize			
-			my $tx = CBitcoin::Transaction->deserialize($fh);
-			#warn "Tx num of inputs:".$tx->numOfInputs().
-			#	" and num of outputs:".$tx->numOfOutputs()."\n";
+			for(my $i=0;$i<$count;$i++){
+				warn "looping\n";
+				
+				# TODO: bug with deserialize			
+				my $tx = CBitcoin::Transaction->deserialize($fh);
+				#warn "Tx num of inputs:".$tx->numOfInputs().
+				#	" and num of outputs:".$tx->numOfOutputs()."\n";
+			}
 		}
-	}
-	else{
-		die "weird block\n";
-	}
+		else{
+			die "weird block\n";
+		}
+		
+		# delete it in inv search.
+		delete $this->spv->{'inv search'}->[2]->{$block->hash()};
+	} || do {
+		my $error = $@;
+		warn "Error:$error\n";
+	};
 	
-	# delete it in inv search.
-	delete $this->spv->{'inv search'}->[2]->{$block->hash()};
 	
 	#$this->spv->{'inv'}->[2]->{$block->hash()} = $block;
 	unlink($fp) if -f $fp;
@@ -749,13 +775,13 @@ Take an opportunity after processing to see if there is a need to close this con
 
 sub read_data {
 	use POSIX qw(:errno_h);
-	#warn "can read from peer";
+	warn "can read from peer";
 	my $this = shift;
 	
 	$this->{'bytes'} = '' unless defined $this->{'bytes'};
 	my $socket = $this->socket();
 	warn "Socket=$socket\n";
-	my $n = sysread($this->socket(),$this->{'bytes'},8192,length($this->{'bytes'}));
+	my $n = sysread($this->socket(),$this->{'bytes'},8192*4,length($this->{'bytes'}));
 
 	
 	if(defined $n && $n == 0){

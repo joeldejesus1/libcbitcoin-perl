@@ -115,37 +115,44 @@ sub new {
 sub deserialize{
 	my ($package,$fh) = @_;
 	
-	my ($n,$buf,$count);
-	my $data;
+	my ($n,$buf,$count,$tx);
+	#my $data;
 	$n = read($fh,$buf,4);
 	die "not enough bytes to read tx" unless $n == 4;
-	$data .= $buf;
+	#$data .= $buf;
 	warn "tx - 1 \n";
 	
 	# get tx inputs
 	my $txin_count = CBitcoin::Utilities::deserialize_varint($fh);
-	$data .= CBitcoin::Utilities::serialize_varint($txin_count);
+	#$data .= CBitcoin::Utilities::serialize_varint($txin_count);
 	die "count is 0" unless 0 <=  $txin_count;
 	warn "tx - 2 \n";
+	
 	if(0 < $txin_count){
 		for(my $i=0;$i < $txin_count;$i++){
 			warn "tx - 3 - $i \n";
 			# read previous output (txid,index)
-			$n = read($fh,$buf,36);
-			die "could not read tx" unless $n == 36;
-			$data .= $buf;
+			$n = read($fh,$buf,32);
+			die "could not read tx" unless $n == 32;
+			my $msgtxt = "spent input hash=".unpack('H*',$buf)." with index=";
+			$n = read($fh,$buf,4);
+			die "could not read tx" unless $n == 4;
+			$msgtxt .= unpack('L',$buf)."\n";
+			warn $msgtxt;
+			
+			#$data .= $buf;
 			# read script length
 			my $scriptlength = CBitcoin::Utilities::deserialize_varint($fh);
 			die "bad script length" unless 0 < $scriptlength;
-			$data .= CBitcoin::Utilities::serialize_varint($scriptlength);
+			#$data .= CBitcoin::Utilities::serialize_varint($scriptlength);
 			# read script
 			$n = read($fh,$buf,$scriptlength);
 			die "bad read of tx" unless $n == $scriptlength;
-			$data .= $buf;
+			#$data .= $buf;
 			# read sequence
 			$n = read($fh,$buf,4);
 			die "bad read of tx" unless $n == 4;			
-			$data .= $buf;
+			#$data .= $buf;
 		}
 	}
 	else{
@@ -153,7 +160,7 @@ sub deserialize{
 	}
 	# read 
 	my $txout_count = CBitcoin::Utilities::deserialize_varint($fh);
-	$data .= CBitcoin::Utilities::serialize_varint($txout_count);
+	#$data .= CBitcoin::Utilities::serialize_varint($txout_count);
 	die "count is 0" unless 0 <=  $txout_count;
 	warn "tx - 4 with count = $txout_count\n";
 	my @txoutputs;
@@ -163,16 +170,16 @@ sub deserialize{
 			# tx value
 			$n = read($fh,$buf,8);
 			die "not enough bytes" unless $n == 8;
-			$data .= $buf;
-			warn "tx - 5 - $i \n";
+			#$data .= $buf;
+			warn "tx - 5 - value=".unpack('q',$buf)." - $i \n";
 			# script length
 			my $scriptlength = CBitcoin::Utilities::deserialize_varint($fh);
 			die "bad script length" unless 0 < $scriptlength;
-			$data .= CBitcoin::Utilities::serialize_varint($scriptlength);
+			#$data .= CBitcoin::Utilities::serialize_varint($scriptlength);
 			# read script
 			$n = read($fh,$buf,$scriptlength);
-			die "bad read of tx" unless $n == $scriptlength;
-			$data .= $buf;
+			die "bad read of script of length=$scriptlength" unless $n == $scriptlength;
+			#$data .= $buf;
 	 
 		}
 	}
@@ -181,9 +188,9 @@ sub deserialize{
 	}
 	warn "tx - 6 \n";
 	
-	my $tx = {'data' => $data};
-	bless($tx,$package);
-	return $tx;
+	#my $tx = {'data' => $data};
+	#bless($tx,$package);
+	#return $tx;
 }
 
 

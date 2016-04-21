@@ -36,6 +36,7 @@ sub new {
 	$this->{'db path'} = '/tmp/spv' unless defined $this->{'db path'};
 	$this->make_directories();
 
+	$this->{'last getaddr'} = 0;
 	
 	# config settings
 	
@@ -372,8 +373,8 @@ Find a peer in a pool, and turn it on
 
 sub activate_peer {
 	my $this = shift;
-	my $connect_sub = shift;
-	#warn "activating peer - 1\n";
+	my $connect_sub = $this->{'connect sub'};
+	warn "activating peer - 1\n";
 	# if we are maxed out on connections, then exit
 	return undef unless scalar(keys %{$this->{'peers'}}) < $this->max_connections();
 	#warn "activating peer - 1.1\n";
@@ -391,6 +392,21 @@ sub activate_peer {
 	
 	my @peer_files = sort @files;
 	
+	my $numOfpeers = scalar(@peer_files);
+	
+	warn "have num of peers =$numOfpeers\n";
+	
+	
+	
+	if($numOfpeers < 5 && 60 < time() - $this->{'last getaddr'}){
+		$this->{'last getaddr'} = time();
+		
+		# get a connected peer?
+		warn "not enough peers, add more\n";
+		foreach my $fd (keys %{$this->{'peers'}}){
+			$this->{'peers'}->{$fd}->send_getaddr();
+		}
+	}
 	
 	
 	my ($latest,$socket);
@@ -642,7 +658,7 @@ sub hook_getdata {
 		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->[0]->{$hash}->[0] )){
 			push(@response,pack('L',0).$hash);
 			$this->{'inv search'}->[0]->{$hash}->[0] = time();
-			$i += 1;	
+			$i += 1;
 		}
 		elsif($max_count_per_peer < $i){
 			last;
