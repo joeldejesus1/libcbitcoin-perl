@@ -114,22 +114,26 @@ sub new {
 
 sub deserialize{
 	my ($package,$fh) = @_;
-	my ($tx,$count);
-	my ($n,$buf);
+	
+	my ($n,$buf,$count);
+	my $data;
 	$n = read($fh,$buf,4);
 	die "not enough bytes to read tx" unless $n == 4;
-	$tx->{'version'} = $buf;
+	$data .= $buf;
+	warn "tx - 1 \n";
 	
 	# get tx inputs
 	my $txin_count = CBitcoin::Utilities::deserialize_varint($fh);
+	$data .= CBitcoin::Utilities::serialize_varint($txin_count);
 	die "count is 0" unless 0 <=  $txin_count;
-	my @txinputs;
+	warn "tx - 2 \n";
 	if(0 < $txin_count){
 		for(my $i=0;$i < $txin_count;$i++){
-			my $data;
+			warn "tx - 3 - $i \n";
 			# read previous output (txid,index)
 			$n = read($fh,$buf,36);
 			die "could not read tx" unless $n == 36;
+			$data .= $buf;
 			# read script length
 			my $scriptlength = CBitcoin::Utilities::deserialize_varint($fh);
 			die "bad script length" unless 0 < $scriptlength;
@@ -142,23 +146,44 @@ sub deserialize{
 			$n = read($fh,$buf,4);
 			die "bad read of tx" unless $n == 4;			
 			$data .= $buf;
-			
-			my $txinput = {'data' => $data};
-			bless($txinput,'CBitcoin::TransactionInput');
-			#die "Txinput hash=".$txinput->prevOutHash()."\n";
-			push(@txinputs,$txinput);		
 		}
 	}
-	
+	else{
+		die "tx has no inputs";
+	}
+	# read 
 	my $txout_count = CBitcoin::Utilities::deserialize_varint($fh);
+	$data .= CBitcoin::Utilities::serialize_varint($txout_count);
 	die "count is 0" unless 0 <=  $txout_count;
-	my @txinputs;
+	warn "tx - 4 with count = $txout_count\n";
+	my @txoutputs;
 	if(0 < $txout_count){
-		for(my $i=0;$i < $txin_count;$i++){
-			my $data;	
-
- 
+		for(my $i=0;$i < $txout_count;$i++){
+			
+			# tx value
+			$n = read($fh,$buf,8);
+			die "not enough bytes" unless $n == 8;
+			$data .= $buf;
+			warn "tx - 5 - $i \n";
+			# script length
+			my $scriptlength = CBitcoin::Utilities::deserialize_varint($fh);
+			die "bad script length" unless 0 < $scriptlength;
+			$data .= CBitcoin::Utilities::serialize_varint($scriptlength);
+			# read script
+			$n = read($fh,$buf,$scriptlength);
+			die "bad read of tx" unless $n == $scriptlength;
+			$data .= $buf;
+	 
+		}
+	}
+	else{
+		die "tx has no outputs";
+	}
+	warn "tx - 6 \n";
 	
+	my $tx = {'data' => $data};
+	bless($tx,$package);
+	return $tx;
 }
 
 

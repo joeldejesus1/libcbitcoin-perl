@@ -680,25 +680,55 @@ sub callback_gotblock {
 	my $this = shift;
 	my $msg = shift;
 	
+	
+	# write this to disk
+	my $fp = '/tmp/spv/tmp.'.$$.'.block';
 	open(my $fh,'<',\($msg->payload()));
-	binmode($fh);
+	if( 100_000 < length($msg->payload()) ){
+		open(my $fhout,'>',$fp) || die "cannot write to disk";
+		
+		binmode($fh);
+		my ($n,$buf);
+		while($n = read($fh,$buf,8192)){
+			my $m = 0;
+			while(0 < $n - $m){
+				$m += syswrite($fh,$buf,$m - $n,$m);
+			}
+		}
+		close($fhout);
+		close($fh);
+		open($fh,'<',$fp) || die "cannot read from disk";		
+	}
+	
+
 	my $block = CBitcoin::Block->deserialize($fh);
 	
 	warn "Got block with hash=".$block->hash_hex().
 		" and transactionNum=".$block->transactionNum.
 		" and prevBlockHash=".$block->prevBlockHash_hex()."\n";
 	my $count = $block->transactionNum;
+	return undef;
+	
 	if(0 < $count){
+		
 		for(my $i=0;$i<$count;$i++){
+			warn "looping\n";
+			
+			# TODO: bug with deserialize			
 			my $tx = CBitcoin::Transaction->deserialize($fh);
+			#warn "Tx num of inputs:".$tx->numOfInputs().
+			#	" and num of outputs:".$tx->numOfOutputs()."\n";
 		}
 	}
-	
+	else{
+		die "weird block\n";
+	}
 	
 	# delete it in inv search.
 	delete $this->spv->{'inv search'}->[2]->{$block->hash()};
 	
-	$this->spv->{'inv'}->[2]->{$block->hash()} = $block;
+	#$this->spv->{'inv'}->[2]->{$block->hash()} = $block;
+	unlink($fp) if -f $fp;
 }
 
 

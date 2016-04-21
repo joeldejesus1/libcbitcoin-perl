@@ -107,7 +107,7 @@ sub initialize_chain{
 	my $this = shift;
 	my $base = $this->db_path();
 	warn "initialize chain 1\n";
-	opendir(my $fh, $base.'/headers') || die "cannot open directory to headers";
+	opendir(my $fh, $base.'/headers') || die "cannot open directory to headers at ". $base.'/headers';
 	warn "initialize chain 1.2\n";
 	my @files = grep { $_ ne '.' && $_ ne '..' } readdir $fh;
 	warn "initialize chain 1.3\n";
@@ -635,7 +635,7 @@ sub hook_getdata {
 	my $this = shift;
 	my @response;
 	
-	my ($i,$max_count_per_peer) = (0,2);
+	my ($i,$max_count_per_peer) = (0,500);
 	#warn "hook_getdata part 1 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[0]}){
 		# error
