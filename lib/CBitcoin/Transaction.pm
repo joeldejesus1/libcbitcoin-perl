@@ -171,7 +171,7 @@ sub deserialize{
 			$n = read($fh,$buf,8);
 			die "not enough bytes" unless $n == 8;
 			#$data .= $buf;
-			warn "tx - 5 - value=".unpack('q',$buf)." - $i \n";
+			warn "tx - 5 - value=". unpack('q',$buf)/100_000_000.0 ." - $i \n";
 			# script length
 			my $scriptlength = CBitcoin::Utilities::deserialize_varint($fh);
 			die "bad script length" unless 0 < $scriptlength;
@@ -186,8 +186,11 @@ sub deserialize{
 	else{
 		die "tx has no outputs";
 	}
-	warn "tx - 6 \n";
 	
+	$n = read($fh,$buf,4);
+	die "bad locktime" unless $n == 4;
+	
+	warn "tx - 6 - locktime=".unpack('L',$buf)."\n";
 	#my $tx = {'data' => $data};
 	#bless($tx,$package);
 	#return $tx;

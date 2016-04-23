@@ -235,6 +235,8 @@ sub initialize_chain_scan_files {
 		}
 		closedir($fh2);
 	}
+	
+	$this->sort_chain();
 }
 
 =pod
@@ -302,10 +304,17 @@ sub add_header_to_inmemory_chain {
 	}
 	
 	$this->{'header changed'} = 1;
+	
+	
+
+
 }
 
 sub sort_chain {
 	my ($this) = @_;
+	
+	return undef unless $this->{'header changed'};
+	
 	$this->{'headers'} = [];
 	
 	my $mainref = $this->{'header hash to hash'};
@@ -313,12 +322,13 @@ sub sort_chain {
 	my $curr_hash = $gen_block->hash;
 	my $loopcheck = {};
 	while(defined $curr_hash && $curr_hash ne '' && !($loopcheck->{$curr_hash})){
-		warn "New hash=".unpack('H*',$curr_hash)."\n";
+		#warn "New hash=".unpack('H*',$curr_hash)."\n";
 		push(@{$this->{'headers'}},$curr_hash);
 		$loopcheck->{$curr_hash} = 1;
 		$curr_hash = $mainref->{$curr_hash}->[1];
 		
 	}
+	warn "finished sorting, new block_height=".scalar(@{$this->{'headers'}})."\n";
 	$this->{'header changed'} = 0;
 }
 
@@ -394,6 +404,20 @@ sub mark_write {
 	return $this->{'mark write sub'}->($socket);
 }
 
+=pod
+
+---++ is_marked_getblocks
+
+
+=cut
+
+sub is_marked_getblocks{
+	my ($this,$x) = @_;
+	if(defined $x){
+		$this->{'marked getblocks'} = $x;
+	}
+	return $this->{'marked getblocks'};
+}
 
 
 sub block{
@@ -842,10 +866,20 @@ sub hook_getdata {
 	warn "hook_getdata size is ".scalar(@response)."\n";
 	
 	
-	if(scalar(@response) > 0){
+	if(0 < scalar(@response)){
 		return CBitcoin::Utilities::serialize_varint(scalar(@response)).join('',@response);
 	}
 	else{
+	# do a check to see if we need to fetch more blocks
+		# hook_getdata
+		# $this->spv->{'inv search'}->[2]
+		warn "need to do another block fetch...";
+		$this->sort_chain();
+		
+		# when a peer is not busy, the first peer to see this will fetch a block
+		$this->is_marked_getblocks(1);
+		
+		
 		return '';	
 	}
 	 

@@ -707,13 +707,14 @@ sub callback_gotblock {
 	open(my $fh,'<',\($msg->payload()));
 	if( 100_000 < length($msg->payload()) ){
 		open(my $fhout,'>',$fp) || die "cannot write to disk";
-		
 		binmode($fh);
+		binmode($fhout);
+		
 		my ($n,$buf);
 		while($n = read($fh,$buf,8192)){
 			my $m = 0;
 			while(0 < $n - $m){
-				$m += syswrite($fh,$buf,$m - $n,$m);
+				$m += syswrite($fhout,$buf,$n - $m,$m);
 			}
 		}
 		close($fhout);
@@ -750,6 +751,7 @@ sub callback_gotblock {
 		
 		# delete it in inv search.
 		delete $this->spv->{'inv search'}->[2]->{$block->hash()};
+		
 	} || do {
 		my $error = $@;
 		warn "Error:$error\n";
@@ -795,10 +797,42 @@ sub read_data {
 		$this->bytes_read($n);
 		warn "Have ".$this->bytes_read()." bytes read into the buffer\n";
 
-		
-		while($this->read_data_parse_msg()){
-			warn "Trying to parse another message\n";
+		while(my $msg = $this->read_data_parse_msg()){
+			if($msg->command eq 'version'){
+				warn "Getting Message=".ref($msg)."\n";
+				$this->callback_gotversion($msg);
+				
+			}
+			elsif($msg->command eq 'verack'){
+				$this->callback_gotverack($msg);
+				
+			}
+			elsif($msg->command eq 'ping'){
+				$this->callback_gotping($msg);
+				
+			}
+			elsif($this->handshake_finished()){
+				#push(@{$this->{'messages to be processed'}},$msg);
+				#return 1;
+				$this->hook_callback($msg);
+			}
+			else{
+				warn "bad client behavior\n";
+				$this->mark_finished();
+			}
 		}
+		
+		# check to see if we need to fetch more inv
+		warn "check to see if we need to fetch more inv\n";
+		$this->send_getdata($this->spv->hook_getdata());
+		
+		# we might have to wait for a ping before this request goes out to the peer
+		if($this->spv->is_marked_getblocks()){
+			warn "getting blocks\n";
+			$this->send_getblocks();
+			$this->spv->is_marked_getblocks(0);
+		}
+		#return shift->{'marked getblocks'};
 		
 		if($this->is_marked_finished()){
 			$this->finish();
@@ -815,7 +849,7 @@ sub read_data {
 
 =pod
 
----++ read_data_parse_msg()->0/1
+---++ read_data_parse_msg()->$msg
 
 Parse the bytes we have till we can't parse anymore.
 
@@ -824,69 +858,16 @@ Parse the bytes we have till we can't parse anymore.
 sub read_data_parse_msg {
 	my $this = shift;
 	
-	
+	# order = ['magic','command', 'length', 'checksum','payload' ], double check if there is a problem
 	foreach my $key (@{$this->{'message definition order'}}){
 		#warn "reading in data for $key\n";
-		return 0 unless $this->read_data_single_msg_item($key);
+		return undef unless $this->read_data_single_msg_item($key);
 	}
 
 	my $msg = CBitcoin::Message->new($this->{'buffer'});
 	$this->{'buffer'} = {};
-	
-	if($msg->command eq 'version'){
-		warn "Getting Message=".ref($msg)."\n";
-		return $this->callback_gotversion($msg);
-		
-	}
-	elsif($msg->command eq 'verack'){
-		return $this->callback_gotverack($msg);
-		
-	}
-	elsif($msg->command eq 'ping'){
-		return $this->callback_gotping($msg);
-		
-	}
-	elsif($this->handshake_finished()){
-		push(@{$this->{'messages to be processed'}},$msg);
-		return 1;
-		#return $this->hook_callback($msg);
-	}
-	else{
-		warn "bad client behavior\n";
-		return 0;
-	}
-	
+	return $msg;	
 }
-
-=pod
-
----++ hook_callback($msg)
-
-Overload this subroutine.
-
-=cut
-
-sub hook_callback{
-	my $this = shift;
-	my $msg = shift;
-	
-	warn "Got message of type=".$msg->command."\n";
-	if(
-		defined $callback_mapper->{'command'}->{$msg->command()}
-		&&  ref($callback_mapper->{'command'}->{$msg->command()}) eq 'HASH'
-		&& defined $callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}
-		&& ref($callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}) eq 'CODE'
-	){
-		warn "Running subroutine for ".$msg->command()."\n";
-		return $callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}->($this,$msg);
-		
-	}
-	else{
-		warn "Not running subroutine for ".$msg->command()."\n";
-		return 1;
-	}
-}
-
 
 =pod
 
@@ -900,6 +881,7 @@ sub read_data_single_msg_item {
 	my $this = shift;
 	my ($key) = (shift);
 	
+	# order = ['magic','command', 'length', 'checksum','payload' ], double check if there is a problem
 	my $size = $this->definition_size_mapper($key);
 	die "key not defined" unless defined $size;
 	
@@ -932,6 +914,39 @@ sub definition_size_mapper {
 		return $this->{'message definition'}->{$key};
 	}
 }
+
+
+=pod
+
+---++ hook_callback($msg)
+
+Overload this subroutine.
+
+=cut
+
+sub hook_callback{
+	my $this = shift;
+	my $msg = shift;
+	
+	warn "Got message of type=".$msg->command."\n";
+	if(
+		defined $callback_mapper->{'command'}->{$msg->command()}
+		&&  ref($callback_mapper->{'command'}->{$msg->command()}) eq 'HASH'
+		&& defined $callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}
+		&& ref($callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}) eq 'CODE'
+	){
+		warn "Running subroutine for ".$msg->command()."\n";
+		return $callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}->($this,$msg);
+		
+	}
+	else{
+		warn "Not running subroutine for ".$msg->command()."\n";
+		return 1;
+	}
+}
+
+
+
 
 =pod
 
