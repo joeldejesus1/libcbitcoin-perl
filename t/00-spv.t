@@ -28,7 +28,7 @@ umask(077);
 my $fn_to_watcher = {};
 
 my $config = {
-	'timeout' => 15
+	'timeout' => 60
 };
 
 
@@ -213,14 +213,14 @@ q6m5jhenk33wm4j4.onion
 =cut
 
 my $spv = CBitcoin::SPV->new({
-	'address' => '10.19.202.164',
+	'address' => '192.168.122.1',
 	'port' => 8333,
 	'isLocal' => 1,
 	'connect sub' => $connectsub,
 	'mark write sub' => $markwritesub 
 });
 
-$spv->add_peer_to_db(pack('Q',1),'10.19.202.164','8333');		
+$spv->add_peer_to_db(pack('Q',1),'192.168.122.1','8333');		
 
 
 

@@ -74,7 +74,7 @@ sub new {
 	return $this;
 }
 
-sub serialize_header {
+sub serialize_header2 {
 	my $package = shift;
 
 
@@ -97,15 +97,6 @@ sub serialize_header {
 4 	nonce 	uint32_t 	The nonce used to generate this block… to allow variations of the header and compute different hashes
 1 	txn_count 	var_int 	Number of transaction entries, this value is always 0 
 
-
-	hv_store(rh, "nonce", 5, newSViv(x->nonce), 0);
-	hv_store(rh, "target", 6, newSViv(x->target), 0);
-	hv_store(rh, "transactionNum", 14, newSViv(x->transactionNum), 0);
-	hv_store(rh, "version", 7, newSViv(x->version), 0);
-	hv_store(rh, "timestamp", 9, newSViv(x->time), 0);
-
-	hv_store(rh, "prevBlockHash", 13, newSVpv(CBByteArrayGetData(x->prevBlockHash),x->prevBlockHash->length), 0);
-	hv_store(rh, "merkleRoot", 10, newSVpv(CBByteAr
 =cut
 
 sub deserialize{
@@ -145,7 +136,7 @@ sub deserialize{
 	$shaobj->add($buf);
 	
 	my $count = CBitcoin::Utilities::deserialize_varint($fh);
-	#warn "got count=$count\n";
+	warn "got tx count=$count\n";
 	$this->{'transactionNum'} = $count;
 	
 	bless($this,$package);
@@ -153,6 +144,24 @@ sub deserialize{
 	$this->{'hash'} = Digest::SHA::sha256($shaobj->digest());
 	
 	return $this;
+}
+
+=pod
+
+---++ serialize_header
+
+transaction count is set to 0.
+
+=cut
+
+sub serialize_header {
+	my ($this) = @_;
+	
+	return $this->{'data'} if defined $this->{'data'};
+	
+	return $this->{'version'}.$this->{'prevBlockHash'}.$this->{'merkleRoot'}.
+		$this->{'timestamp'}.$this->{'bits'}.$this->{'nonce'}.
+		CBitcoin::Utilities::serialize_varint(0);
 }
 
 

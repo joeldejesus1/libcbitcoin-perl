@@ -107,10 +107,10 @@ sub network_address_deserialize {
 	$ans->{'timestamp'} = unpack('L',$buf);
 	die "bad addr network addr" unless $n == 4;
 	my $diff = time() - $ans->{'timestamp'};
-	unless(abs($diff) < 1*60*60){
-		warn "bad addr, too stale\n";
+	unless(abs($diff) < 8*60*60){
+		warn "bad addr, might be stale\n";
 		$n = read($fh,$buf,30-4);
-		#die "bad addr packet" unless $n == 26;
+		die "bad addr packet" unless $n == 26;
 		return undef
 	}
 	warn "Timestamp diff=$diff\n";
@@ -323,6 +323,8 @@ sub serialize_getheaders {
 =pod
 
 ---++ HashToFilepath
+
+1,3,the rest
 
 =cut
 

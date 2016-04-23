@@ -55,12 +55,31 @@ sub new {
 	$this->{'headers'} = [];
 	$this->{'transactions'} = {};
 	$this->initialize_chain();
-	
+	$this->sort_chain();
 	
 	# brain
 	$this->{'inv'} = [{},{},{},{}];
 
 	$this->{'inv search'} = [{},{},{},{}];
+	
+	
+	
+	#require Data::Dumper;
+	#my $xo = Data::Dumper::Dumper($this->{'headers'});
+	#warn "XO=$xo\n";
+	#foreach my $k (keys %{$this->{'header hash to hash'}}){
+	#	my $ar = $this->{'header hash to hash'}->{$k};
+	#	warn "P=".unpack('H*',$ar->[0]).".....N=".unpack('H*',$ar->[1])."\n";
+	#}
+	
+	#warn "Block Height=".$this->block_height()."\n";
+	#warn "Locator=".join('|',CBitcoin::Utilities::block_locator_indicies($this->block_height()))."\n";
+	
+	#print "Bail out!";
+	#die "finished";
+	$this->initialize_peers();
+	
+	
 	
 	return $this;
 	
@@ -95,6 +114,30 @@ sub make_directories{
 	
 }
 
+=pod
+
+---++ initialize_peers
+
+Move any peers in active to pool
+
+=cut
+
+sub initialize_peers {
+	my ($this) = @_;
+	my $base = $this->{'db path'};
+	my $fp_active = "$base/peers/active";
+	my $fp_pool = "$base/peers/pool";
+	
+	
+	opendir(my $fh,$fp_active);
+	my @files = readdir($fh);
+	closedir($fh);
+	foreach my $f1 (@files){
+		next if $f1 eq '.' || $f1 eq '..';
+		rename("$fp_active/$f1", "$fp_pool/$f1") 
+			|| die "Move $fp_active/$f1 -> $fp_pool/$f1 failed: $!";
+	}
+}
 
 =pod
 
@@ -115,7 +158,7 @@ sub initialize_chain{
 	closedir($fh);
 	unless(0 == scalar(@files)){
 		#die "no files?=".scalar(@files)."\n";
-		return $this->initialize_chain_scan_files();	
+		return $this->initialize_chain_scan_files(\@files);	
 	}
 	warn "initialize chain 2\n";
 	# must get genesis block
@@ -124,67 +167,159 @@ sub initialize_chain{
 	warn "Genesis prevBlockHash=".$gen_block->prevBlockHash_hex."\n";
 
 	my @path = CBitcoin::Utilities::HashToFilepath($gen_block->hash_hex);
+	
 	warn "initialize chain 3\n";
 	CBitcoin::Utilities::recursive_mkdir("$base/headers/".join('/',@path)) 
 		unless -d "$base/headers/".join('/',@path);
 	my $n;
-	open($fh,'>',"$base/headers/".join('/',@path).'/prevBlockHash') || die "cannot save prevblock hash";
+	open($fh,'>',"$base/headers/".join('/',@path).'/prevBlockHash') 
+		|| die "cannot save prevblock hash";
 	$n = syswrite($fh,$gen_block->prevBlockHash);
 	die "could not save hash" unless $n == length($gen_block->prevBlockHash) && $n > 1;
 	close($fh);
+	
 	warn "initialize chain 4\n";
 	open($fh,'>',"$base/headers/".join('/',@path).'/data') || die "cannot save block data";
-	$n = syswrite($fh,$gen_block->data);
-	die "could not save data" unless $n == length($gen_block->data) && $n > 1;
+	my $data = $gen_block->serialize_header();
+	$n = syswrite($fh,$data);
+	die "could not save data" unless $n == length($data) && $n > 1;
 	close($fh);
 	
 	warn "initialize chain 5 hash=".unpack('H*',$gen_block->hash)."\n";
 	#$this->{'headers'}->[0] = $gen_block->hash;
-	push(@{$this->{'headers'}},$gen_block->hash);
+	$this->add_header_to_chain($gen_block);
+	#push(@{$this->{'headers'}},$gen_block->hash);
 	
 	#require Data::Dumper;
 	#my $xo = Data::Dumper::Dumper($this->{'headers'});
 	#warn "XO1=$xo\n"; 
 	
-	$this->block_height(0);
+	#$this->block_height(0);
 	
 	
 	return 1;
 }
 
+=pod
+
+---+++ initialize_chain_scan_files(\@files)
+
+Given a set of files, scan in blocks.
+
+Make sure the hash/directory relationship matches that in CBitcoin::Utilities::HashToFilepath.
+
+=cut
+
 sub initialize_chain_scan_files {
-	my $this = shift;
+	my ($this,$files_ref) = @_;
+	
+	my $base = $this->db_path();
+	
+	#my $gen_block = CBitcoin::Block->genesis_block();
+	
+	# get all the hashes
+	# format=1,3,the rest
+	foreach my $f1 (@{$files_ref}){
+		opendir(my $fh2,"$base/headers/$f1") || die "cannot open directory";
+		while(my $f2 = readdir($fh2)) {
+		 	next if $f2 eq '.' || $f2 eq '..';
+		 	warn "in directory=$base/headers/$f1/$f2\n";
+		 	opendir(my $fh3,"$base/headers/$f1/$f2") || die "cannot open directory";
+		 	while(my $f3 = readdir($fh3)){
+		 		next if $f3 eq '.' || $f3 eq '..';
+		 		open(my $fhdata,'<',"$base/headers/$f1/$f2/$f3/data") || die "cannot read data";
+		 		$this->add_header_to_inmemory_chain(CBitcoin::Block->deserialize($fhdata));
+		 		close($fhdata);
+		 	}
+		 	closedir($fh3);
+		}
+		closedir($fh2);
+	}
 }
 
 =pod
 
 ---++ add_header_to_chain($block)
 
+Directory: $dbpath/headers/hash1/hash2/hash3/
+
+In the directory:
+	./prevBlockHash (binary format)
+	./data (serialized header with tx count set to 0)
+	
 =cut
 
 sub add_header_to_chain {
 	my $this = shift;
-	my $block = shift;
-	die "block is null" unless defined $block;
+	my $header = shift;
+	die "header is null" unless defined $header;
 	
 	my $base = $this->db_path();
-	my $fh;
+	my ($fh,$n);
 	
-	my @path = CBitcoin::Utilities::HashToFilepath($block->hash_hex);
+	my @path = CBitcoin::Utilities::HashToFilepath($header->hash_hex);
+
 	unless(-d "$base/headers/".join('/',@path)){
+		# the dir is the hex of the hash
 		CBitcoin::Utilities::recursive_mkdir("$base/headers/".join('/',@path));	
-		my $n;
-		open($fh,'>',"$base/headers/".join('/',@path).'/prevBlockHash') || die "cannot save prevblock hash";
-		$n = syswrite($fh,$block->prevBlockHash);
-		die "could not save hash" unless $n == length($block->prevBlockHash) && $n > 1;
+		
+		# write the prevBlockHash into ./prevBlockHash
+		open($fh,'>',"$base/headers/".join('/',@path).'/prevBlockHash') 
+			|| die "cannot save prevblock hash";
+		$n = syswrite($fh,$header->prevBlockHash);
+		die "could not save hash" unless $n == length($header->prevBlockHash) && $n > 1;
 		close($fh);
+		
+		# write the header into ./data
 		open($fh,'>',"$base/headers/".join('/',@path).'/data') || die "cannot save block data";
-		$n = syswrite($fh,$block->data);
-		die "could not save data" unless $n == length($block->data) && $n > 1;
+		my $data = $header->serialize_header();
+		$n = 0;
+		while(0 < length($data) - $n){
+			$n += syswrite($fh,$data, 8192, $n);
+		}
 		close($fh);
+		
 	}
-	push(@{$this->{'headers'}},$block->hash);
-	return $this->block_height(1);
+	$this->add_header_to_inmemory_chain($header);
+	#return $this->block_height(1);
+}
+
+sub add_header_to_inmemory_chain {
+	my ($this,$header) = @_;
+	
+	if(defined $this->{'header hash to hash'}->{$header->hash} ){
+		$this->{'header hash to hash'}->{$header->hash}->[0] = $header->prevBlockHash;
+	}
+	else{
+		$this->{'header hash to hash'}->{$header->hash} = [$header->prevBlockHash,''];
+	}
+	
+	if(defined $this->{'header hash to hash'}->{$header->prevBlockHash}){
+		$this->{'header hash to hash'}->{$header->prevBlockHash}->[1] = $header->hash;
+	}
+	else{
+		$this->{'header hash to hash'}->{$header->prevBlockHash} = ['',$header->hash];
+	}
+	
+	$this->{'header changed'} = 1;
+}
+
+sub sort_chain {
+	my ($this) = @_;
+	$this->{'headers'} = [];
+	
+	my $mainref = $this->{'header hash to hash'};
+	my $gen_block = CBitcoin::Block->genesis_block();
+	my $curr_hash = $gen_block->hash;
+	my $loopcheck = {};
+	while(defined $curr_hash && $curr_hash ne '' && !($loopcheck->{$curr_hash})){
+		warn "New hash=".unpack('H*',$curr_hash)."\n";
+		push(@{$this->{'headers'}},$curr_hash);
+		$loopcheck->{$curr_hash} = 1;
+		$curr_hash = $mainref->{$curr_hash}->[1];
+		
+	}
+	$this->{'header changed'} = 0;
 }
 
 
@@ -212,6 +347,7 @@ sub calculate_block_locator {
 	
 	my @ans;
 	foreach my $i (CBitcoin::Utilities::block_locator_indicies($this->block_height())){
+		warn "need block=$i\n";
 		my $hash = $this->block($i);
 		die "bad index, rebuild block header database" unless defined $hash;
 		push(@ans,$hash);
@@ -263,28 +399,25 @@ sub mark_write {
 sub block{
 	my ($this,$index) = (shift,shift);
 	die "bad index given" unless
-		$index =~ m/^(\d+)$/ && 0 <= $index;
+		defined $index && $index =~ m/^(\d+)$/ && 0 <= $index;
+	#$index = $index;
+	
+	if($this->{'header changed'}){
+		$this->sort_chain();
+	}
+	
 	#require Data::Dumper;
 	#my $xo = Data::Dumper::Dumper($this->{'headers'});
 	#warn "XO=$xo\n"; 
-	warn "Returning block i=$index v=".unpack('H*',$this->{'headers'}->[$index])."\n";
+	warn "Returning block i=$index v=".unpack('H*',$this->{'headers'}->[$index])."\n"
+		if defined $this->{'headers'}->[$index];
 	return $this->{'headers'}->[$index];
 }
 
 
 sub block_height {
 	my $this = shift;
-	my $new_height = shift;
-	if(defined $new_height && $new_height =~ m/^(\d+)$/){
-		$this->{'block height'} += $1;
-		return $this->{'block height'};
-	}
-	elsif(!defined $new_height){
-		return $this->{'block height'};
-	}
-	else{
-		die "bad block height";
-	}
+	return scalar(@{$this->{'headers'}}) - 1;
 }
 
 =pod
@@ -398,7 +531,7 @@ sub activate_peer {
 	
 	
 	
-	if($numOfpeers < 5 && 60 < time() - $this->{'last getaddr'}){
+	if(0 < $numOfpeers && $numOfpeers < 5 && 60 < time() - $this->{'last getaddr'}){
 		$this->{'last getaddr'} = time();
 		
 		# get a connected peer?
@@ -406,6 +539,9 @@ sub activate_peer {
 		foreach my $fd (keys %{$this->{'peers'}}){
 			$this->{'peers'}->{$fd}->send_getaddr();
 		}
+	}
+	elsif($numOfpeers == 0){
+		#die "ran out of nodes to connect to.";
 	}
 	
 	
@@ -478,7 +614,7 @@ port
 sub add_peer_to_db{
 	
 	my ($this,$services, $addr_recv_ip,$addr_recv_port) = (shift,shift,shift,shift);
-	#warn "Adding peer to db\n";
+	warn "Adding peer to db ($addr_recv_ip,$addr_recv_port)\n";
 	
 	my $filename = Digest::SHA::sha256_hex("$addr_recv_ip:$addr_recv_port");
 	#warn "Filepath =".$this->db_path().'/peers/pool/'.$filename."\n";
@@ -594,8 +730,11 @@ sub peer_hook_handshake_finished{
 	my $this = shift;
 	my $peer = shift;
 	warn "Running send getblocks since hand shake is finished\n";
-	$peer->send_getblocks();
+	
 	#$peer->send_getheaders();
+	$peer->send_getaddr();
+	
+	$peer->send_getblocks();
 }
 
 =pod
@@ -651,7 +790,7 @@ sub hook_getdata {
 	my $this = shift;
 	my @response;
 	
-	my ($i,$max_count_per_peer) = (0,500);
+	my ($i,$max_count_per_peer) = (0,50);
 	#warn "hook_getdata part 1 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[0]}){
 		# error

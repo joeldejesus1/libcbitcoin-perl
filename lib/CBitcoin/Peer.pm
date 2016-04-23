@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use CBitcoin::Message; # out of laziness, all c functions get referenced out of CBitcoin::Message
 use CBitcoin::Utilities;
-use constant BUFFSIZE => 8192;
+use constant BUFFSIZE => 8192*4;
 
 our $callback_mapper;
 
@@ -24,6 +24,7 @@ sub new {
 	my $this = {};
 	bless($this,$package);
 	$this = $this->init(shift);
+	
 	
 	
 	return $this;
@@ -64,7 +65,8 @@ sub init {
 		'socket' => $options->{'socket'},
 		'message definition' => {'magic' => 4,'command' => 12, 'length' => 4, 'checksum' => 4 },
 		'message definition order' => ['magic','command', 'length', 'checksum','payload' ],
-		'command buffer' => {}
+		'command buffer' => {},
+		'receive rate' => [0,0] 
 	};
 	bless($this,$ref);
 	# to have some human readable stuff for later 
@@ -502,7 +504,6 @@ sub callback_gotaddr {
 	open(my $fh,'<',\$msg->{'payload'});
 	my $addr_ref = CBitcoin::Utilities::deserialize_addr($fh);
 	close($fh);
-	
 	if(defined $addr_ref && ref($addr_ref) eq 'ARRAY'){
 		warn "Got ".scalar(@{$addr_ref})." new addresses\n";
 		
@@ -514,6 +515,8 @@ sub callback_gotaddr {
 				$addr->{'port'}
 			);
 		}
+		
+		
 	}
 	else{
 		warn "Got no new addresses\n";
@@ -781,7 +784,7 @@ sub read_data {
 	$this->{'bytes'} = '' unless defined $this->{'bytes'};
 	my $socket = $this->socket();
 	warn "Socket=$socket\n";
-	my $n = sysread($this->socket(),$this->{'bytes'},8192*4,length($this->{'bytes'}));
+	my $n = sysread($this->socket(),$this->{'bytes'},BUFFSIZE,length($this->{'bytes'}));
 
 	
 	if(defined $n && $n == 0){
@@ -844,7 +847,9 @@ sub read_data_parse_msg {
 		
 	}
 	elsif($this->handshake_finished()){
-		return $this->hook_callback($msg);
+		push(@{$this->{'messages to be processed'}},$msg);
+		return 1;
+		#return $this->hook_callback($msg);
 	}
 	else{
 		warn "bad client behavior\n";
