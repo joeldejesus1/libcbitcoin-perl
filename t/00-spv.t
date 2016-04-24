@@ -220,7 +220,7 @@ my $spv = CBitcoin::SPV->new({
 	'mark write sub' => $markwritesub 
 });
 
-$spv->add_peer_to_db(pack('Q',1),'127.0.0.1','8333');		
+$spv->add_peer_to_inmemmory(pack('Q',1),'127.0.0.1','8333');		
 
 
 

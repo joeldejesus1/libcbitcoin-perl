@@ -256,7 +256,20 @@ sub serialize_varint {
 	}
 }
 
+=pod
 
+---++ serialize_varstr($string)
+   * [[https://github.com/bitcoin/bips/blob/master/bip-0014.mediawiki][bip-0014]]
+IE: /Satoshi:5.64/bitcoin-qt:0.4/
+
+
+=cut
+
+sub serialize_varstr {
+	my $str = shift;
+	$str = '' unless defined $str;
+	return serialize_varint(length($str)).$str;
+}
 
 =pod
 

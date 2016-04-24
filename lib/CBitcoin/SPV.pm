@@ -12,44 +12,30 @@ use Net::IP;
 
 =pod
 
----+ new({'})
+---+ contructors/destructors
+
+=cut
+
+
+=pod
+
+---++ new($options)
 
 Create a new SPV client.
-
 
 =cut
 
 sub new {
 	my $package = shift;
 	my $options = shift;
-	$options ||= {};
-	#my $this = CBitcoin::Message::spv_initialize(ip_convert_to_binary('0.0.0.0'),0);
-	my $this = $options;
-	
-	die "no mark write sub" unless defined $this->{'mark write sub'} && ref($this->{'mark write sub'}) eq 'CODE';
-	die "no connect sub" unless defined $this->{'connect sub'} && ref($this->{'connect sub'}) eq 'CODE';
-	
+	$options = {} unless defined $options;
+
+	my $this = {};
+	bless($this,$package);
+	$this = $this->init($options);
 	bless($this,$package);
 	
-	$this->{'version'} = 70001 unless defined $this->{'version'};
-	
-	$this->{'db path'} = '/tmp/spv' unless defined $this->{'db path'};
 	$this->make_directories();
-
-	$this->{'last getaddr'} = 0;
-	
-	# config settings
-	
-	# ..max connections
-	if(defined $this->{'max connections'} && $this->{'max connections'} =~ m/^(\d+)$/){
-		$this->{'max connections'} = $1;
-	}
-	elsif(!defined $this->{'max connections'}){
-		$this->{'max connections'} = 8;
-	}
-	else{
-		die "bad max connection setting";
-	}
 	
 	# start block chain at 0
 	$this->{'headers'} = [];
@@ -59,32 +45,59 @@ sub new {
 	
 	# brain
 	$this->{'inv'} = [{},{},{},{}];
-
-	$this->{'inv search'} = [{},{},{},{}];
-	
-	
-	
-	#require Data::Dumper;
-	#my $xo = Data::Dumper::Dumper($this->{'headers'});
-	#warn "XO=$xo\n";
-	#foreach my $k (keys %{$this->{'header hash to hash'}}){
-	#	my $ar = $this->{'header hash to hash'}->{$k};
-	#	warn "P=".unpack('H*',$ar->[0]).".....N=".unpack('H*',$ar->[1])."\n";
-	#}
-	
-	#warn "Block Height=".$this->block_height()."\n";
-	#warn "Locator=".join('|',CBitcoin::Utilities::block_locator_indicies($this->block_height()))."\n";
-	
-	#print "Bail out!";
-	#die "finished";
+	$this->{'inv search'} = [{},{},{},{}];	
 	$this->initialize_peers();
-	
-	
-	
+
 	return $this;
 	
 }
 
+=pod
+
+---++ init($options)
+
+Overload this subroutine.
+
+=cut
+
+sub init {
+	my ($this,$options) = @_;
+	
+	die "no mark write sub" unless defined $options->{'mark write sub'} 
+		&& ref($options->{'mark write sub'}) eq 'CODE';
+	die "no connect sub" unless defined $options->{'connect sub'} 
+		&& ref($options->{'connect sub'}) eq 'CODE';
+	
+	
+	
+	$options->{'version'} = 70001 unless defined $options->{'version'};
+	
+	$options->{'db path'} = '/tmp/spv' unless defined $options->{'db path'};
+	
+
+	$options->{'last getaddr'} = 0;
+	
+	# config settings
+	
+	# ..max connections
+	if(defined $options->{'max connections'} && $options->{'max connections'} =~ m/^(\d+)$/){
+		$options->{'max connections'} = $1;
+	}
+	elsif(!defined $options->{'max connections'}){
+		$options->{'max connections'} = 8;
+	}
+	else{
+		die "bad max connection setting";
+	}
+	
+	return $options;
+}
+
+=pod
+
+---++ make_directories
+
+=cut
 
 sub make_directories{
 	my $this = shift;
@@ -141,6 +154,12 @@ sub initialize_peers {
 
 =pod
 
+---+ chain management
+
+=cut
+
+=pod
+
 ---++ initialize_chain
 
 Save the genesis block into block headers.  Also, create the first block locator for use in getheaders.
@@ -190,19 +209,12 @@ sub initialize_chain{
 	$this->add_header_to_chain($gen_block);
 	#push(@{$this->{'headers'}},$gen_block->hash);
 	
-	#require Data::Dumper;
-	#my $xo = Data::Dumper::Dumper($this->{'headers'});
-	#warn "XO1=$xo\n"; 
-	
-	#$this->block_height(0);
-	
-	
 	return 1;
 }
 
 =pod
 
----+++ initialize_chain_scan_files(\@files)
+---++ initialize_chain_scan_files(\@files)
 
 Given a set of files, scan in blocks.
 
@@ -281,10 +293,17 @@ sub add_header_to_chain {
 		}
 		close($fh);
 		
+		$this->add_header_to_db($header);
 	}
 	$this->add_header_to_inmemory_chain($header);
 	#return $this->block_height(1);
 }
+
+=pod
+
+---++ add_header_to_inmemory_chain
+
+=cut
 
 sub add_header_to_inmemory_chain {
 	my ($this,$header) = @_;
@@ -304,11 +323,13 @@ sub add_header_to_inmemory_chain {
 	}
 	
 	$this->{'header changed'} = 1;
-	
-	
-
-
 }
+
+=pod
+
+---++ sort_chain
+
+=cut
 
 sub sort_chain {
 	my ($this) = @_;
@@ -331,7 +352,6 @@ sub sort_chain {
 	warn "finished sorting, new block_height=".scalar(@{$this->{'headers'}})."\n";
 	$this->{'header changed'} = 0;
 }
-
 
 =pod
 
@@ -371,9 +391,54 @@ sub calculate_block_locator {
 #	}
 	
 	
-	return pack('L',$this->version).CBitcoin::Utilities::serialize_varint(scalar(@ans)).join('',@ans).$hash_stop;
+	return pack('L',$this->version).CBitcoin::Utilities::serialize_varint(scalar(@ans)).
+		join('',@ans).$hash_stop;
 }
 
+=pod
+
+---+ database
+
+=cut
+
+=pod
+
+---++ add_header_to_db($header)
+
+=cut
+
+sub add_header_to_db {
+	my ($this, $header) = @_;
+	
+	warn "New header with hash=".unpack('H*',$header->hash)."\n";
+}
+
+=pod
+
+---++ add_tx_to_db($block_hash,$tx)
+
+Given a block hash and a transaction, do something.
+
+=cut
+
+sub add_tx_to_db {
+	my ($this,$block_hash,$tx) = @_;
+
+	warn "Tx with inputs=".scalar(@{$tx->{'inputs'}})." and outputs=".
+		scalar(@{$tx->{'outputs'}})."\n";
+}
+
+=pod
+
+---++ add_peer_to_db($peer)
+
+=cut
+
+sub add_peer_to_db {
+	my ($this,$peer) = @_;
+	
+	warn "Got Peer in database\n";
+}
 
 =pod
 
@@ -381,21 +446,51 @@ sub calculate_block_locator {
 
 =cut
 
+=pod
+
+---++ db_path
+
+=cut
+
 sub db_path {
 	return shift->{'db path'};
 }
+
+=pod
+
+---++ version
+
+=cut
 
 sub version {
 	return shift->{'version'};
 }
 
+=pod
+
+---++ peers_path
+
+=cut
+
 sub peers_path {
 	return shift->{'db path'}.'/peers';
 }
 
+=pod
+
+---++ max_connections
+
+=cut
+
 sub max_connections {
 	return shift->{'max connections'};
 }
+
+=pod
+
+---++ mark_write
+
+=cut
 
 sub mark_write {
 	my $this = shift;
@@ -408,7 +503,6 @@ sub mark_write {
 
 ---++ is_marked_getblocks
 
-
 =cut
 
 sub is_marked_getblocks{
@@ -419,6 +513,11 @@ sub is_marked_getblocks{
 	return $this->{'marked getblocks'};
 }
 
+=pod
+
+---++ block
+
+=cut
 
 sub block{
 	my ($this,$index) = (shift,shift);
@@ -438,18 +537,16 @@ sub block{
 	return $this->{'headers'}->[$index];
 }
 
+=pod
+
+---++ block_height
+
+=cut
 
 sub block_height {
 	my $this = shift;
 	return scalar(@{$this->{'headers'}}) - 1;
 }
-
-=pod
-
----+ Networking
-
-=cut
-
 
 =pod
 
@@ -469,54 +566,11 @@ sub our_address {
 	
 }
 
-
 =pod
 
----++ add_peer($socket,$addr_recv_ip,$addr_recv_port)
-
-Mark that a peer has been connected to and that it is ready to do a handshake.
-
+---+ Peer Management
 
 =cut
-
-sub add_peer{
-	my $this = shift;
-	
-	my ($socket, $addr_recv_ip,$addr_recv_port) = (shift,shift,shift,shift);
-	my $ref = $this->our_address();
-	my $peer = CBitcoin::Peer->new({
-		'spv' => $this,
-		'socket' => $socket,
-		'address' => $addr_recv_ip, 'port' => $addr_recv_port,
-		'our address' => $ref->[0], 'our port' => $ref->[1]
-	});
-
-	# go by fileno, it is friendly to IO::Epoll
-	$this->{'peers'}->{fileno($socket)} = $peer;
-	$this->{'peers by address:port'}->{$addr_recv_ip}->{$addr_recv_port} = $peer;
-	
-	
-	
-	
-	return 1;
-}
-
-=pod
-
----++ add_peer_obj($peer)
-
-Same as add_peer, but feed in a Peer object.
-
-=cut
-
-sub add_peer_obj{
-	my ($this,$peer) = (shift,shift);
-	
-	$this->{'peers'}->{fileno($peer->socket)} = $peer;
-	$this->{'peers by address:port'}->{$peer->address}->{$peer->port} = $peer;
-	
-	return 1;
-}
 
 
 
@@ -624,7 +678,7 @@ sub activate_peer {
 
 =pod
 
----++ add_peer_to_db($services,$addr_recv_ip,$addr_recv_port)
+---++ add_peer_to_inmemmory($services,$addr_recv_ip,$addr_recv_port)
 
 This adds a peer to a list of potential peers, but does not create a new connection.
 
@@ -635,7 +689,7 @@ port
 
 =cut
 
-sub add_peer_to_db{
+sub add_peer_to_inmemmory{
 	
 	my ($this,$services, $addr_recv_ip,$addr_recv_port) = (shift,shift,shift,shift);
 	warn "Adding peer to db ($addr_recv_ip,$addr_recv_port)\n";
@@ -665,7 +719,52 @@ sub add_peer_to_db{
 	print $fh "$addr_recv_ip\n$addr_recv_port\n";
 	close($fh);
 	#warn "adding peer 5\n";
+	
+	
+	
 	return 1;
+}
+
+=pod
+
+---++ add_peer($socket,$addr_recv_ip,$addr_recv_port)
+
+Mark that a peer has been connected to and that it is ready to do a handshake.
+
+This is called by activate_peer.
+
+=cut
+
+sub add_peer{
+	my ($this,$socket, $addr_recv_ip,$addr_recv_port) = @_;
+	
+	my $ref = $this->our_address();
+	my $peer = CBitcoin::Peer->new({
+		'spv' => $this,
+		'socket' => $socket,
+		'address' => $addr_recv_ip, 'port' => $addr_recv_port,
+		'our address' => $ref->[0], 'our port' => $ref->[1]
+	});
+	# basically, this gets overloaded by an inheriting class
+	$this->add_peer_to_db($peer);
+
+	# go by fileno, it is friendly to IO::Epoll
+	$this->{'peers'}->{fileno($socket)} = $peer;
+	$this->{'peers by address:port'}->{$addr_recv_ip}->{$addr_recv_port} = $peer;
+	
+	return 1;
+}
+
+=pod
+
+---++ client_name
+
+Overload this.
+
+=cut
+
+sub client_name {
+	return '';
 }
 
 
@@ -763,7 +862,7 @@ sub peer_hook_handshake_finished{
 
 =pod
 
----++ handle_inv($type,$hash)
+---++ hook_inv($type,$hash)
 
 Add the pair to the list of inventory_vectors that need to be fetched
 
@@ -783,7 +882,7 @@ When done, set result=1???
 
 =cut
 
-sub handle_inv {
+sub hook_inv {
 	my ($this,$type,$hash) = @_;
 	warn "Got inv of type=$type with hash=".unpack('H*',$hash)."\n";
 	
@@ -800,6 +899,29 @@ sub handle_inv {
 	# nothing, everything gets handled in Peer::callback_gotinv
 	
 	
+}
+
+=pod
+
+---++ hook_peer_onreadidle($peer)
+
+A peer can do a read, so, after reading in the bytes, figure out what to do.
+
+=cut
+
+sub hook_peer_onreadidle {
+	my ($this,$peer) = @_;
+	
+	# check to see if we need to fetch more inv
+	warn "check to see if we need to fetch more inv\n";
+	$peer->send_getdata($this->hook_getdata());
+	
+	# we might have to wait for a ping before this request goes out to the peer
+	if($this->is_marked_getblocks()){
+		warn "getting blocks\n";
+		$peer->send_getblocks();
+		$this->is_marked_getblocks(0);
+	}
 }
 
 =pod
@@ -887,6 +1009,11 @@ sub hook_getdata {
 	
 }
 
+=pod
+
+---+ Event Loop
+
+=cut
 
 =pod
 

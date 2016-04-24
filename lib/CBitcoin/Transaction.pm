@@ -110,90 +110,102 @@ sub new {
 
 ---++ deserialize($fh)
 
+
+Get a hash back, not a blessed object.
+
+version
+inputs => [..]
+outputs => [..]
+locktime
+
+input = {prevHash, prevIndex, script, sequence}
+output = {value, script}
+
 =cut
 
 sub deserialize{
 	my ($package,$fh) = @_;
 	
 	my ($n,$buf,$count,$tx);
-	#my $data;
 	$n = read($fh,$buf,4);
 	die "not enough bytes to read tx" unless $n == 4;
-	#$data .= $buf;
-	warn "tx - 1 \n";
+	$tx->{'version'} = unpack('l',$buf);
 	
 	# get tx inputs
 	my $txin_count = CBitcoin::Utilities::deserialize_varint($fh);
-	#$data .= CBitcoin::Utilities::serialize_varint($txin_count);
+
 	die "count is 0" unless 0 <=  $txin_count;
-	warn "tx - 2 \n";
-	
+
+	my @inputs;
 	if(0 < $txin_count){
 		for(my $i=0;$i < $txin_count;$i++){
-			warn "tx - 3 - $i \n";
-			# read previous output (txid,index)
+			my $txin;
+
 			$n = read($fh,$buf,32);
 			die "could not read tx" unless $n == 32;
-			my $msgtxt = "spent input hash=".unpack('H*',$buf)." with index=";
+			$txin->{'prevHash'} = $buf;
+			
 			$n = read($fh,$buf,4);
 			die "could not read tx" unless $n == 4;
-			$msgtxt .= unpack('L',$buf)."\n";
-			warn $msgtxt;
-			
-			#$data .= $buf;
+			$txin->{'prevIndex'} = unpack('L',$buf);
+
 			# read script length
 			my $scriptlength = CBitcoin::Utilities::deserialize_varint($fh);
 			die "bad script length" unless 0 < $scriptlength;
-			#$data .= CBitcoin::Utilities::serialize_varint($scriptlength);
+			
 			# read script
 			$n = read($fh,$buf,$scriptlength);
 			die "bad read of tx" unless $n == $scriptlength;
-			#$data .= $buf;
+			$txin->{'script'} = $buf;
+			
 			# read sequence
 			$n = read($fh,$buf,4);
-			die "bad read of tx" unless $n == 4;			
-			#$data .= $buf;
+			die "bad read of tx" unless $n == 4;
+			$txin->{'sequence'} = $buf;			
+
+			push(@inputs,$txin);
 		}
+		
 	}
 	else{
 		die "tx has no inputs";
 	}
-	# read 
+	$tx->{'inputs'} = \@inputs;
+	
+	# read outputs
 	my $txout_count = CBitcoin::Utilities::deserialize_varint($fh);
-	#$data .= CBitcoin::Utilities::serialize_varint($txout_count);
 	die "count is 0" unless 0 <=  $txout_count;
-	warn "tx - 4 with count = $txout_count\n";
-	my @txoutputs;
+	my @outputs;
 	if(0 < $txout_count){
 		for(my $i=0;$i < $txout_count;$i++){
-			
+			my $txout;
 			# tx value
 			$n = read($fh,$buf,8);
 			die "not enough bytes" unless $n == 8;
-			#$data .= $buf;
-			warn "tx - 5 - value=". unpack('q',$buf)/100_000_000.0 ." - $i \n";
+			$txout->{'value'} = unpack('q',$buf);
+
 			# script length
 			my $scriptlength = CBitcoin::Utilities::deserialize_varint($fh);
 			die "bad script length" unless 0 < $scriptlength;
-			#$data .= CBitcoin::Utilities::serialize_varint($scriptlength);
+			
 			# read script
 			$n = read($fh,$buf,$scriptlength);
 			die "bad read of script of length=$scriptlength" unless $n == $scriptlength;
-			#$data .= $buf;
-	 
+	 		$txout->{'script'} = $buf;
+	 		
+	 		push(@outputs,$txout);
 		}
 	}
 	else{
 		die "tx has no outputs";
 	}
+	$tx->{'outputs'} = \@outputs;
 	
 	$n = read($fh,$buf,4);
 	die "bad locktime" unless $n == 4;
-	
-	warn "tx - 6 - locktime=".unpack('L',$buf)."\n";
-	#my $tx = {'data' => $data};
-	#bless($tx,$package);
-	#return $tx;
+	$tx->{'locktime'} = unpack('L',$buf);
+
+	return $tx;
 }
 
 
