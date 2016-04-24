@@ -1,4 +1,4 @@
 #!/bin/sh
 
 
-perl Makefile.PL
+perl Makefile.PL PREFIX=/usr DESTDIR=${DESTDIR}
