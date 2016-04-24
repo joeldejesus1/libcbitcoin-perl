@@ -2,11 +2,18 @@ package CBitcoin::Peer;
 
 use strict;
 use warnings;
-use CBitcoin::Message; # out of laziness, all c functions get referenced out of CBitcoin::Message
+use CBitcoin::Message; 
 use CBitcoin::Utilities;
-use constant BUFFSIZE => 8192;
+use constant BUFFSIZE => 8192*4;
 
 our $callback_mapper;
+
+
+=pod
+
+---+ constructors/destructors
+
+=cut
 
 
 =pod
@@ -25,10 +32,16 @@ sub new {
 	bless($this,$package);
 	$this = $this->init(shift);
 	
-	
 	return $this;
 }
 
+=pod
+
+---++ init($options)
+
+Overload this subroutine when overloading this class.
+
+=cut
 
 sub init {
 	my $this = shift;
@@ -64,7 +77,8 @@ sub init {
 		'socket' => $options->{'socket'},
 		'message definition' => {'magic' => 4,'command' => 12, 'length' => 4, 'checksum' => 4 },
 		'message definition order' => ['magic','command', 'length', 'checksum','payload' ],
-		'command buffer' => {}
+		'command buffer' => {},
+		'receive rate' => [0,0] 
 	};
 	bless($this,$ref);
 	# to have some human readable stuff for later 
@@ -129,6 +143,12 @@ sub mark_finished {
 
 =cut
 
+=pod
+
+---++ handshake_finished
+
+=cut
+
 sub handshake_finished{
 	my $this = shift;
 	
@@ -140,6 +160,7 @@ sub handshake_finished{
 	if($this->sent_version && $this->sent_verack && $this->received_version && $this->received_verack){
 		$this->{'handshake finished'} = 1;
 		warn "handshake is finished, ready to run hooks\n";
+		$this->spv->peer_hook_handshake_finished($this);
 		return 1;
 	}
 	else{
@@ -147,30 +168,81 @@ sub handshake_finished{
 	}
 }
 
+=pod
+
+---++ sent_version
+
+=cut
+
 sub sent_version {
 	return shift->{'sent version'};
 }
+
+=pod
+
+---++ sent_verack
+
+=cut
+
 sub sent_verack {
 	return shift->{'sent verack'};
 }
+
+=pod
+
+---++ received_version
+
+=cut
+
 sub received_version {
 	return shift->{'received version'};
 }
+
+=pod
+
+---++ received_verack
+
+=cut
+
 sub received_verack {
 	return shift->{'received verack'};
 }
+
+=pod
+
+---++ address
+
+=cut
 
 sub address {
 	return shift->{'address'};
 }
 
+=pod
+
+---++ port
+
+=cut
+
 sub port {
 	return shift->{'port'};
 }
 
+=pod
+
+---++ spv
+
+=cut
+
 sub spv {
 	return shift->{'spv'};
 }
+
+=pod
+
+---++ block_height
+
+=cut
 
 sub block_height {
 	my $this = shift;
@@ -187,63 +259,37 @@ sub block_height {
 	}
 }
 
+=pod
+
+---++ magic
+
+=cut
+
 sub magic {
 	return shift->{'magic'};
 }
+
+=pod
+
+---++ our_version
+
+=cut
 
 sub our_version {
 	return shift->{'handshake'}->{'our version'};
 }
 
-sub socket {
-	my $this = shift;
-	require Data::Dumper;
-	my $xo = Data::Dumper::Dumper($this);
-	open(my $fhout,'>','/tmp/bonus');
-	print $fhout $xo;
-	close($fhout);
-	return $this->{'socket'};
-}
 
-sub last_pinged {
-	return shift->{'last pinged'};
-}
-
-sub command_buffer {
-	return shift->{'commands'}->{shift};
-}
-
-
-sub bytes_read{
-	my $this = shift;
-	my $newbytes = shift;
-	if(defined $newbytes && $newbytes > 0){
-		$this->{'bytes read'} += $newbytes;  #implies undefined means 0
-		return $this->{'bytes read'};
-	}
-	elsif(!defined $newbytes){
-		return $this->{'bytes read'};
-	}
-	else{
-		die "number of bytes in bad format";
-	}
-}
-
-sub bytes {
-	my $this = shift;
-	my $newbytes = shift;
-	if(defined $newbytes && length($newbytes) > 0){
-		$this->{'bytes'} .= $newbytes; 
-		return $this->{'bytes'};
-	}
-	else{
-		return $this->{'bytes'};
-	}
-}
 
 =pod
 
 ---+ Handshakes
+
+=cut
+
+=pod
+
+---++ version_deserialize
 
 =cut
 
@@ -325,6 +371,11 @@ sub version_deserialize {
 	return $this->{'version'};
 }
 
+=pod
+
+---++ version_serialize
+
+=cut
 
 sub version_serialize {
 	my $this = shift;
@@ -359,7 +410,7 @@ sub version_serialize {
 	#warn "nonce=".unpack('H*',$x);
 	$data .= $x;
 	# user agent (null, no string)
-	$x = pack('C',0);
+	$x = CBitcoin::Utilities::serialize_varstr($this->spv->client_name());
 	#warn "user agent=".unpack('H*',$x);
 	$data .= $x;
 	# start height
@@ -373,17 +424,365 @@ sub version_serialize {
 	return $data;
 }
 
+
+
+
+
+=pod
+
+---+ Read/Write
+
+=cut
+
+
+=pod
+
+---++ read_data
+
+Take an opportunity after processing to see if there is a need to close this connection based on bad data from the peer.
+
+=cut
+
+sub read_data {
+	use POSIX qw(:errno_h);
+	warn "can read from peer";
+	my $this = shift;
+	
+	$this->{'bytes'} = '' unless defined $this->{'bytes'};
+	my $socket = $this->socket();
+	warn "Socket=$socket\n";
+	my $n = sysread($this->socket(),$this->{'bytes'},BUFFSIZE,length($this->{'bytes'}));
+
+	
+	if(defined $n && $n == 0){
+		warn "Closing peer, socket was closed from the other end.\n";
+		$this->finish();
+	}
+	elsif(defined $n && $n > 0){
+		$this->bytes_read($n);
+		warn "Have ".$this->bytes_read()." bytes read into the buffer\n";
+
+		while(my $msg = $this->read_data_parse_msg()){
+			if($msg->command eq 'version'){
+				warn "Getting Message=".ref($msg)."\n";
+				$this->callback_gotversion($msg);
+				
+			}
+			elsif($msg->command eq 'verack'){
+				$this->callback_gotverack($msg);
+				
+			}
+			elsif($msg->command eq 'ping'){
+				$this->callback_gotping($msg);
+				
+			}
+			elsif($this->handshake_finished()){
+				#push(@{$this->{'messages to be processed'}},$msg);
+				#return 1;
+				$this->hook_callback($msg);
+			}
+			else{
+				warn "bad client behavior\n";
+				$this->mark_finished();
+			}
+		}
+		
+		$this->spv->hook_peer_onreadidle($this);
+		
+		if($this->is_marked_finished()){
+			$this->finish();
+		}
+	}
+	else{
+		# would block
+		warn "socket is blocking, so skip, error=".$!."\n";
+	}
+	
+	return undef;
+	
+}
+
+
+=pod
+
+---++ read_data_parse_msg()->$msg
+
+Parse the bytes we have till we can't parse anymore.
+
+=cut
+
+sub read_data_parse_msg {
+	my $this = shift;
+	
+	# order = ['magic','command', 'length', 'checksum','payload' ], double check if there is a problem
+	foreach my $key (@{$this->{'message definition order'}}){
+		#warn "reading in data for $key\n";
+		return undef unless $this->read_data_single_msg_item($key);
+	}
+
+	my $msg = CBitcoin::Message->new($this->{'buffer'});
+	$this->{'buffer'} = {};
+	return $msg;	
+}
+
+=pod
+
+---++ read_data_single_msg_item->0/1
+
+Return 1 for keep going, return 0 for stop since we don't have any more bytes to read.
+
+=cut
+
+sub read_data_single_msg_item {
+	my $this = shift;
+	my ($key) = (shift);
+	
+	# order = ['magic','command', 'length', 'checksum','payload' ], double check if there is a problem
+	my $size = $this->definition_size_mapper($key);
+	die "key not defined" unless defined $size;
+	
+	
+	if(!defined $this->{'buffer'}->{$key} &&  $this->{'bytes read'} >= $size){
+		$this->{'buffer'}->{$key} = substr($this->{'bytes'},0,$size);
+		#warn "Pre $key=".unpack('H*',$this->{'buffer'}->{$key})."\n";
+		substr($this->{'bytes'},0,$size) = ""; # delete  bytes we don't need
+		$this->{'bytes read'} = $this->{'bytes read'} - $size;
+		die "sizes do not match" unless $this->{'bytes read'} == length($this->{'bytes'});
+		return 1;
+	}
+	elsif(defined $this->{'buffer'}->{$key}){
+		# skip this
+		return 1;
+	}
+	else{
+		return 0;
+	}
+}
+
+=pod
+
+---++ definition_size_mapper
+
+=cut
+
+sub definition_size_mapper {
+	my $this = shift;
+	my $key = shift;
+	if($key eq 'payload'){
+		die "length not defined" unless defined $this->{'buffer'}->{'length'};
+		return unpack('L',$this->{'buffer'}->{'length'});
+	}
+	else{
+		return $this->{'message definition'}->{$key};
+	}
+}
+
+
+
+=pod
+
+---++ socket
+
+=cut
+
+sub socket {
+	my $this = shift;
+	require Data::Dumper;
+	my $xo = Data::Dumper::Dumper($this);
+	open(my $fhout,'>','/tmp/bonus');
+	print $fhout $xo;
+	close($fhout);
+	return $this->{'socket'};
+}
+
+=pod
+
+---++ last_pinged
+
+=cut
+
+sub last_pinged {
+	return shift->{'last pinged'};
+}
+
+=pod
+
+---++ command_buffer
+
+=cut
+
+sub command_buffer {
+	return shift->{'commands'}->{shift};
+}
+
+=pod
+
+---++ bytes_read
+
+=cut
+
+sub bytes_read{
+	my $this = shift;
+	my $newbytes = shift;
+	if(defined $newbytes && $newbytes > 0){
+		$this->{'bytes read'} += $newbytes;  #implies undefined means 0
+		return $this->{'bytes read'};
+	}
+	elsif(!defined $newbytes){
+		return $this->{'bytes read'};
+	}
+	else{
+		die "number of bytes in bad format";
+	}
+}
+
+=pod
+
+---++ bytes
+
+=cut
+
+sub bytes {
+	my $this = shift;
+	my $newbytes = shift;
+	if(defined $newbytes && length($newbytes) > 0){
+		$this->{'bytes'} .= $newbytes; 
+		return $this->{'bytes'};
+	}
+	else{
+		return $this->{'bytes'};
+	}
+}
+
+
+
+=pod
+
+---++ write($data)
+
+Add to the write queue.  Also adds a write flag to the event mask on the socket via the sub passed in the $spv constructor.
+
+=cut
+
+sub write {
+	my $this = shift;
+	my $data = shift;
+
+	$data = '' unless defined $data;
+
+	return length($this->{'bytes to write'}) unless defined $data && length($data) > 0;
+	$this->{'bytes to write'} .= $data;
+	
+	warn "Added ".length($data)." bytes to the write queue\n";
+	
+	if($this->write_data() == 0 && fileno($this->socket) > 0){
+		$this->spv->mark_write($this->socket);
+		return 0;
+	}
+	
+	return length($this->{'bytes to write'});
+}
+
+=pod
+
+---++ write_data()
+
+When we can write data, send out BUFFSIZE bytes.
+
+=cut
+
+sub write_data {
+	my $this = shift;
+	
+	use POSIX qw(:errno_h);
+
+	
+	unless( 0 < fileno($this->socket()) ){
+		$this->mark_finished();
+		return undef;
+	}
+	
+	
+	return undef unless defined $this->{'bytes to write'} && length($this->{'bytes to write'}) > 0;
+	
+	my $n = syswrite($this->socket(),$this->{'bytes to write'},BUFFSIZE);
+
+	if (!defined($n) && $! == EAGAIN) {
+		# would block
+		warn "socket is blocking, so skip\n";
+		return 0;
+	}
+	elsif($n == 0){
+		warn "Closing peer, socket was closed from the other end.\n";
+		$this->finish();
+		return 0;
+	}
+	else{
+		warn "wrote $n bytes";
+		substr($this->{'bytes to write'},0,$n) = "";
+		return $n;		
+	}
+	
+}
+
+=pod
+
+---+ Sending Messages
+
+The logic used to figure out what needs to be uploaded and downloaded is stored here.
+
+=cut
+
+
+=pod
+
+---++ send_getheaders
+
+Compare the spv's block height with the peer's.  Use that as a condition as to whether or not to fetch blocks/headers.
+
+The timeout on this command is 10 minutes.
+
+=cut
+
+sub send_getheaders {
+	my $this = shift;
+	return CBitcoin::Message::serialize(
+			$this->spv->calculate_block_locator(),
+			'getheaders',
+			CBitcoin::Message::net_magic($this->magic)  # defaults as MAINNET
+	);
+	
+}
+
+=pod
+
+---++ send_version
+
+=cut
+
 sub send_version {
 	my $this = shift;
 	$this->{'sent version'} = 1;
 	return $this->write(CBitcoin::Message::serialize($this->our_version(),'version'));
 }
 
+=pod
+
+---++ send_verack
+
+=cut
+
 sub send_verack {
 	my $this = shift;
 	$this->{'sent verack'} = 1;
 	return $this->write(CBitcoin::Message::serialize('','verack',$this->magic));
 }
+
+=pod
+
+---++ send_ping
+
+=cut
 
 sub send_ping {
 	my $this = shift;
@@ -392,6 +791,12 @@ sub send_ping {
 	
 	return $this->write(CBitcoin::Message::serialize($this->{'sent ping nonce'},'ping',$this->magic));
 }
+
+=pod
+
+---++ send_pong
+
+=cut
 
 sub send_pong {
 	my $this = shift;
@@ -403,21 +808,69 @@ sub send_pong {
 
 =pod
 
+---++ send_getblocks()
+
+Calculate the block locator based on the block headers we have, then send a message out.
+
+=cut
+
+sub send_getblocks{
+	my ($this) = @_;
+
+	return $this->write(CBitcoin::Message::serialize(
+		$this->spv->calculate_block_locator(),
+		'getblocks',
+		$this->magic
+	));
+}
+
+
+
+=pod
+
+---++ send_getaddr
+
+Ask for info on more peers.
+
+=cut
+
+sub send_getaddr{
+	my ($this) = @_;
+	warn "sending getaddr\n";
+	return $this->write(CBitcoin::Message::serialize(
+		'',
+		'getaddr',
+		$this->magic
+	));
+}
+
+
+=pod
+
+---++ send_getdata($invpayload)
+
+Given a payload, go get some data.  This is called in callback_gotinv
+
+=cut
+
+sub send_getdata{
+	my ($this,$payload) = @_;
+	
+	return undef unless defined $payload && 0 < length($payload);
+
+	return $this->write(CBitcoin::Message::serialize(
+		$payload,
+		'getdata',
+		$this->magic
+	));
+}
+
+
+=pod
+
 ---+ Callbacks
 
-
-sub sent_version {
-	return shift->{'sent version'};
-}
-sub sent_verack {
-	return shift->{'sent verack'};
-}
-sub received_version {
-	return shift->{'received version'};
-}
-sub received_verack {
-	return shift->{'received verack'};
-}
+When a message is recieved, the command is parsed from the message and used to fetch the subroutine, which is stored in the global hash $callback_mapper.
 
 =cut
 
@@ -426,6 +879,7 @@ sub received_verack {
 
 ---++ callback_gotaddr
 
+Store the new addr in the peer database.
 
 =cut
 
@@ -438,22 +892,23 @@ BEGIN{
 sub callback_gotaddr {
 	my $this = shift;
 	my $msg = shift;
-	
+	warn "gotaddr\n";
 	open(my $fh,'<',\$msg->{'payload'});
 	my $addr_ref = CBitcoin::Utilities::deserialize_addr($fh);
 	close($fh);
-	
 	if(defined $addr_ref && ref($addr_ref) eq 'ARRAY'){
 		warn "Got ".scalar(@{$addr_ref})." new addresses\n";
 		
 		foreach my $addr (@{$addr_ref}){
 			# timestamp, services, ipaddress, port
-			$this->spv->add_peer_to_db(
+			$this->spv->add_peer_to_inmemmory(
 				$addr->{'services'},
 				$addr->{'ipaddress'},
 				$addr->{'port'}
 			);
 		}
+		
+		
 	}
 	else{
 		warn "Got no new addresses\n";
@@ -467,6 +922,7 @@ sub callback_gotaddr {
 
 ---++ callback_gotversion
 
+Used in the handshake between peers.
 
 =cut
 
@@ -509,6 +965,7 @@ sub callback_gotversion {
 
 ---++ callback_gotverack
 
+Used in the handshake.
 
 =cut
 
@@ -540,6 +997,8 @@ sub callback_gotverack {
 
 ---++ callback_ping
 
+Used after a timeout has been reached, to confirm that the connection is still up.
+
 =cut
 
 sub callback_gotping {
@@ -558,6 +1017,8 @@ sub callback_gotping {
 =pod
 
 ---++ callback_pong
+
+Sent by a peer in response to a ping sent by us.
 
 =cut
 
@@ -580,108 +1041,142 @@ sub callback_gotpong {
 }
 
 
-
-
 =pod
 
----+ Read/Write
+---++ callback_gotinv
+
+Used when inventory vectors have been received.  The next step is to fetch the corresponding content via getdata.  See hook_getdata for information on how getdata is handled.
 
 =cut
 
+BEGIN{
+	$callback_mapper->{'command'}->{'inv'} = {
+		'subroutine' => \&callback_gotinv
+	}
+};
 
-=pod
-
----++ read_data
-
-Take an opportunity after processing to see if there is a need to close this connection based on bad data from the peer.
-
-=cut
-
-sub read_data {
-	use POSIX qw(:errno_h);
-	#warn "can read from peer";
+sub callback_gotinv {
 	my $this = shift;
-	
-	$this->{'bytes'} = '' unless defined $this->{'bytes'};
-	my $socket = $this->socket();
-	warn "Socket=$socket\n";
-	my $n = sysread($this->socket(),$this->{'bytes'},8192,length($this->{'bytes'}));
-
-	
-	if(defined $n && $n == 0){
-		warn "Closing peer, socket was closed from the other end.\n";
-		$this->finish();
+	my $msg = shift;
+	warn "Got inv\n";
+	unless($this->handshake_finished()){
+		warn "got inv before handshake finsihed\n";
+		$this->mark_finished();
+		return undef;
 	}
-	elsif(defined $n && $n > 0){
-		$this->bytes_read($n);
-		warn "Have ".$this->bytes_read()." bytes read into the buffer\n";
-
+	open(my $fh,'<',\($msg->payload()));
+	binmode($fh);
+	my $count = CBitcoin::Utilities::deserialize_varint($fh);
+	warn "gotinv: count=$count\n";
+	for(my $i=0;$i < $count;$i++){
+		$this->spv->hook_inv(@{CBitcoin::Utilities::deserialize_inv($fh)});
+	}
+	close($fh);
 		
-		while($this->read_data_parse_msg()){
-			warn "Trying to parse another message\n";
+	# go fetch the data
+	$this->send_getdata($this->spv->hook_getdata());
+	
+}
+
+
+=pod
+
+---++ callback_gotblock
+
+Got a block, so put it into the database.
+
+
+---+++ Tx Format
+version
+inputs => [..]
+outputs => [..]
+locktime
+
+input = {prevHash, prevIndex, script, sequence}
+output = {value, script}
+
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'block'} = {
+		'subroutine' => \&callback_gotblock
+	}
+};
+
+sub callback_gotblock {
+	my $this = shift;
+	my $msg = shift;
+	
+	
+	# write this to disk
+	my $fp = '/tmp/spv/tmp.'.$$.'.block';
+	open(my $fh,'<',\($msg->payload()));
+	if( 100_000 < length($msg->payload()) ){
+		open(my $fhout,'>',$fp) || die "cannot write to disk";
+		binmode($fh);
+		binmode($fhout);
+		
+		my ($n,$buf);
+		while($n = read($fh,$buf,8192)){
+			my $m = 0;
+			while(0 < $n - $m){
+				$m += syswrite($fhout,$buf,$n - $m,$m);
+			}
+		}
+		close($fhout);
+		close($fh);
+		open($fh,'<',$fp) || die "cannot read from disk";		
+	}
+	
+	eval{
+		
+		my $block = CBitcoin::Block->deserialize($fh);
+		
+		warn "Got block with hash=".$block->hash_hex().
+			" and transactionNum=".$block->transactionNum.
+			" and prevBlockHash=".$block->prevBlockHash_hex()."\n";
+		my $count = $block->transactionNum;
+		#die "let us finish early\n";
+		$this->spv->add_header_to_chain($block);
+		
+		if(0 < $count){
+			for(my $i=0;$i<$count;$i++){
+				warn "looping\n";		
+				$this->spv->add_tx_to_db(
+					$block->hash(),
+					CBitcoin::Transaction->deserialize($fh)
+				);
+			}
+		}
+		else{
+			die "weird block\n";
 		}
 		
-		if($this->is_marked_finished()){
-			$this->finish();
-		}
-	}
-	else{
-		# would block
-		warn "socket is blocking, so skip, error=".$!."\n";
-	}
+		# delete it in inv search.
+		delete $this->spv->{'inv search'}->[2]->{$block->hash()};
+		
+	} || do {
+		my $error = $@;
+		warn "Error:$error\n";
+	};
 	
-	return undef;
 	
+	#$this->spv->{'inv'}->[2]->{$block->hash()} = $block;
+	unlink($fp) if -f $fp;
 }
 
 =pod
 
----++ read_data_parse_msg()->0/1
-
-Parse the bytes we have till we can't parse anymore.
+---+ hooks
 
 =cut
-
-sub read_data_parse_msg {
-	my $this = shift;
-	
-	
-	foreach my $key (@{$this->{'message definition order'}}){
-		#warn "reading in data for $key\n";
-		return 0 unless $this->read_data_single_msg_item($key);
-	}
-
-	my $msg = CBitcoin::Message->new($this->{'buffer'});
-	$this->{'buffer'} = {};
-	
-	if($msg->command eq 'version'){
-		warn "Getting Message=".ref($msg)."\n";
-		return $this->callback_gotversion($msg);
-		
-	}
-	elsif($msg->command eq 'verack'){
-		return $this->callback_gotverack($msg);
-		
-	}
-	elsif($msg->command eq 'ping'){
-		return $this->callback_gotping($msg);
-		
-	}
-	elsif($this->handshake_finished()){
-		return $this->hook_callback($msg);
-	}
-	else{
-		warn "bad client behavior\n";
-		return 0;
-	}
-	
-}
 
 =pod
 
 ---++ hook_callback($msg)
 
-Overload this subroutine.
+Take the command out of a message, and map it to a subroutine.
 
 =cut
 
@@ -705,164 +1200,5 @@ sub hook_callback{
 		return 1;
 	}
 }
-
-
-=pod
-
----++ read_data_single_msg_item->0/1
-
-Return 1 for keep going, return 0 for stop since we don't have any more bytes to read.
-
-=cut
-
-sub read_data_single_msg_item {
-	my $this = shift;
-	my ($key) = (shift);
-	
-	my $size = $this->definition_size_mapper($key);
-	die "key not defined" unless defined $size;
-	
-	
-	if(!defined $this->{'buffer'}->{$key} &&  $this->{'bytes read'} >= $size){
-		$this->{'buffer'}->{$key} = substr($this->{'bytes'},0,$size);
-		#warn "Pre $key=".unpack('H*',$this->{'buffer'}->{$key})."\n";
-		substr($this->{'bytes'},0,$size) = ""; # delete  bytes we don't need
-		$this->{'bytes read'} = $this->{'bytes read'} - $size;
-		die "sizes do not match" unless $this->{'bytes read'} == length($this->{'bytes'});
-		return 1;
-	}
-	elsif(defined $this->{'buffer'}->{$key}){
-		# skip this
-		return 1;
-	}
-	else{
-		return 0;
-	}
-}
-
-sub definition_size_mapper {
-	my $this = shift;
-	my $key = shift;
-	if($key eq 'payload'){
-		die "length not defined" unless defined $this->{'buffer'}->{'length'};
-		return unpack('L',$this->{'buffer'}->{'length'});
-	}
-	else{
-		return $this->{'message definition'}->{$key};
-	}
-}
-
-=pod
-
----++ write($data)
-
-Add to the write queue.  Also adds a write flag to the event mask on the socket via the sub passed in the $spv constructor.
-
-=cut
-
-sub write {
-	my $this = shift;
-	my $data = shift;
-
-	$data = '' unless defined $data;
-
-	if($this->handshake_finished()){
-		#my $x = length($data);
-		$data .= $this->hook_getheaders();
-		#$x = length($data) - $x;
-		#warn "Running peer getheader hooks, got $x\n";
-		#$x = length($data);
-		$data .= $this->spv->hook_getdata();
-		#$x = length($data) - $x;
-		#warn "Running spv getdata hooks, got $x\n";
-	}
-
-	return length($this->{'bytes to write'}) unless defined $data && length($data) > 0;
-	$this->{'bytes to write'} .= $data;
-	
-	warn "Added ".length($data)." bytes to the write queue\n";
-	
-	if($this->write_data() == 0 && fileno($this->socket) > 0){
-		$this->spv->mark_write($this->socket);
-		return 0;
-	}
-	
-	return length($this->{'bytes to write'});
-}
-
-=pod
-
----++ write_data()
-
-When we can write data, send out 8192 bytes.
-
-=cut
-
-sub write_data {
-	use POSIX qw(:errno_h);
-	#warn "can write data\n";
-	my $this = shift;
-	return undef unless defined $this->{'bytes to write'} && length($this->{'bytes to write'}) > 0;
-	
-	my $n = syswrite($this->socket(),$this->{'bytes to write'},8192);
-
-	if (!defined($n) && $! == EAGAIN) {
-		# would block
-		warn "socket is blocking, so skip\n";
-		return 0;
-	}
-	elsif($n == 0){
-		warn "Closing peer, socket was closed from the other end.\n";
-		$this->finish();
-		return 0;
-	}
-	else{
-		warn "wrote $n bytes";
-		substr($this->{'bytes to write'},0,$n) = "";
-		return $n;		
-	}
-	
-	
-
-}
-
-=pod
-
----+ Brain
-
-The logic used to figure out what needs to be uploaded and downloaded is stored here.
-
-=cut
-
-
-=pod
-
----++ hook_getheaders
-
-Compare the spv's block height with the peer's.  Use that as a condition as to whether or not to fetch blocks/headers.
-
-The timeout on this command is 10 minutes.
-
-=cut
-
-sub hook_getheaders {
-	my $this = shift;
-	
-	# $this->block_height $this->spv->block_height;
-	
-	if(!defined $this->{'getheaders'} || 10*60 < (time() - $this->{'getheaders'}->{'time'})){
-		$this->{'getheaders'}->{'time'} = time();
-		return CBitcoin::Message::serialize(
-			$this->spv->calculate_block_locator(),
-			'getheaders',
-			CBitcoin::Message::net_magic($this->magic)  # defaults as MAINNET
-		);
-	}
-	else{
-		return '';
-	}
-	
-}
-
 
 1;

@@ -107,10 +107,10 @@ sub network_address_deserialize {
 	$ans->{'timestamp'} = unpack('L',$buf);
 	die "bad addr network addr" unless $n == 4;
 	my $diff = time() - $ans->{'timestamp'};
-	unless(abs($diff) < 1*60*60){
-		warn "bad addr, too stale\n";
+	unless(abs($diff) < 8*60*60){
+		warn "bad addr, might be stale\n";
 		$n = read($fh,$buf,30-4);
-		#die "bad addr packet" unless $n == 26;
+		die "bad addr packet" unless $n == 26;
 		return undef
 	}
 	warn "Timestamp diff=$diff\n";
@@ -214,6 +214,27 @@ sub deserialize_varint {
 
 =pod
 
+---++ deserialize_inv($fh)->[$type,$hash]
+
+Deserialize inventory vectors.
+
+=cut
+
+sub deserialize_inv{
+	my $fh = shift;
+	my ($n,$buf);
+	$n = read($fh,$buf,4);
+	die "not enough bytes to read type" unless $n == 4;
+	my $type = unpack('L',$buf);
+	
+	$n = read($fh,$buf,32);
+	die "not enough bytes to read hash" unless $n == 32;
+	
+	return [$type,$buf];
+}
+
+=pod
+
 ---++ serialize_varint($integer)
 
 =cut
@@ -235,7 +256,20 @@ sub serialize_varint {
 	}
 }
 
+=pod
 
+---++ serialize_varstr($string)
+   * [[https://github.com/bitcoin/bips/blob/master/bip-0014.mediawiki][bip-0014]]
+IE: /Satoshi:5.64/bitcoin-qt:0.4/
+
+
+=cut
+
+sub serialize_varstr {
+	my $str = shift;
+	$str = '' unless defined $str;
+	return serialize_varint(length($str)).$str;
+}
 
 =pod
 
@@ -302,6 +336,8 @@ sub serialize_getheaders {
 =pod
 
 ---++ HashToFilepath
+
+1,3,the rest
 
 =cut
 

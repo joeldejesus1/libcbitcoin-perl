@@ -20,6 +20,7 @@ use CBitcoin::Script;
 use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
 use CBitcoin::Transaction;
+use CBitcoin::Utilities;
 use Digest::SHA;
 
 use constant MAINNET    => 0xd9b4bef9, TESTNET => pack('L',0xdab5bffa), TESTNET3 => pack('L',0x0709110b), NAMECOIN => pack('L',0xfeb4bef9) ;
@@ -73,7 +74,7 @@ sub new {
 	return $this;
 }
 
-sub serialize_header {
+sub serialize_header2 {
 	my $package = shift;
 
 
@@ -83,6 +84,86 @@ sub serialize_header {
 	
 	return $package->new($ref);
 }
+
+=pod
+
+---++ deserialize($fh)->object
+
+4 	version 	int32_t 	Block version information (note, this is signed)
+32 	prev_block 	char[32] 	The hash value of the previous block this particular block references
+32 	merkle_root 	char[32] 	The reference to a Merkle tree collection which is a hash of all transactions related to this block
+4 	timestamp 	uint32_t 	A timestamp recording when this block was created (Will overflow in 2106[2])
+4 	bits 	uint32_t 	The calculated difficulty target being used for this block
+4 	nonce 	uint32_t 	The nonce used to generate this block… to allow variations of the header and compute different hashes
+1 	txn_count 	var_int 	Number of transaction entries, this value is always 0 
+
+=cut
+
+sub deserialize{
+	my $package = shift;
+	my $fh = shift;
+	my $this;
+	my ($n,$buf);
+	my $shaobj = Digest::SHA->new(256);
+	$n = read($fh,$buf,4);
+	die "not enough bytes to read version" unless $n == 4;
+	$this->{'version'} = $buf;
+	$shaobj->add($buf);
+
+	$n = read($fh,$buf,32);
+	die "not enough bytes to read prevBlockHash" unless $n == 32;
+	$this->{'prevBlockHash'} = $buf;	
+	$shaobj->add($buf);
+	
+	$n = read($fh,$buf,32);
+	die "not enough bytes to read merkleRoot" unless $n == 32;
+	$this->{'merkleRoot'} = $buf;
+	$shaobj->add($buf);
+
+	$n = read($fh,$buf,4);
+	die "not enough bytes to read timestamp" unless $n == 4;
+	$this->{'timestamp'} = $buf;
+	$shaobj->add($buf);
+	
+	$n = read($fh,$buf,4);
+	die "not enough bytes to read bits" unless $n == 4;
+	$this->{'bits'} = $buf;
+	$shaobj->add($buf);
+	
+	$n = read($fh,$buf,4);
+	die "not enough bytes to read nonce" unless $n == 4;
+	$this->{'nonce'} = $buf;
+	$shaobj->add($buf);
+	
+	my $count = CBitcoin::Utilities::deserialize_varint($fh);
+	warn "got tx count=$count\n";
+	$this->{'transactionNum'} = $count;
+	
+	bless($this,$package);
+	
+	$this->{'hash'} = Digest::SHA::sha256($shaobj->digest());
+	
+	return $this;
+}
+
+=pod
+
+---++ serialize_header
+
+transaction count is set to 0.
+
+=cut
+
+sub serialize_header {
+	my ($this) = @_;
+	
+	return $this->{'data'} if defined $this->{'data'};
+	
+	return $this->{'version'}.$this->{'prevBlockHash'}.$this->{'merkleRoot'}.
+		$this->{'timestamp'}.$this->{'bits'}.$this->{'nonce'}.
+		CBitcoin::Utilities::serialize_varint(0);
+}
+
 
 =pod
 
@@ -103,11 +184,11 @@ sub nonce {
 }
 
 sub version {
-	return unpack('L',shift->{'version'});
+	return unpack('l',shift->{'version'});
 }
 
 sub transactionNum {
-	return unpack('L',shift->{'transactionNum'});
+	return shift->{'transactionNum'};
 }
 
 

@@ -18,6 +18,7 @@ use bigint;
 use CBitcoin::Script;
 use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
+use CBitcoin::Utilities;
 
 require Exporter;
 *import = \&Exporter::import;
@@ -111,6 +112,109 @@ sub new {
 
 =pod
 
+---++ deserialize($fh)
+
+
+Get a hash back, not a blessed object.
+
+version
+inputs => [..]
+outputs => [..]
+locktime
+
+input = {prevHash, prevIndex, script, sequence}
+output = {value, script}
+
+=cut
+
+sub deserialize{
+	my ($package,$fh) = @_;
+	
+	my ($n,$buf,$count,$tx);
+	$n = read($fh,$buf,4);
+	die "not enough bytes to read tx" unless $n == 4;
+	$tx->{'version'} = unpack('l',$buf);
+	
+	# get tx inputs
+	my $txin_count = CBitcoin::Utilities::deserialize_varint($fh);
+
+	die "count is 0" unless 0 <=  $txin_count;
+
+	my @inputs;
+	if(0 < $txin_count){
+		for(my $i=0;$i < $txin_count;$i++){
+			my $txin;
+
+			$n = read($fh,$buf,32);
+			die "could not read tx" unless $n == 32;
+			$txin->{'prevHash'} = $buf;
+			
+			$n = read($fh,$buf,4);
+			die "could not read tx" unless $n == 4;
+			$txin->{'prevIndex'} = unpack('L',$buf);
+
+			# read script length
+			my $scriptlength = CBitcoin::Utilities::deserialize_varint($fh);
+			die "bad script length" unless 0 < $scriptlength;
+			
+			# read script
+			$n = read($fh,$buf,$scriptlength);
+			die "bad read of tx" unless $n == $scriptlength;
+			$txin->{'script'} = $buf;
+			
+			# read sequence
+			$n = read($fh,$buf,4);
+			die "bad read of tx" unless $n == 4;
+			$txin->{'sequence'} = $buf;			
+
+			push(@inputs,$txin);
+		}
+		
+	}
+	else{
+		die "tx has no inputs";
+	}
+	$tx->{'inputs'} = \@inputs;
+	
+	# read outputs
+	my $txout_count = CBitcoin::Utilities::deserialize_varint($fh);
+	die "count is 0" unless 0 <=  $txout_count;
+	my @outputs;
+	if(0 < $txout_count){
+		for(my $i=0;$i < $txout_count;$i++){
+			my $txout;
+			# tx value
+			$n = read($fh,$buf,8);
+			die "not enough bytes" unless $n == 8;
+			$txout->{'value'} = unpack('q',$buf);
+
+			# script length
+			my $scriptlength = CBitcoin::Utilities::deserialize_varint($fh);
+			die "bad script length" unless 0 < $scriptlength;
+			
+			# read script
+			$n = read($fh,$buf,$scriptlength);
+			die "bad read of script of length=$scriptlength" unless $n == $scriptlength;
+	 		$txout->{'script'} = $buf;
+	 		
+	 		push(@outputs,$txout);
+		}
+	}
+	else{
+		die "tx has no outputs";
+	}
+	$tx->{'outputs'} = \@outputs;
+	
+	$n = read($fh,$buf,4);
+	die "bad locktime" unless $n == 4;
+	$tx->{'locktime'} = unpack('L',$buf);
+
+	return $tx;
+}
+
+
+=pod
+
 ---++ original_script($txhash,$txid)->script
 
 =cut
@@ -145,6 +249,10 @@ sub serialized_data {
 	}
 
 }
+
+
+
+
 
 =item lockTime
 
