@@ -343,7 +343,7 @@ sub serialize_getheaders {
 
 sub HashToFilepath {
 	my $x = shift;
-	return substr($x,0,1).'/'.substr($x,1,3).'/'.substr($x,4);
+	return (substr($x,0,1),substr($x,1,3),substr($x,4));
 }
 
 =pod

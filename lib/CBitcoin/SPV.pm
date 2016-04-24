@@ -239,7 +239,7 @@ sub initialize_chain_scan_files {
 		 	opendir(my $fh3,"$base/headers/$f1/$f2") || die "cannot open directory";
 		 	while(my $f3 = readdir($fh3)){
 		 		next if $f3 eq '.' || $f3 eq '..';
-		 		open(my $fhdata,'<',"$base/headers/$f1/$f2/$f3/data") || die "cannot read data";
+		 		open(my $fhdata,'<',"$base/headers/$f1/$f2/$f3") || die "cannot read data";
 		 		$this->add_header_to_inmemory_chain(CBitcoin::Block->deserialize($fhdata));
 		 		close($fhdata);
 		 	}
@@ -271,21 +271,16 @@ sub add_header_to_chain {
 	my $base = $this->db_path();
 	my ($fh,$n);
 	
+	# the size is 3, with 2 directories and the final element being the file name
 	my @path = CBitcoin::Utilities::HashToFilepath($header->hash_hex);
+	die "path is not the right size" unless scalar(@path) == 3;
 
 	unless(-d "$base/headers/".join('/',@path)){
 		# the dir is the hex of the hash
-		CBitcoin::Utilities::recursive_mkdir("$base/headers/".join('/',@path));	
-		
-		# write the prevBlockHash into ./prevBlockHash
-		open($fh,'>',"$base/headers/".join('/',@path).'/prevBlockHash') 
-			|| die "cannot save prevblock hash";
-		$n = syswrite($fh,$header->prevBlockHash);
-		die "could not save hash" unless $n == length($header->prevBlockHash) && $n > 1;
-		close($fh);
+		CBitcoin::Utilities::recursive_mkdir("$base/headers/".join('/',@path[0..1]));
 		
 		# write the header into ./data
-		open($fh,'>',"$base/headers/".join('/',@path).'/data') || die "cannot save block data";
+		open($fh,'>',"$base/headers/".join('/',@path)) || die "cannot save block data";
 		my $data = $header->serialize_header();
 		$n = 0;
 		while(0 < length($data) - $n){
