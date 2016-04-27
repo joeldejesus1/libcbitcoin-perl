@@ -102,6 +102,12 @@ sub init {
 sub make_directories{
 	my $this = shift;
 	my $base = $this->{'db path'};
+	
+	# untaint the db path (TODO: make a better regex for this)
+	if($base =~ m/^(.*)$/){
+		$base = $1;
+	}
+	
 	mkdir($base) unless -d $base;
 	
 	# ./peers
@@ -169,25 +175,25 @@ Save the genesis block into block headers.  Also, create the first block locator
 sub initialize_chain{
 	my $this = shift;
 	my $base = $this->db_path();
-	warn "initialize chain 1\n";
+	#warn "initialize chain 1\n";
 	opendir(my $fh, $base.'/headers') || die "cannot open directory to headers at ". $base.'/headers';
-	warn "initialize chain 1.2\n";
+	#warn "initialize chain 1.2\n";
 	my @files = grep { $_ ne '.' && $_ ne '..' } readdir $fh;
-	warn "initialize chain 1.3\n";
+	#warn "initialize chain 1.3\n";
 	closedir($fh);
 	unless(0 == scalar(@files)){
 		#die "no files?=".scalar(@files)."\n";
 		return $this->initialize_chain_scan_files(\@files);	
 	}
-	warn "initialize chain 2\n";
+	#warn "initialize chain 2\n";
 	# must get genesis block
 	my $gen_block = CBitcoin::Block->genesis_block();
-	warn "Genesis hash=".$gen_block->hash_hex."\n";
-	warn "Genesis prevBlockHash=".$gen_block->prevBlockHash_hex."\n";
+	#warn "Genesis hash=".$gen_block->hash_hex."\n";
+	#warn "Genesis prevBlockHash=".$gen_block->prevBlockHash_hex."\n";
 
 	my @path = CBitcoin::Utilities::HashToFilepath($gen_block->hash_hex);
 	
-	warn "initialize chain 3\n";
+	#warn "initialize chain 3\n";
 	CBitcoin::Utilities::recursive_mkdir("$base/headers/".join('/',@path)) 
 		unless -d "$base/headers/".join('/',@path);
 	my $n;
@@ -197,14 +203,14 @@ sub initialize_chain{
 	die "could not save hash" unless $n == length($gen_block->prevBlockHash) && $n > 1;
 	close($fh);
 	
-	warn "initialize chain 4\n";
+	#warn "initialize chain 4\n";
 	open($fh,'>',"$base/headers/".join('/',@path).'/data') || die "cannot save block data";
 	my $data = $gen_block->serialize_header();
 	$n = syswrite($fh,$data);
 	die "could not save data" unless $n == length($data) && $n > 1;
 	close($fh);
 	
-	warn "initialize chain 5 hash=".unpack('H*',$gen_block->hash)."\n";
+	#warn "initialize chain 5 hash=".unpack('H*',$gen_block->hash)."\n";
 	#$this->{'headers'}->[0] = $gen_block->hash;
 	$this->add_header_to_chain($gen_block);
 	#push(@{$this->{'headers'}},$gen_block->hash);
@@ -235,7 +241,7 @@ sub initialize_chain_scan_files {
 		opendir(my $fh2,"$base/headers/$f1") || die "cannot open directory";
 		while(my $f2 = readdir($fh2)) {
 		 	next if $f2 eq '.' || $f2 eq '..';
-		 	warn "in directory=$base/headers/$f1/$f2\n";
+		 	#warn "in directory=$base/headers/$f1/$f2\n";
 		 	opendir(my $fh3,"$base/headers/$f1/$f2") || die "cannot open directory";
 		 	while(my $f3 = readdir($fh3)){
 		 		next if $f3 eq '.' || $f3 eq '..';
@@ -344,7 +350,7 @@ sub sort_chain {
 		$curr_hash = $mainref->{$curr_hash}->[1];
 		
 	}
-	warn "finished sorting, new block_height=".scalar(@{$this->{'headers'}})."\n";
+	#warn "finished sorting, new block_height=".scalar(@{$this->{'headers'}})."\n";
 	$this->{'header changed'} = 0;
 }
 
@@ -372,12 +378,12 @@ sub calculate_block_locator {
 	
 	my @ans;
 	foreach my $i (CBitcoin::Utilities::block_locator_indicies($this->block_height())){
-		warn "need block=$i\n";
+		#warn "need block=$i\n";
 		my $hash = $this->block($i);
 		die "bad index, rebuild block header database" unless defined $hash;
 		push(@ans,$hash);
 	}
-	warn "Have index of n=".scalar(@ans)."\n";
+	#warn "Have index of n=".scalar(@ans)."\n";
 	# pack('L',$this->version) 
 #	if(scalar(@ans) == 1){
 #		# need to download whole chain
@@ -490,7 +496,7 @@ sub max_connections {
 sub mark_write {
 	my $this = shift;
 	my $socket = shift;
-	warn "doing mark write\n";
+	#warn "doing mark write\n";
 	return $this->{'mark write sub'}->($socket);
 }
 
@@ -527,8 +533,8 @@ sub block{
 	#require Data::Dumper;
 	#my $xo = Data::Dumper::Dumper($this->{'headers'});
 	#warn "XO=$xo\n"; 
-	warn "Returning block i=$index v=".unpack('H*',$this->{'headers'}->[$index])."\n"
-		if defined $this->{'headers'}->[$index];
+	#warn "Returning block i=$index v=".unpack('H*',$this->{'headers'}->[$index])."\n"
+	#	if defined $this->{'headers'}->[$index];
 	return $this->{'headers'}->[$index];
 }
 
@@ -580,7 +586,7 @@ Find a peer in a pool, and turn it on
 sub activate_peer {
 	my $this = shift;
 	my $connect_sub = $this->{'connect sub'};
-	warn "activating peer - 1\n";
+	#warn "activating peer - 1\n";
 	# if we are maxed out on connections, then exit
 	return undef unless scalar(keys %{$this->{'peers'}}) < $this->max_connections();
 	#warn "activating peer - 1.1\n";
@@ -600,7 +606,7 @@ sub activate_peer {
 	
 	my $numOfpeers = scalar(@peer_files);
 	
-	warn "have num of peers =$numOfpeers\n";
+	#warn "have num of peers =$numOfpeers\n";
 	
 	
 	
@@ -608,7 +614,7 @@ sub activate_peer {
 		$this->{'last getaddr'} = time();
 		
 		# get a connected peer?
-		warn "not enough peers, add more\n";
+		#warn "not enough peers, add more\n";
 		foreach my $fd (keys %{$this->{'peers'}}){
 			$this->{'peers'}->{$fd}->send_getaddr();
 		}
@@ -622,7 +628,7 @@ sub activate_peer {
 	#warn "activating peer - 3\n";
 	while(scalar(@peer_files)>0){
 		$latest = shift(@peer_files);
-		warn "Latest peer to try to connect to is hash=$latest\n";
+		#warn "Latest peer to try to connect to is hash=$latest\n";
 		# untaint
 		if("$latest" =~ m/^(.*)$/){
 			$latest = $1;
@@ -630,14 +636,14 @@ sub activate_peer {
 		
 		
 		eval{
-			warn "part 1\n";
+			#warn "part 1\n";
 			rename($dir_pool.'/'.$latest,$dir_pending.'/'.$latest) || die "alpha";
 			
 			# create connection
 			open($fh,'<',$dir_pending.'/'.$latest) || die "beta";
 			my @guts = <$fh>;
 			close($fh);
-			warn "part 2\n";
+			#warn "part 2\n";
 			die "charlie" unless scalar(@guts) == 3;
 			
 			# connect with ip address and port
@@ -645,7 +651,7 @@ sub activate_peer {
 			# perhaps the end user wants to use tor, or a proxy to connect
 			# so, let that logic be elsewhere, just send an anonymous subroutine
 			$socket = $connect_sub->($this,$guts[1],$guts[2]);
-			warn "part 3 with socket=".fileno($socket)."\n";
+			#warn "part 3 with socket=".fileno($socket)."\n";
 			
 			unless(defined $socket && fileno($socket) > 0){
 				rename($dir_pending.'/'.$latest,$dir_banned.'/'.$latest);
@@ -654,7 +660,7 @@ sub activate_peer {
 			
 			# we have a socket, ready to go
 			$this->add_peer($socket,$guts[1],$guts[2]);
-			warn "part 4\n";
+			#warn "part 4\n";
 			rename($dir_pending.'/'.$latest,$dir_active.'/'.$latest);
 			
 		};
@@ -663,7 +669,7 @@ sub activate_peer {
 			warn "have to try another peer. Error=$error\n";
 		}
 		else{
-			warn "finished looping to find a new peer\n";
+			#warn "finished looping to find a new peer\n";
 			last;
 		}
 
@@ -687,7 +693,7 @@ port
 sub add_peer_to_inmemmory{
 	
 	my ($this,$services, $addr_recv_ip,$addr_recv_port) = (shift,shift,shift,shift);
-	warn "Adding peer to db ($addr_recv_ip,$addr_recv_port)\n";
+	#warn "Adding peer to db ($addr_recv_ip,$addr_recv_port)\n";
 	
 	my $filename = Digest::SHA::sha256_hex("$addr_recv_ip:$addr_recv_port");
 	#warn "Filepath =".$this->db_path().'/peers/pool/'.$filename."\n";
@@ -703,11 +709,11 @@ sub add_peer_to_inmemmory{
 	open($fh, '>',$this->db_path().'/peers/pool/'.$filename) || die "cannot open file for peer\n";
 	#warn "adding peer 3\n";
 	if($services & pack('Q',1)){
-		warn "adding peer offering full blocks, not just headers\n";
+		#warn "adding peer offering full blocks, not just headers\n";
 		print $fh "FULLBLOCKS\n";
 	}
 	else{
-		warn "adding peer offering just headers\n";
+		#warn "adding peer offering just headers\n";
 		print $fh "HEADERSONLY\n";		
 	}
 	#warn "adding peer 4\n";
@@ -727,6 +733,10 @@ sub add_peer_to_inmemmory{
 Mark that a peer has been connected to and that it is ready to do a handshake.
 
 This is called by activate_peer.
+
+For tor/onion addresses, use the following website:
+
+https://lists.torproject.org/pipermail/tor-talk/2012-June/024591.html
 
 =cut
 
@@ -789,12 +799,12 @@ sub peer_by_fileno {
 	my $fileno = shift;
 	#warn "peer_by_fileno=$fileno\n with glob=".ref($this->{'peers'}->{$fileno})."\n";
 	
-	require Data::Dumper;
-	my $xo = Data::Dumper::Dumper($this->{'peers'});
-	open(my $fhout,'>','/tmp/bonus2');
-	print "peer_by_fileno\n";
-	print $fhout $xo;
-	close($fhout);
+	#require Data::Dumper;
+	#my $xo = Data::Dumper::Dumper($this->{'peers'});
+	#open(my $fhout,'>','/tmp/bonus2');
+	#print "peer_by_fileno\n";
+	#print $fhout $xo;
+	#close($fhout);
 	return $this->{'peers'}->{$fileno};
 }
 
@@ -805,14 +815,15 @@ sub peer_by_fileno {
 =cut
 
 sub close_peer {
-	my $this = shift;
-	my $fileno = shift;
+	my ($this,$fileno) = @_;
+	
+	# TODO: untaint everything!
 	
 	my $peer = $this->{'peers'}->{$fileno};
 	
 	close($peer->socket());
 	delete  $this->{'peers'}->{$fileno};
-	
+	# peer and address should already be untainted
 	my $filename = Digest::SHA::sha256_hex($peer->address.':'.$peer->port);
 	my $path_active = $this->db_path().'/peers/active/'.$filename;
 	my $path_banned = $this->db_path().'/peers/banned/'.$filename;
@@ -847,7 +858,7 @@ This is called when a handshake is finished.
 sub peer_hook_handshake_finished{
 	my $this = shift;
 	my $peer = shift;
-	warn "Running send getblocks since hand shake is finished\n";
+	#warn "Running send getblocks since hand shake is finished\n";
 	
 	#$peer->send_getheaders();
 	$peer->send_getaddr();
@@ -908,12 +919,12 @@ sub hook_peer_onreadidle {
 	my ($this,$peer) = @_;
 	
 	# check to see if we need to fetch more inv
-	warn "check to see if we need to fetch more inv\n";
+	#warn "check to see if we need to fetch more inv\n";
 	$peer->send_getdata($this->hook_getdata());
 	
 	# we might have to wait for a ping before this request goes out to the peer
 	if($this->is_marked_getblocks()){
-		warn "getting blocks\n";
+		#warn "getting blocks\n";
 		$peer->send_getblocks();
 		$this->is_marked_getblocks(0);
 	}
@@ -990,7 +1001,7 @@ sub hook_getdata {
 	# do a check to see if we need to fetch more blocks
 		# hook_getdata
 		# $this->spv->{'inv search'}->[2]
-		warn "need to do another block fetch...";
+		#warn "need to do another block fetch...";
 		$this->sort_chain();
 		
 		# when a peer is not busy, the first peer to see this will fetch a block

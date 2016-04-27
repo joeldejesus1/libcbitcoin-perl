@@ -3,7 +3,8 @@ package CBitcoin::Utilities;
 use strict;
 use warnings;
 use Net::IP;
-
+use Convert::Base32;
+use constant TORPREFIX => 'fd87d87eeb43';
 
 =pod
 
@@ -18,12 +19,18 @@ use Net::IP;
 
 ---++ ip_convert_to_binary($string)
 
-Convert AAA.BBB.CCC.DDD to network byte notation
+Convert AAA.BBB.CCC.DDD to network byte notation, an onion address to ipv6 local address, or an ipv6.
 
 =cut
 
 sub ip_convert_to_binary {
 	my($string) = (shift);
+	
+	if($string =~ m/^([0-9A-Za-z]+)\.onion$/){
+		# return a tor address
+		return pack('H*',TORPREFIX).Convert::Base32::decode_base32($1);
+	}
+	
 	my $ip  = Net::IP->new($string);
 	if(length(unpack('H*',pack('B*',$ip->binip())) ) < 12){
 		# set it so it goes in as an ipv6, cuz bitcoin mandates
@@ -39,6 +46,8 @@ sub ip_convert_to_binary {
 
 ---++ ip_convert_to_string
 
+Untaint here and figure out if we are dealing with an ipv4, ipv6, or onion address.
+
 =cut
 
 sub ip_convert_to_string {
@@ -46,14 +55,31 @@ sub ip_convert_to_string {
 	
 	my $stripv6 = unpack('H*',$binipv6);
 	
-	
-	if(substr($stripv6,0,24) eq '00000000000000000000ffff'){
-		warn "ipv4 with full=$stripv6\n";
-		return hex2ip(substr($stripv6,24,8));
+	# untaint
+	if($stripv6 =~ m/^([0-9a-fA-F]+)$/){
+		$stripv6 = $1;
 	}
 	else{
-		warn "ipv6\n";
-		return $stripv6;
+		die "we should not be here.";
+	}
+	if($stripv6 eq '00000000000000000000ffff00000000'){
+		return '00000000000000000000ffff00000000';
+	}
+	elsif(substr($stripv6,0,24) eq '00000000000000000000ffff'){
+		#warn "ipv4 with full=$stripv6\n";
+		return hex2ip(substr($stripv6,24,8));
+	}
+	# FD87:D87E:EB43 is the official tor prefix for local ipv6 addresses
+	elsif(substr($stripv6,0,12) eq TORPREFIX){
+		# return an onion address
+		return Convert::Base32::encode_base32(pack('H*',substr($stripv6,12))).'.onion';
+	}
+	elsif($stripv6 =~ m/^([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})$/){
+		#warn "ipv6\n";
+		return "$1:$2:$3:$4:$5:$6:$7:$8";
+	}
+	else{
+		die "bad address format";
 	}
 }
 
@@ -84,11 +110,26 @@ sub network_address_serialize_forversion {
 sub network_address_deserialize_forversion {
 	my $data = shift;
 	die "bad data with length=".length($data) unless length($data) == 26;
-	return {
-		'services' => substr($data,0,8),
-		'ipaddress' => ip_convert_to_string(substr($data,8,16)),
-		'port' => unpack('n',substr($data,24,2))
-	};
+	
+	my $ans;
+	$ans->{'services'} = substr($data,0,8);
+	# TODO: find a better way to untaint a binary value
+	if(unpack('H*',$ans->{'services'}) =~ m/^(.*)$/){
+		$ans->{'services'} = pack('H*',$1);
+	}
+	
+	$ans->{'ipaddress'} = ip_convert_to_string(substr($data,8,16));
+	
+	$ans->{'port'} = unpack('n',substr($data,24,2));
+	
+	if($ans->{'port'} =~ m/^(\d+)$/){
+		$ans->{'port'} = $1;
+	}
+	else{
+		die "port did not untaint";
+	}
+
+	return $ans;
 }
 
 =pod
@@ -108,12 +149,12 @@ sub network_address_deserialize {
 	die "bad addr network addr" unless $n == 4;
 	my $diff = time() - $ans->{'timestamp'};
 	unless(abs($diff) < 8*60*60){
-		warn "bad addr, might be stale\n";
+		#warn "bad addr, might be stale\n";
 		$n = read($fh,$buf,30-4);
 		die "bad addr packet" unless $n == 26;
 		return undef
 	}
-	warn "Timestamp diff=$diff\n";
+	#warn "Timestamp diff=$diff\n";
 
 	$n = read($fh,$buf,8);
 	die "no network addr services" unless $n == 8;
@@ -124,7 +165,7 @@ sub network_address_deserialize {
 	die "no network addr ipaddress" unless $n == 16;
 	$ans->{'ipaddress'} = ip_convert_to_string($buf);
 	unless(defined $ans->{'ipaddress'}){
-		warn "ip address format is bad\n";
+		#warn "ip address format is bad\n";
 		#die "bad addr"
 		$n = read($fh,$buf,30-4-8-16);
 		
@@ -132,20 +173,32 @@ sub network_address_deserialize {
 		
 		return undef;
 	}
-	warn "ip address of peer is ip=".$ans->{'ipaddress'}."\n";
+	#warn "ip address of peer is ip=".$ans->{'ipaddress'}."\n";
 	
 	
 	$n = read($fh,$buf,2);
 	die "no network addr port" unless $n == 2;
 	$ans->{'port'} = unpack('n',$buf);
 	unless( $ans->{'port'} ){
-		warn "ip address format is bad\n";
+		#warn "ip address format is bad\n";
 		#die "bad addr"
 		return undef;
 	}
-	warn "port of peer is port=".$ans->{'port'}."\n";
+	#warn "port of peer is port=".$ans->{'port'}."\n";
 	
 	
+	# TODO: find a better way to untaint a binary value
+	if(unpack('H*',$ans->{'services'}) =~ m/^(.*)$/){
+		$ans->{'services'} = pack('H*',$1);
+	}
+	# ipaddress has already been untainted
+	# untaint the port number
+	if($ans->{'port'} =~ m/^(\d+)$/){
+		$ans->{'port'} = $1;
+	}
+	else{
+		die "port did not untaint";
+	}
 	return $ans;
 }
 
@@ -159,6 +212,9 @@ sub generate_random {
 	close($fh);
 	return $buf;
 }
+
+
+
 
 =pod
 
@@ -289,12 +345,12 @@ sub deserialize_addr{
 			my $newaddr = network_address_deserialize($fh);
 			push(@addrs, $newaddr) if defined $newaddr && $newaddr->{'ipaddress'} ne '00000000000000000000ffff00000000';
 			
-			warn "adding address to pool\n";
+			#warn "adding address to pool\n";
 		}
 		return \@addrs;
 	}
 	else{
-		warn "bad peer, b/c bad addr packet\n";
+		#warn "bad peer, b/c bad addr packet\n";
 		# TODO: kill connection
 		return undef;
 	}
@@ -311,18 +367,18 @@ sub serialize_getheaders {
 	my ($version,$blocklocatorref,$hashstop) = (shift,shift,shift);
 	
 	unless(defined $blocklocatorref && ref($blocklocatorref) eq 'ARRAY' && scalar(@{$blocklocatorref}) > 0){
-		warn "not enough block locators\n";
+		#warn "not enough block locators\n";
 		return undef;
 	}
 	unless(length(join('',@{$blocklocatorref})) == 32 * scalar(@{$blocklocatorref})){
-		warn "length mismatch\n";
+		#warn "length mismatch\n";
 		return undef;
 	}
 	if(defined $hashstop && length($hashstop) == 32){
-		warn "hashstop checks out\n";
+		#warn "hashstop checks out\n";
 	}
 	elsif(!defined $hashstop){
-		warn "null hashstop\n";
+		#warn "null hashstop\n";
 		$hashstop = pack('x');
 		foreach my $i (2..32){
 			$hashstop .= pack('x');
