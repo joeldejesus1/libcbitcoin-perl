@@ -9,7 +9,6 @@ use CBitcoin::Peer;
 use CBitcoin::Block;
 use Net::IP;
 
-use constant BUFFSIZE => 8192;
 
 =pod
 
@@ -90,9 +89,6 @@ sub init {
 	else{
 		die "bad max connection setting";
 	}
-	
-	$options->{'write buffer size'} = 8192  unless defined $options->{'write buffer size'};
-	$options->{'read buffer size'} = 8192  unless defined $options->{'read buffer size'};
 	
 	return $options;
 }
@@ -285,7 +281,6 @@ sub add_header_to_chain {
 	my @path = CBitcoin::Utilities::HashToFilepath($header->hash_hex);
 	die "path is not the right size" unless scalar(@path) == 3;
 
-	# This takes too long
 	unless(-d "$base/headers/".join('/',@path)){
 		# the dir is the hex of the hash
 		CBitcoin::Utilities::recursive_mkdir("$base/headers/".join('/',@path[0..1]));
@@ -517,43 +512,6 @@ sub is_marked_getblocks{
 		$this->{'marked getblocks'} = $x;
 	}
 	return $this->{'marked getblocks'};
-}
-
-=pod
-
----++ read_buffer_size()
-
-=cut
-
-sub read_buffer_size {
-	return shift->{'read buffer size'};
-}
-
-=pod
-
----++ write_buffer_size()
-
-=cut
-
-sub write_buffer_size {
-	return shift->{'write buffer size'};
-}
-
-=pod
-
----++ broadcast_message($msg)
-
-Take a message and broadcast it out.  $msg must be serialized first!
-
-=cut
-
-sub broadcast_message {
-	my ($this,$msg) = @_;
-	return undef unless defined $msg;
-	
-	foreach my $fileno (keys %{$this->{'peers'}}){
-		$this->{'peers'}->{$fileno}->write($msg);
-	}
 }
 
 =pod
@@ -869,9 +827,6 @@ sub close_peer {
 	my $filename = Digest::SHA::sha256_hex($peer->address.':'.$peer->port);
 	my $path_active = $this->db_path().'/peers/active/'.$filename;
 	my $path_banned = $this->db_path().'/peers/banned/'.$filename;
-	# TODO: untaint this
-	if($path_active =~ m/^(.*)$/){ $path_active = $1;}
-	if($path_banned =~ m/^(.*)$/){ $path_banned = $1;}
 	rename($path_active,$path_banned);
 	
 	delete $this->{'peers by address:port'}->{$peer->address}->{$peer->port};

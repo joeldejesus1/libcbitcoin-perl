@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use CBitcoin::Message; 
 use CBitcoin::Utilities;
+use constant BUFFSIZE => 8192*4;
 
 our $callback_mapper;
 
@@ -443,19 +444,14 @@ Take an opportunity after processing to see if there is a need to close this con
 =cut
 
 sub read_data {
-	my $this = shift;
 	use POSIX qw(:errno_h);
-	warn "can read from peer with buff size=".$this->spv->read_buffer_size();
-	
+	#warn "can read from peer";
+	my $this = shift;
 	
 	$this->{'bytes'} = '' unless defined $this->{'bytes'};
 	my $socket = $this->socket();
 	#warn "Socket=$socket\n";
-	my $n = sysread(
-		$this->socket(),$this->{'bytes'},
-		8192,
-		length($this->{'bytes'})
-	);
+	my $n = sysread($this->socket(),$this->{'bytes'},BUFFSIZE,length($this->{'bytes'}));
 
 	
 	if(defined $n && $n == 0){
@@ -464,7 +460,7 @@ sub read_data {
 	}
 	elsif(defined $n && $n > 0){
 		$this->bytes_read($n);
-		warn "Have ".$this->bytes_read()." bytes read into the buffer\n";
+		#warn "Have ".$this->bytes_read()." bytes read into the buffer\n";
 
 		while(my $msg = $this->read_data_parse_msg()){
 			if($msg->command eq 'version'){
@@ -709,7 +705,7 @@ sub write_data {
 	
 	return undef unless defined $this->{'bytes to write'} && length($this->{'bytes to write'}) > 0;
 	
-	my $n = syswrite($this->socket(),$this->{'bytes to write'},$this->spv->write_buffer_size());
+	my $n = syswrite($this->socket(),$this->{'bytes to write'},BUFFSIZE);
 
 	if (!defined($n) && $! == EAGAIN) {
 		# would block
@@ -1116,8 +1112,8 @@ sub callback_gotblock {
 	# write this to disk
 	my $fp = '/tmp/spv/tmp.'.$$.'.block';
 	open(my $fh,'<',\($msg->payload()));
-	if( 100_000_000 < length($msg->payload()) ){
-		open(my $fhout,'>',$fp) || die "cannot write to disk at $fp";
+	if( 100_000 < length($msg->payload()) ){
+		open(my $fhout,'>',$fp) || die "cannot write to disk";
 		binmode($fh);
 		binmode($fhout);
 		
