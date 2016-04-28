@@ -447,7 +447,7 @@ sub read_data {
 	use POSIX qw(:errno_h);
 	#warn "can read from peer";
 	my $this = shift;
-	
+	warn "can read with buff size=".$this->{'read buffer size'}."\n";
 	$this->{'bytes'} = '' unless defined $this->{'bytes'};
 	my $socket = $this->socket();
 	#warn "Socket=$socket\n";
