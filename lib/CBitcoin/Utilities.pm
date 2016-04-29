@@ -314,17 +314,52 @@ sub serialize_varint {
 
 =pod
 
----++ serialize_varstr($string)
-   * [[https://github.com/bitcoin/bips/blob/master/bip-0014.mediawiki][bip-0014]]
-IE: /Satoshi:5.64/bitcoin-qt:0.4/
 
+---++ deserialize_invvector($fh)
 
 =cut
 
-sub serialize_varstr {
-	my $str = shift;
-	$str = '' unless defined $str;
-	return serialize_varint(length($str)).$str;
+sub deserialize_invvector {
+	my $fh = shift;
+	my ($n,$buf,$total,$prefix);	
+	my @invvector;
+	$n = read($fh,$buf,4);
+	die "not enough bytes to read inv vectory type"  unless $n == 4;
+	$buf = unpack('L',$buf);
+	die "no proper vectory type" unless $buf == 0 || $buf == 1 || $buf == 2 || $buf == 3;
+	$invvector[0] = $buf;
+	
+	$n = read($fh,$buf,32);
+	die "cannot read hash" unless $n == 32;
+	$invvector[1] = $buf;
+	
+	return \@invvector;
+}
+
+=pod
+
+---++ serialize_invvector($type,$hash)
+
+https://en.bitcoin.it/wiki/Protocol_specification#Inventory_Vectors
+
+4 	type 	uint32_t 	Identifies the object type linked to this inventory
+32 	hash 	char[32] 	Hash of the object 
+
+0 	ERROR 	Any data of with this number may be ignored
+1 	MSG_TX 	Hash is related to a transaction
+2 	MSG_BLOCK 	Hash is related to a data block
+3 	MSG_FILTERED_BLOCK 	Hash of a block header; identical to MSG_BLOCK.
+
+=cut
+
+sub serialize_invvector {
+	my ($type,$hash) = @_;
+	die "bad type" unless defined $type && ( $type == 0 || $type == 1 || $type == 2 || $type == 3 );
+	
+	die "hash is not right size" unless defined $hash && length($hash) == 32;
+
+	return pack('L',$type).$hash;
+
 }
 
 =pod
