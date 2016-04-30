@@ -16,6 +16,8 @@ use Net::IP;
 
 =cut
 
+our $callback_mapper;
+
 
 =pod
 
@@ -93,8 +95,11 @@ sub init {
 	$options->{'read buffer size'} = 8192 unless
 		defined $options->{'read buffer size'} && $options->{'read buffer size'} =~ m/^\d+$/;
 	
+	
 	return $options;
 }
+
+
 
 =pod
 
@@ -1056,6 +1061,341 @@ sub broadcast_message {
 			$this->{'peers'}->{$fileno}->write($msg);
 		}
 	}
+}
+
+
+=pod
+
+---+ Callbacks
+
+When a message is recieved, the command is parsed from the message and used to fetch the subroutine, which is stored in the global hash $callback_mapper.
+
+=cut
+
+=pod
+
+---++ get_callback_mapper
+
+Overload this if you want to run a different set of callbacks than default.
+
+=cut
+
+sub get_callback_mapper {
+	return 	$callback_mapper;
+}
+
+=pod
+
+---++ callback_run
+
+When a receiving a message from a peer, handle it.  Callback subroutines must accept @args = ($spv,$msg,$peer).
+
+=cut
+
+
+sub callback_run {
+	my ($this,$msg,$peer) = @_;
+
+	return undef unless defined $peer && defined $msg;
+	my $command = $msg->command();
+	my $cm = $this->get_callback_mapper();
+	if(
+		defined $cm->{'command'}->{$command}
+		&& ref($cm->{'command'}->{$command}) eq 'HASH'
+		&& defined $cm->{'command'}->{$command}->{'subroutine'}
+		&& ref($cm->{'command'}->{$command}->{'subroutine'}) eq 'CODE'
+	){
+		return $cm->{'command'}->{$command}->{'subroutine'}->($this,$msg,$peer);
+	}
+	else{
+		return undef;
+	}
+}
+
+
+=pod
+
+---++ callback_gotaddr
+
+Store the new addr in the peer database.
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'addr'} = {
+		'subroutine' => \&callback_gotaddr
+	}
+};
+
+sub callback_gotaddr {
+	my ($this,$msg,$peer) = @_;
+	#warn "gotaddr\n";
+	open(my $fh,'<',\$msg->{'payload'});
+	my $addr_ref = CBitcoin::Utilities::deserialize_addr($fh);
+	close($fh);
+	if(defined $addr_ref && ref($addr_ref) eq 'ARRAY'){
+		#warn "Got ".scalar(@{$addr_ref})." new addresses\n";
+		
+		foreach my $addr (@{$addr_ref}){
+			# timestamp, services, ipaddress, port
+			$this->spv->add_peer_to_inmemmory(
+				$addr->{'services'},
+				$addr->{'ipaddress'},
+				$addr->{'port'}
+			);
+		}
+		
+		
+	}
+	else{
+		#warn "Got no new addresses\n";
+	}
+	return 1;
+	
+}
+
+
+=pod
+
+---++ callback_gotversion
+
+Used in the handshake between peers.
+
+=cut
+
+sub callback_gotversion {
+	my ($this,$msg,$peer) = @_;
+	
+	# handshake should not be finished
+	if($peer->handshake_finished()){
+		#warn "peer already finished handshake, but received another version\n";
+		$peer->mark_finished();
+		return undef;
+	}
+	
+	# we should not already have a version
+	if($peer->received_version()){
+		#warn "peer already sent a version\n";
+		$peer->mark_finished();
+		return undef;
+	}
+
+
+	# parse version	
+	unless($peer->version_deserialize($msg)){
+		#warn "peer sent bad version\n";
+		$peer->mark_finished();
+		return undef;
+	}
+	
+	
+	#open(my)
+	$peer->{'received version'} = 1;
+	
+	$peer->send_verack();
+	return 1;
+}
+
+
+=pod
+
+---++ callback_gotverack
+
+Used in the handshake.
+
+=cut
+
+sub callback_gotverack {
+	my ($this,$msg,$peer) = @_;
+	
+	
+	# we should not have already received a verack
+	if($peer->received_verack()){
+		#warn "bad peer, already received verack";
+		$peer->mark_finished();
+		return undef;
+	}
+	
+	# we should have sent a version
+	if(!$peer->sent_version()){
+		#warn "no version sent, so we should not be getting a verack\n";
+		$peer->mark_finished();
+		return undef;
+	}
+	
+	$peer->{'received verack'} = 1;
+	
+	$peer->send_ping();
+	return 1;
+}
+
+=pod
+
+---++ callback_ping
+
+Used after a timeout has been reached, to confirm that the connection is still up.
+
+=cut
+
+sub callback_gotping {
+	my ($this,$msg,$peer) = @_;
+	#warn "Got ping\n";
+	unless($peer->handshake_finished()){
+		#warn "got ping before handshek finsihed\n";
+		$peer->mark_finished();
+		return undef;
+	}
+	$peer->send_pong($msg->payload());
+	return 1;
+}
+
+=pod
+
+---++ callback_pong
+
+Sent by a peer in response to a ping sent by us.
+
+=cut
+
+sub callback_gotpong {
+	my ($this,$msg,$peer) = @_;
+	
+	if($peer->{'sent ping nonce'} eq $msg->payload() ){
+		#warn "got pong and it matches";
+		$peer->{'sent ping nonce'} = undef;
+		$peer->{'last pinged'} = time();
+		return 1;
+	}
+	else{
+		#warn "bad pong received\n";
+		$peer->mark_finished();
+		return undef;
+	}
+	
+}
+
+
+=pod
+
+---++ callback_gotinv
+
+Used when inventory vectors have been received.  The next step is to fetch the corresponding content via getdata.  See hook_getdata for information on how getdata is handled.
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'inv'} = {
+		'subroutine' => \&callback_gotinv
+	}
+};
+
+sub callback_gotinv {
+	my ($this,$msg,$peer) = @_;
+	#warn "Got inv\n";
+	unless($peer->handshake_finished()){
+		#warn "got inv before handshake finsihed\n";
+		$peer->mark_finished();
+		return undef;
+	}
+	open(my $fh,'<',\($msg->payload()));
+	binmode($fh);
+	my $count = CBitcoin::Utilities::deserialize_varint($fh);
+	#warn "gotinv: count=$count\n";
+	for(my $i=0;$i < $count;$i++){
+		$this->hook_inv(@{CBitcoin::Utilities::deserialize_inv($fh)});
+	}
+	close($fh);
+		
+	# go fetch the data
+	$peer->send_getdata($this->hook_getdata());
+	
+}
+
+
+=pod
+
+---++ callback_gotblock
+
+Got a block, so put it into the database.
+
+
+---+++ Tx Format
+version
+inputs => [..]
+outputs => [..]
+locktime
+
+input = {prevHash, prevIndex, script, sequence}
+output = {value, script}
+
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'block'} = {
+		'subroutine' => \&callback_gotblock
+	}
+};
+
+sub callback_gotblock {
+	my ($this,$msg,$peer) = @_;
+	
+	
+	# write this to disk
+	my $fp = '/tmp/spv/tmp.'.$$.'.block';
+	open(my $fh,'<',\($msg->payload()));
+	if( 100_000 < length($msg->payload()) ){
+		open(my $fhout,'>',$fp) || die "cannot write to disk";
+		binmode($fh);
+		binmode($fhout);
+		
+		my ($n,$buf);
+		while($n = read($fh,$buf,8192)){
+			my $m = 0;
+			while(0 < $n - $m){
+				$m += syswrite($fhout,$buf,$n - $m,$m);
+			}
+		}
+		close($fhout);
+		close($fh);
+		open($fh,'<',$fp) || die "cannot read from disk";		
+	}
+	
+	eval{
+		
+		my $block = CBitcoin::Block->deserialize($fh);
+		
+		#warn "Got block with hash=".$block->hash_hex().
+		#	" and transactionNum=".$block->transactionNum.
+		#	" and prevBlockHash=".$block->prevBlockHash_hex()."\n";
+		my $count = $block->transactionNum;
+		#die "let us finish early\n";
+		$this->add_header_to_chain($block);
+		
+		if(0 < $count){
+			for(my $i=0;$i<$count;$i++){
+				#warn "looping\n";		
+				$this->add_tx_to_db(
+					$block->hash(),
+					CBitcoin::Transaction->deserialize($fh)
+				);
+			}
+		}
+		else{
+			die "weird block\n";
+		}
+		
+		# delete it in inv search.
+		delete $this->{'inv search'}->[2]->{$block->hash()};
+		
+	} || do {
+		my $error = $@;
+		warn "Error:$error\n";
+	};
+	
+	
+	#$this->spv->{'inv'}->[2]->{$block->hash()} = $block;
+	unlink($fp) if -f $fp;
 }
 
 

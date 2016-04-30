@@ -486,7 +486,8 @@ sub read_data {
 			elsif($this->handshake_finished()){
 				#push(@{$this->{'messages to be processed'}},$msg);
 				#return 1;
-				$this->hook_callback($msg);
+				#$this->hook_callback($msg);
+				$this->spv->callback_run($msg,$this);
 			}
 			else{
 				#warn "bad client behavior\n";
