@@ -1,4 +1,4 @@
-use 5.014002;
+#use 5.014002;
 use strict;
 use warnings;
 use ExtUtils::MakeMaker;
@@ -7,7 +7,7 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
 	    'TYPEMAPS' => []
 	    ,'NAME' => 'CBitcoin'
-	     ,'LIBS' => [ ' -lcrypto -lcbitcoin -lccoin' ]
+	     ,'LIBS' => [ ' -lcrypto -lccoin -lgmp ' ]
 		,'VERSION' => '0.2'
 
 		,'AUTHOR'              => q{Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>}
@@ -44,12 +44,12 @@ sub MY::makefile {
 	return qq{
 all ::
 	(cd blib/arch/auto/CBitcoin/ && ( [ -d CBHD ] || mkdir CBHD ) && ([ -e CBHD/CBHD.so ] || ln -s ../CBitcoin.so CBHD/CBHD.so ) )
-	(cd blib/arch/auto/CBitcoin/ && ( [ -d Script ] || mkdir Script ) && ( [ -e Script/Script.so ] || ln -s ../CBitcoin.so Script/Script.so ) )
-	(cd blib/arch/auto/CBitcoin/ && ( [ -d TransactionInput ] || mkdir TransactionInput ) && ( [ -e TransactionInput/TransactionInput.so ] || ln -s ../CBitcoin.so TransactionInput/TransactionInput.so ) )
-	(cd blib/arch/auto/CBitcoin/ && ( [ -d TransactionOutput ] || mkdir TransactionOutput ) && ( [ -e TransactionOutput/TransactionOutput.so ] || ln -s ../CBitcoin.so TransactionOutput/TransactionOutput.so ) )
-	(cd blib/arch/auto/CBitcoin/ && ( [ -d Transaction ] || mkdir Transaction ) && ( [ -e Transaction/Transaction.so ] || ln -s ../CBitcoin.so Transaction/Transaction.so ) )
-	(cd blib/arch/auto/CBitcoin/ && ( [ -d Message ] || mkdir Message ) && ( [ -e Message/Message.so ] || ln -s ../CBitcoin.so Message/Message.so ) )
-	(cd blib/arch/auto/CBitcoin/ && ( [ -d Block ] || mkdir Block ) && ( [ -e Block/Block.so ] || ln -s ../CBitcoin.so Block/Block.so ) )
+#	(cd blib/arch/auto/CBitcoin/ && ( [ -d Script ] || mkdir Script ) && ( [ -e Script/Script.so ] || ln -s ../CBitcoin.so Script/Script.so ) )
+#	(cd blib/arch/auto/CBitcoin/ && ( [ -d TransactionInput ] || mkdir TransactionInput ) && ( [ -e TransactionInput/TransactionInput.so ] || ln -s ../CBitcoin.so TransactionInput/TransactionInput.so ) )
+#	(cd blib/arch/auto/CBitcoin/ && ( [ -d TransactionOutput ] || mkdir TransactionOutput ) && ( [ -e TransactionOutput/TransactionOutput.so ] || ln -s ../CBitcoin.so TransactionOutput/TransactionOutput.so ) )
+#	(cd blib/arch/auto/CBitcoin/ && ( [ -d Transaction ] || mkdir Transaction ) && ( [ -e Transaction/Transaction.so ] || ln -s ../CBitcoin.so Transaction/Transaction.so ) )
+##	(cd blib/arch/auto/CBitcoin/ && ( [ -d Message ] || mkdir Message ) && ( [ -e Message/Message.so ] || ln -s ../CBitcoin.so Message/Message.so ) )
+#	(cd blib/arch/auto/CBitcoin/ && ( [ -d Block ] || mkdir Block ) && ( [ -e Block/Block.so ] || ln -s ../CBitcoin.so Block/Block.so ) )
 
 };
 

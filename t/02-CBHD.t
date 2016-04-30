@@ -1,4 +1,4 @@
-use 5.014002;
+#use 5.014002;
 use strict;
 use warnings;
 
@@ -6,6 +6,32 @@ use warnings;
 use Test::More tests => 1;
 
 require CBitcoin::CBHD;
+
+my $priv = 'xprv9wSp6B7kry3Vj9m1zSnLvN3xH8RdsPP1Mh7fAaR7aRLcQMKTR2vidYEeEg2mUCTAwCd6vnxVrcjfy2kRgVsFawNzmjuHc2YmYRmagcEPdU9';
+
+my $hash = CBitcoin::CBHD::picocoin_newhdkey($priv);
+
+require Data::Dumper;
+my $xo = Data::Dumper::Dumper($hash);
+warn "Got XO=$xo\n";
+
+$hash = CBitcoin::CBHD::picocoin_generatehdkeymaster("my super secret seed/password");
+
+require Data::Dumper;
+$xo = Data::Dumper::Dumper($hash);
+warn "Got XO2=$xo\n";
+
+$hash = CBitcoin::CBHD::picocoin_generatehdkeychild($hash->{'data'},1);
+
+require Data::Dumper;
+$xo = Data::Dumper::Dumper($hash);
+warn "Got XO3=$xo\n";
+
+
+ok($hash->{'success'}, 'get success');
+
+
+__END__
 
 warn "Starting\n";
 
