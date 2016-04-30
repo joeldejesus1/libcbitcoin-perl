@@ -899,7 +899,7 @@ When done, set result=1???
 
 sub hook_inv {
 	my ($this,$type,$hash) = @_;
-	warn "Got inv of type=$type with hash=".unpack('H*',$hash)."\n";
+	#warn "Got inv of type=$type with hash=".unpack('H*',$hash)."\n";
 	
 	return undef unless defined $type && (0 <= $type && $type <= 3 ) &&
 		 defined $hash && length($hash) > 0;
