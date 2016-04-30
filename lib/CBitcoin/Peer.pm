@@ -59,7 +59,7 @@ sub init {
 		&& CBitcoin::Utilities::ip_convert_to_binary($options->{'our address'});
 	
 	die "no good ports given" unless $options->{'port'} =~ m/^\d+$/ && $options->{'our port'} =~ m/^\d+$/;
-	die "no buffer given" unless defined $options->{'read buffer size'} && $options->{'read buffer size'} =~ m/^\d+$/;
+	
 
 	#createversion1(addr_recv_ip,addr_recv_port,addr_from_ip,addr_from_port,lastseen,version,blockheight)
 #	my $this = CBitcoin::Message::createversion1(
@@ -78,8 +78,7 @@ sub init {
 		'message definition' => {'magic' => 4,'command' => 12, 'length' => 4, 'checksum' => 4 },
 		'message definition order' => ['magic','command', 'length', 'checksum','payload' ],
 		'command buffer' => {},
-		'receive rate' => [0,0],
-		'read buffer size' => $options->{'read buffer size'}
+		'receive rate' => [0,0] 
 	};
 	bless($this,$ref);
 	# to have some human readable stuff for later 
@@ -448,14 +447,11 @@ sub read_data {
 	use POSIX qw(:errno_h);
 	#warn "can read from peer";
 	my $this = shift;
-	warn "can read with buff size=".$this->{'read buffer size'}."\n";
+	
 	$this->{'bytes'} = '' unless defined $this->{'bytes'};
 	my $socket = $this->socket();
 	#warn "Socket=$socket\n";
-	my $n = sysread(
-		$this->socket(),$this->{'bytes'},
-		$this->{'read buffer size'},length($this->{'bytes'})
-	);
+	my $n = sysread($this->socket(),$this->{'bytes'},BUFFSIZE,length($this->{'bytes'}));
 
 	
 	if(defined $n && $n == 0){

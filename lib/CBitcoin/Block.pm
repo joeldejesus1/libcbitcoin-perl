@@ -76,17 +76,9 @@ sub new {
 
 sub serialize_header2 {
 	my $package = shift;
-	my $data = shift;
-	my $txbool = shift;
-	if($txbool){
-		$txbool = 1;
-	}
-	else{
-		$txbool = 0;
-	}
-	
 
-	my $ref = block_BlockFromData($data,$txbool);
+
+	my $ref = block_BlockFromData(shift,0);
 	
 	return undef unless $ref->{'result'};
 	
@@ -180,24 +172,26 @@ sub serialize_header {
 =cut
 
 sub timestamp {
-	return shift->{'timestamp'};
+	return unpack('L',shift->{'timestamp'});
 }
 
 sub target {
-	return shift->{'target'};
+	return unpack('L',shift->{'target'});
 }
 
 sub nonce {
-	return shift->{'nonce'};
+	return unpack('L',shift->{'nonce'});
 }
 
 sub version {
-	return shift->{'version'};
+	return unpack('l',shift->{'version'});
 }
 
 sub transactionNum {
 	return shift->{'transactionNum'};
 }
+
+
 
 
 sub merkleRoot {
@@ -230,18 +224,6 @@ sub data {
 	return shift->{'data'};
 }
 
-sub error_print {
-	my $this = shift;
-	my $printsub = shift;
-	$printsub->('hash:'.$this->hash_hex());
-	$printsub->('prevBlockhash:'.$this->prevBlockHash_hex());
-	$printsub->('merkleRoot_hex:'.$this->merkleRoot_hex());
-	$printsub->('version:'.$this->version());
-	$printsub->('nonce:'.$this->nonce());
-	$printsub->('timestamp:'.$this->timestamp());
-	$printsub->('transactionNum:'.$this->transactionNum());
-	$printsub->('target:'.$this->target());
 
-}
 
 1;

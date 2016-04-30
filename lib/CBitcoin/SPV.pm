@@ -90,8 +90,6 @@ sub init {
 		die "bad max connection setting";
 	}
 	
-	$options->{'read buffer size'} = 8192 unless defined $options->{'read buffer size'};
-	
 	return $options;
 }
 
@@ -750,8 +748,7 @@ sub add_peer{
 		'spv' => $this,
 		'socket' => $socket,
 		'address' => $addr_recv_ip, 'port' => $addr_recv_port,
-		'our address' => $ref->[0], 'our port' => $ref->[1],
-		'read buffer size' => $this->{'read buffer size'}
+		'our address' => $ref->[0], 'our port' => $ref->[1]
 	});
 	# basically, this gets overloaded by an inheriting class
 	$this->add_peer_to_db($peer);
@@ -1039,23 +1036,6 @@ sub loop {
 	$loopsub->($this,$connectsub);
 }
 
-=pod
-
----++ broadcast_message($msg,..)
-
-Make sure that the $msg is serialized.
-
-=cut
-
-sub broadcast_message {
-	my $this = shift;
-		
-	foreach my $msg (@_){
-		foreach my $fileno (keys %{$this->{'peers'}}){
-			$this->{'peers'}->{$fileno}->write($msg);
-		}
-	}
-}
 
 
 1;
