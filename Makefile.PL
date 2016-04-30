@@ -7,7 +7,7 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
 	    'TYPEMAPS' => []
 	    ,'NAME' => 'CBitcoin'
-	     ,'LIBS' => [ ' -lcrypto -lcbitcoin ' ]
+	     ,'LIBS' => [ ' -lcrypto -lcbitcoin -lccoin' ]
 		,'VERSION' => '0.2'
 
 		,'AUTHOR'              => q{Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>}
