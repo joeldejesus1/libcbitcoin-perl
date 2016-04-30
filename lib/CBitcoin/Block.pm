@@ -192,18 +192,12 @@ sub nonce {
 }
 
 sub version {
-<<<<<<< HEAD
-	return unpack('l',shift->{'version'});
-=======
 	return shift->{'version'};
->>>>>>> 67e5badc7e4be5f01e5eb75353bdb096990fc2b1
 }
 
 sub transactionNum {
 	return shift->{'transactionNum'};
 }
-
-
 
 
 sub merkleRoot {
