@@ -78,8 +78,11 @@ sub init {
 		'message definition' => {'magic' => 4,'command' => 12, 'length' => 4, 'checksum' => 4 },
 		'message definition order' => ['magic','command', 'length', 'checksum','payload' ],
 		'command buffer' => {},
-		'receive rate' => [0,0] 
+		'receive rate' => [0,0] ,
+		'read buffer size' => $options->{'read buffer size'}
 	};
+	$this->{'read buffer size'} ||= 8192;
+	
 	bless($this,$ref);
 	# to have some human readable stuff for later 
 	$this->{'address'} = $options->{'address'};
@@ -451,7 +454,11 @@ sub read_data {
 	$this->{'bytes'} = '' unless defined $this->{'bytes'};
 	my $socket = $this->socket();
 	#warn "Socket=$socket\n";
-	my $n = sysread($this->socket(),$this->{'bytes'},BUFFSIZE,length($this->{'bytes'}));
+	my $n = sysread(
+		$this->socket(),$this->{'bytes'},
+		$this->{'read buffer size'},
+		length($this->{'bytes'})
+	);
 
 	
 	if(defined $n && $n == 0){
