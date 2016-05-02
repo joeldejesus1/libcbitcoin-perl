@@ -7,8 +7,8 @@ use Test::More tests => 1;
 
 require CBitcoin::CBHD;
 
-my $priv = 'xprv9wSp6B7kry3Vj9m1zSnLvN3xH8RdsPP1Mh7fAaR7aRLcQMKTR2vidYEeEg2mUCTAwCd6vnxVrcjfy2kRgVsFawNzmjuHc2YmYRmagcEPdU9';
-
+my $priv = 'xprv9s21ZrQH143K31xYSDQpPDxsXRTUcvj2iNHm5NUtrGiGG5e2DtALGdso3pGz6ssrdK4PFmM8NSpSBHNqPqm55Qn3LqFtT2emdEXVYsCzC2U';
+warn "starting\n";
 my $hash = CBitcoin::CBHD::picocoin_newhdkey($priv);
 
 require Data::Dumper;
