@@ -37,6 +37,8 @@ sub new {
 	$this = $this->init($options);
 	bless($this,$package);
 	
+	$this->{'getblocks timeout'} = 0;
+	
 	$this->make_directories();
 	
 	# start block chain at 0
@@ -836,6 +838,14 @@ sub close_peer {
 	my $filename = Digest::SHA::sha256_hex($peer->address.':'.$peer->port);
 	my $path_active = $this->db_path().'/peers/active/'.$filename;
 	my $path_banned = $this->db_path().'/peers/banned/'.$filename;
+	
+	if($path_active =~ m/^(.*)$/){
+		$path_active = $1;
+	}
+	if($path_banned =~ m/^(.*)$/){
+		$path_banned = $1;
+	}
+	
 	rename($path_active,$path_banned);
 	
 	delete $this->{'peers by address:port'}->{$peer->address}->{$peer->port};
@@ -932,10 +942,11 @@ sub hook_peer_onreadidle {
 	$peer->send_getdata($this->hook_getdata());
 	
 	# we might have to wait for a ping before this request goes out to the peer
-	if($this->is_marked_getblocks()){
+	if($this->is_marked_getblocks() && 60 < time() - $this->{'getblocks timeout'} ){
 		#warn "getting blocks\n";
 		$peer->send_getblocks();
 		$this->is_marked_getblocks(0);
+		$this->{'getblocks timeout'} = time();
 	}
 }
 
@@ -1000,7 +1011,7 @@ sub hook_getdata {
 			last;
 		}
 	}
-	warn "hook_getdata size is ".scalar(@response)."\n";
+	#warn "hook_getdata size is ".scalar(@response)."\n";
 	
 	
 	if(0 < scalar(@response)){
@@ -1138,7 +1149,7 @@ sub callback_gotaddr {
 		
 		foreach my $addr (@{$addr_ref}){
 			# timestamp, services, ipaddress, port
-			$this->spv->add_peer_to_inmemmory(
+			$this->add_peer_to_inmemmory(
 				$addr->{'services'},
 				$addr->{'ipaddress'},
 				$addr->{'port'}

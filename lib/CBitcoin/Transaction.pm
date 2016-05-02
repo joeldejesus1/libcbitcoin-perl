@@ -125,15 +125,16 @@ output = {value, script}
 
 sub deserialize{
 	my ($package,$fh) = @_;
-	
+	my $shaobj = Digest::SHA->new(256);
 	my ($n,$buf,$count,$tx);
 	$n = read($fh,$buf,4);
 	die "not enough bytes to read tx" unless $n == 4;
+	$shaobj->add($buf);
 	$tx->{'version'} = unpack('l',$buf);
 	
 	# get tx inputs
 	my $txin_count = CBitcoin::Utilities::deserialize_varint($fh);
-
+	$shaobj->add(CBitcoin::Utilities::serialize_varint($txin_count));
 	die "count is 0" unless 0 <=  $txin_count;
 
 	my @inputs;
@@ -143,24 +144,29 @@ sub deserialize{
 
 			$n = read($fh,$buf,32);
 			die "could not read tx" unless $n == 32;
+			$shaobj->add($buf);
 			$txin->{'prevHash'} = $buf;
 			
 			$n = read($fh,$buf,4);
 			die "could not read tx" unless $n == 4;
+			$shaobj->add($buf);
 			$txin->{'prevIndex'} = unpack('L',$buf);
 
 			# read script length
 			my $scriptlength = CBitcoin::Utilities::deserialize_varint($fh);
+			$shaobj->add(CBitcoin::Utilities::serialize_varint($scriptlength));
 			die "bad script length" unless 0 < $scriptlength;
 			
 			# read script
 			$n = read($fh,$buf,$scriptlength);
 			die "bad read of tx" unless $n == $scriptlength;
+			$shaobj->add($buf);
 			$txin->{'script'} = $buf;
 			
 			# read sequence
 			$n = read($fh,$buf,4);
 			die "bad read of tx" unless $n == 4;
+			$shaobj->add($buf);
 			$txin->{'sequence'} = $buf;			
 
 			push(@inputs,$txin);
@@ -174,6 +180,7 @@ sub deserialize{
 	
 	# read outputs
 	my $txout_count = CBitcoin::Utilities::deserialize_varint($fh);
+	$shaobj->add(CBitcoin::Utilities::serialize_varint($txout_count));
 	die "count is 0" unless 0 <=  $txout_count;
 	my @outputs;
 	if(0 < $txout_count){
@@ -182,15 +189,18 @@ sub deserialize{
 			# tx value
 			$n = read($fh,$buf,8);
 			die "not enough bytes" unless $n == 8;
+			$shaobj->add($buf);
 			$txout->{'value'} = unpack('q',$buf);
 
 			# script length
 			my $scriptlength = CBitcoin::Utilities::deserialize_varint($fh);
+			$shaobj->add(CBitcoin::Utilities::serialize_varint($scriptlength));
 			die "bad script length" unless 0 < $scriptlength;
 			
 			# read script
 			$n = read($fh,$buf,$scriptlength);
 			die "bad read of script of length=$scriptlength" unless $n == $scriptlength;
+			$shaobj->add($buf);
 	 		$txout->{'script'} = $buf;
 	 		
 	 		push(@outputs,$txout);
@@ -203,7 +213,10 @@ sub deserialize{
 	
 	$n = read($fh,$buf,4);
 	die "bad locktime" unless $n == 4;
+	$shaobj->add($buf);
 	$tx->{'locktime'} = unpack('L',$buf);
+
+	$tx->{'hash'} = Digest::SHA::sha256($shaobj->digest());
 
 	return $tx;
 }
