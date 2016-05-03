@@ -245,6 +245,8 @@ sub spv {
 
 ---++ block_height
 
+Block height of peer at the time of handshake.
+
 =cut
 
 sub block_height {
@@ -794,7 +796,7 @@ sub send_verack {
 
 sub send_ping {
 	my $this = shift;
-	#warn "Sending ping\n";
+	warn "Sending ping\n";
 	$this->{'sent ping nonce'} = CBitcoin::Utilities::generate_random(8);
 	
 	return $this->write(CBitcoin::Message::serialize($this->{'sent ping nonce'},'ping',$this->magic));
@@ -1035,7 +1037,7 @@ sub callback_gotpong {
 	my $msg = shift;
 	
 	if($this->{'sent ping nonce'} eq $msg->payload() ){
-		#warn "got pong and it matches";
+		warn "got pong and it matches";
 		$this->{'sent ping nonce'} = undef;
 		$this->{'last pinged'} = time();
 		return 1;

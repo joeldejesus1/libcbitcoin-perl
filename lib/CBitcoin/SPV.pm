@@ -38,6 +38,7 @@ sub new {
 	bless($this,$package);
 	
 	$this->{'getblocks timeout'} = 0;
+	$this->{'callbacks nonce'} = 1;
 	
 	$this->make_directories();
 	
@@ -51,6 +52,8 @@ sub new {
 	$this->{'inv'} = [{},{},{},{}];
 	$this->{'inv search'} = [{},{},{},{}];	
 	$this->initialize_peers();
+	
+	
 
 	return $this;
 	
@@ -882,7 +885,7 @@ sub peer_hook_handshake_finished{
 	#$peer->send_getheaders();
 	$peer->send_getaddr();
 	
-	$peer->send_getblocks();
+	#$peer->send_getblocks();
 }
 
 =pod
@@ -939,34 +942,41 @@ sub hook_peer_onreadidle {
 	
 	# check to see if we need to fetch more inv
 	#warn "check to see if we need to fetch more inv\n";
-	$peer->send_getdata($this->hook_getdata());
+	#$peer->send_getdata($this->hook_getdata());
 	
 	# we might have to wait for a ping before this request goes out to the peer
-	if($this->is_marked_getblocks() && 60 < time() - $this->{'getblocks timeout'} ){
+	#if($this->is_marked_getblocks() && 60 < time() - $this->{'getblocks timeout'} ){
 		#warn "getting blocks\n";
-		$peer->send_getblocks();
-		$this->is_marked_getblocks(0);
-		$this->{'getblocks timeout'} = time();
-	}
+	#	$peer->send_getblocks();
+	#	$this->is_marked_getblocks(0);
+	#	$this->{'getblocks timeout'} = time();
+	#}
 }
 
 =pod
 
----++ hook_getdata($peer)
+---++ hook_getdata($peer,$max)
 
 This is called by a peer when it is ready to write.  Max count= 500 per peer.  The timeout is 60 seconds.
 
 =cut
 
 sub hook_getdata {
-	my $this = shift;
+	my ($this,$max_count) = @_;
 	my @response;
 	
-	my ($i,$max_count_per_peer) = (0,500);
+	$max_count = 100 unless defined $max_count;
+	
+	my $gd_timeout = 600;
+	
+	my ($i,$max_count_per_peer) = (0,$max_count);
 	#warn "hook_getdata part 1 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[0]}){
 		# error
-		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->[0]->{$hash}->[0] )){
+		if(
+			$i < $max_count_per_peer 
+			&& $gd_timeout < (time() - $this->{'inv search'}->[0]->{$hash}->[0] )
+		){
 			push(@response,pack('L',0).$hash);
 			$this->{'inv search'}->[0]->{$hash}->[0] = time();
 			$i += 1;
@@ -978,7 +988,10 @@ sub hook_getdata {
 	#warn "hook_getdata part 2 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[1]}){
 		# tx
-		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->[1]->{$hash}->[0] )){
+		if(
+			$i < $max_count_per_peer 
+			&& $gd_timeout < (time() - $this->{'inv search'}->[1]->{$hash}->[0] )
+		){
 			push(@response,pack('L',1).$hash);
 			$this->{'inv search'}->[1]->{$hash}->[0] = time();
 			$i += 1;	
@@ -990,7 +1003,10 @@ sub hook_getdata {
 	#warn "hook_getdata part 3 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[2]}){
 		# block
-		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->[2]->{$hash}->[0] )){
+		if(
+			$i < $max_count_per_peer 
+			&& $gd_timeout < (time() - $this->{'inv search'}->[2]->{$hash}->[0] )
+		){
 			push(@response,pack('L',2).$hash);
 			$this->{'inv search'}->[2]->{$hash}->[0] = time();
 			$i += 1;	
@@ -1002,7 +1018,10 @@ sub hook_getdata {
 	#warn "hook_getdata part 4 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[3]}){
 		# filtered block
-		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->[3]->{$hash}->[0] )){
+		if(
+			$i < $max_count_per_peer 
+			&& $gd_timeout < (time() - $this->{'inv search'}->[3]->{$hash}->[0] )
+		){
 			push(@response,pack('L',3).$hash);
 			$this->{'inv search'}->[3]->{$hash}->[0] = time();
 			$i += 1;	
@@ -1034,6 +1053,20 @@ sub hook_getdata {
 
 	
 }
+
+=pod
+
+---+++ hook_getdata_blocks_size
+
+Includes stuff that is waiting on time out.
+
+=cut
+
+sub hook_getdata_blocks_size {
+	my $this = shift;
+	return (keys %{$this->{'inv search'}->[2]});
+}
+
 
 =pod
 
@@ -1085,6 +1118,42 @@ When a message is recieved, the command is parsed from the message and used to f
 
 =pod
 
+---++ callback_add($peer,$callback,$timeout)->$nonce
+
+Add a custom callback where the args are ($delete_sub,$peer,$message)
+
+The callbacks are run after the default callbacks, not before.  
+
+=cut
+
+sub callback_add {
+	my ($this,$peer,$callback,$timeout) = @_;
+	$timeout = 2*time() unless defined $timeout;
+	
+	unless(defined $callback && ref($callback) eq 'CODE'){
+#		$logger->error("Callback is not an a subroutine");
+		return undef;
+	}
+	
+	
+	$peer = 'any peer' unless defined $peer;
+	
+	my $nonce = $this->{'callbacks nonce'};
+	$this->{'callbacks nonce'} += 1;
+	
+	my $deletesub = sub{
+		my ($t1,$p1,$n1) = ($this,$peer,$nonce);
+		delete $t1->{'callbacks'}->{$p1}->{$n1};
+	};
+	
+	$this->{'callbacks'}->{$peer}->{$nonce} = [$timeout,$callback,$deletesub];
+
+	return $nonce;
+}
+
+
+=pod
+
 ---++ get_callback_mapper
 
 Overload this if you want to run a different set of callbacks than default.
@@ -1108,6 +1177,8 @@ sub callback_run {
 	my ($this,$msg,$peer) = @_;
 
 	return undef unless defined $peer && defined $msg;
+	
+	# handle default callbacks
 	my $command = $msg->command();
 	my $cm = $this->get_callback_mapper();
 	if(
@@ -1116,11 +1187,45 @@ sub callback_run {
 		&& defined $cm->{'command'}->{$command}->{'subroutine'}
 		&& ref($cm->{'command'}->{$command}->{'subroutine'}) eq 'CODE'
 	){
-		return $cm->{'command'}->{$command}->{'subroutine'}->($this,$msg,$peer);
+		# run the default callback
+		$cm->{'command'}->{$command}->{'subroutine'}->($this,$msg,$peer);
 	}
-	else{
-		return undef;
+
+	# handle custom callbacks
+
+	my @x = ('any peer');
+	if(
+		defined $this->{'callbacks'}->{$peer}
+		&& ref($this->{'callbacks'}->{$peer}) eq 'HASH'
+		&& 0 < scalar(keys %{$this->{'callbacks'}->{$peer}})
+	){
+		push(@x,$peer);
 	}
+
+	foreach my $py (@x){
+		
+		foreach my $nonce (keys %{$this->{'callbacks'}->{$py}}){
+			# [$timeout,$callback,$deletesub]
+			if(
+				time() - $this->{'callbacks'}->{$py}->{$nonce}->[0] < 0
+			){
+				# spv,deletesub,peer,msg
+				$this->{'callbacks'}->{$py}->{$nonce}->[1]->(
+					$this,
+					$this->{'callbacks'}->{$py}->{$nonce}->[2],
+					$peer,
+					$msg
+				);				
+			}
+			else{
+				# exceeded timeout, delete callback
+				$this->{'callbacks'}->{$py}->{$nonce}->[2]->();
+			}
+
+		}
+	}
+
+	return undef;
 }
 
 
@@ -1272,7 +1377,7 @@ sub callback_gotpong {
 	my ($this,$msg,$peer) = @_;
 	
 	if($peer->{'sent ping nonce'} eq $msg->payload() ){
-		#warn "got pong and it matches";
+		warn "got pong and it matches";
 		$peer->{'sent ping nonce'} = undef;
 		$peer->{'last pinged'} = time();
 		return 1;
@@ -1318,7 +1423,7 @@ sub callback_gotinv {
 	close($fh);
 		
 	# go fetch the data
-	$peer->send_getdata($this->hook_getdata());
+	#$peer->send_getdata($this->hook_getdata());
 	
 }
 
