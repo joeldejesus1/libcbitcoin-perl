@@ -9,6 +9,8 @@ So, we have to symlink auto/CBitcoin/CBitcoin.so to auto/CBitcoin/CBHD/CBHD.so.
 To create Hierarchial Deterministic keys, see CBitcoin::CBHD.  
 To create scripts, see CBitcoin::Script. To create transactions, see CBitcoin::Transaction, CBitcoin::TransactionInput and CBitcoin::TransactionOutput.
 
+To see how an spv client works, check out the t/spv.t.no script.  It contains an example of how to implement an spv client in perl.  Though, this section is work in progress.
+
 ## DEBIAN INSTALLATION
 
 To compile a debian package, first install libcbitcoin0, which is https://github.com/favioflamingo/cbitcoin.  
