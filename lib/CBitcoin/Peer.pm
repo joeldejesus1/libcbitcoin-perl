@@ -450,7 +450,7 @@ Take an opportunity after processing to see if there is a need to close this con
 
 sub read_data {
 	use POSIX qw(:errno_h);
-	#warn "can read from peer";
+	warn "can read from peer";
 	my $this = shift;
 	
 	$this->{'bytes'} = '' unless defined $this->{'bytes'};
@@ -552,10 +552,10 @@ sub read_data_single_msg_item {
 	die "key not defined" unless defined $size;
 	
 	
-	if(!defined $this->{'buffer'}->{$key} &&  $this->{'bytes read'} >= $size){
+	if(!defined $this->{'buffer'}->{$key} &&  $size <= $this->{'bytes read'} ){
 		$this->{'buffer'}->{$key} = substr($this->{'bytes'},0,$size);
 		#warn "Pre $key=".unpack('H*',$this->{'buffer'}->{$key})."\n";
-		substr($this->{'bytes'},0,$size) = ""; # delete  bytes we don't need
+		substr($this->{'bytes'},0,$size) = ''; # delete  bytes we don't need
 		$this->{'bytes read'} = $this->{'bytes read'} - $size;
 		die "sizes do not match" unless $this->{'bytes read'} == length($this->{'bytes'});
 		return 1;

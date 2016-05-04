@@ -1067,6 +1067,33 @@ sub hook_getdata_blocks_size {
 	return (keys %{$this->{'inv search'}->[2]});
 }
 
+=pod
+
+---+++ hook_getdata_blocks_preview
+
+Does not include stuff that is waiting on time out.
+
+=cut
+
+sub hook_getdata_blocks_preview {
+	my ($this,$max_count_per_peer) = @_;
+	#warn "hook_getdata part 2 \n";
+	my $i = 0;
+	foreach my $hash (keys %{$this->{'inv search'}->[2]}){
+		# tx
+		if( 
+			60 < (time() - $this->{'inv search'}->[2]->{$hash}->[0] )
+		){
+			#push(@response,pack('L',1).$hash);
+			#$this->{'inv search'}->[1]->{$hash}->[0] = time();
+			$i += 1;	
+		}
+		#elsif($max_count_per_peer < $i){
+		#	last;
+		#}
+	}
+	return $i;
+}
 
 =pod
 
@@ -1088,6 +1115,15 @@ sub loop {
 	die "no connect sub" unless defined $connectsub && ref($connectsub) eq 'CODE';
 	$loopsub->($this,$connectsub);
 }
+
+
+=pod
+
+---+ Broadasting Messages
+
+The logic used to figure out what needs to be uploaded and downloaded is stored here.
+
+=cut
 
 =pod
 
@@ -1355,7 +1391,7 @@ Used after a timeout has been reached, to confirm that the connection is still u
 
 sub callback_gotping {
 	my ($this,$msg,$peer) = @_;
-	#warn "Got ping\n";
+	warn "Got ping\n";
 	unless($peer->handshake_finished()){
 		#warn "got ping before handshek finsihed\n";
 		$peer->mark_finished();
@@ -1460,7 +1496,7 @@ sub callback_gotblock {
 	# write this to disk
 	my $fp = '/tmp/spv/tmp.'.$$.'.block';
 	open(my $fh,'<',\($msg->payload()));
-	if( 100_000 < length($msg->payload()) ){
+	if( 100_000_000 < length($msg->payload()) ){
 		open(my $fhout,'>',$fp) || die "cannot write to disk";
 		binmode($fh);
 		binmode($fhout);
