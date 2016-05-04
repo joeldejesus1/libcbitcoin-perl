@@ -2,12 +2,12 @@ Source: libcbitcoin-perl
 Section: extra
 Priority: extra
 Maintainer: Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>
-Build-Depends: debhelper (>= 8.0.0), libssl-dev, autotools-dev, libcbitcoin0, libcbitcoin-dev, libnet-ip-perl, libio-epoll-perl, libev-perl
+Build-Depends: debhelper (>= 8.0.0),libconvert-base32-perl, libssl-dev, autotools-dev, libcbitcoin0, libcbitcoin-dev, libnet-ip-perl, libio-epoll-perl, libev-perl
 Standards-Version: 3.9.3
 Homepage: https://e-flamingo.jp
 
 Package: libcbitcoin-perl
 Architecture: any
-Depends: libc6, libcbitcoin0, libdigest-sha-perl, libnet-ip-perl,${misc:Depends}
+Depends: libc6, libconvert-base32-perl, libcbitcoin0, libdigest-sha-perl, libnet-ip-perl,${misc:Depends}
 Description: Perl modules for cbitcoin.
  Manipulate bitcoin objects in perl.

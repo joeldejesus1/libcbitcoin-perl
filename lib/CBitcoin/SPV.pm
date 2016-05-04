@@ -16,6 +16,8 @@ use Net::IP;
 
 =cut
 
+our $callback_mapper;
+
 
 =pod
 
@@ -35,6 +37,9 @@ sub new {
 	$this = $this->init($options);
 	bless($this,$package);
 	
+	$this->{'getblocks timeout'} = 0;
+	$this->{'callbacks nonce'} = 1;
+	
 	$this->make_directories();
 	
 	# start block chain at 0
@@ -47,6 +52,8 @@ sub new {
 	$this->{'inv'} = [{},{},{},{}];
 	$this->{'inv search'} = [{},{},{},{}];	
 	$this->initialize_peers();
+	
+	
 
 	return $this;
 	
@@ -90,8 +97,14 @@ sub init {
 		die "bad max connection setting";
 	}
 	
+	$options->{'read buffer size'} = 8192 unless
+		defined $options->{'read buffer size'} && $options->{'read buffer size'} =~ m/^\d+$/;
+	
+	
 	return $options;
 }
+
+
 
 =pod
 
@@ -102,6 +115,12 @@ sub init {
 sub make_directories{
 	my $this = shift;
 	my $base = $this->{'db path'};
+	
+	# untaint the db path (TODO: make a better regex for this)
+	if($base =~ m/^(.*)$/){
+		$base = $1;
+	}
+	
 	mkdir($base) unless -d $base;
 	
 	# ./peers
@@ -169,25 +188,25 @@ Save the genesis block into block headers.  Also, create the first block locator
 sub initialize_chain{
 	my $this = shift;
 	my $base = $this->db_path();
-	warn "initialize chain 1\n";
+	#warn "initialize chain 1\n";
 	opendir(my $fh, $base.'/headers') || die "cannot open directory to headers at ". $base.'/headers';
-	warn "initialize chain 1.2\n";
+	#warn "initialize chain 1.2\n";
 	my @files = grep { $_ ne '.' && $_ ne '..' } readdir $fh;
-	warn "initialize chain 1.3\n";
+	#warn "initialize chain 1.3\n";
 	closedir($fh);
 	unless(0 == scalar(@files)){
 		#die "no files?=".scalar(@files)."\n";
 		return $this->initialize_chain_scan_files(\@files);	
 	}
-	warn "initialize chain 2\n";
+	#warn "initialize chain 2\n";
 	# must get genesis block
 	my $gen_block = CBitcoin::Block->genesis_block();
-	warn "Genesis hash=".$gen_block->hash_hex."\n";
-	warn "Genesis prevBlockHash=".$gen_block->prevBlockHash_hex."\n";
+	#warn "Genesis hash=".$gen_block->hash_hex."\n";
+	#warn "Genesis prevBlockHash=".$gen_block->prevBlockHash_hex."\n";
 
 	my @path = CBitcoin::Utilities::HashToFilepath($gen_block->hash_hex);
 	
-	warn "initialize chain 3\n";
+	#warn "initialize chain 3\n";
 	CBitcoin::Utilities::recursive_mkdir("$base/headers/".join('/',@path)) 
 		unless -d "$base/headers/".join('/',@path);
 	my $n;
@@ -197,14 +216,14 @@ sub initialize_chain{
 	die "could not save hash" unless $n == length($gen_block->prevBlockHash) && $n > 1;
 	close($fh);
 	
-	warn "initialize chain 4\n";
+	#warn "initialize chain 4\n";
 	open($fh,'>',"$base/headers/".join('/',@path).'/data') || die "cannot save block data";
 	my $data = $gen_block->serialize_header();
 	$n = syswrite($fh,$data);
 	die "could not save data" unless $n == length($data) && $n > 1;
 	close($fh);
 	
-	warn "initialize chain 5 hash=".unpack('H*',$gen_block->hash)."\n";
+	#warn "initialize chain 5 hash=".unpack('H*',$gen_block->hash)."\n";
 	#$this->{'headers'}->[0] = $gen_block->hash;
 	$this->add_header_to_chain($gen_block);
 	#push(@{$this->{'headers'}},$gen_block->hash);
@@ -235,11 +254,11 @@ sub initialize_chain_scan_files {
 		opendir(my $fh2,"$base/headers/$f1") || die "cannot open directory";
 		while(my $f2 = readdir($fh2)) {
 		 	next if $f2 eq '.' || $f2 eq '..';
-		 	warn "in directory=$base/headers/$f1/$f2\n";
+		 	#warn "in directory=$base/headers/$f1/$f2\n";
 		 	opendir(my $fh3,"$base/headers/$f1/$f2") || die "cannot open directory";
 		 	while(my $f3 = readdir($fh3)){
 		 		next if $f3 eq '.' || $f3 eq '..';
-		 		open(my $fhdata,'<',"$base/headers/$f1/$f2/$f3/data") || die "cannot read data";
+		 		open(my $fhdata,'<',"$base/headers/$f1/$f2/$f3") || die "cannot read data";
 		 		$this->add_header_to_inmemory_chain(CBitcoin::Block->deserialize($fhdata));
 		 		close($fhdata);
 		 	}
@@ -271,21 +290,16 @@ sub add_header_to_chain {
 	my $base = $this->db_path();
 	my ($fh,$n);
 	
+	# the size is 3, with 2 directories and the final element being the file name
 	my @path = CBitcoin::Utilities::HashToFilepath($header->hash_hex);
+	die "path is not the right size" unless scalar(@path) == 3;
 
 	unless(-d "$base/headers/".join('/',@path)){
 		# the dir is the hex of the hash
-		CBitcoin::Utilities::recursive_mkdir("$base/headers/".join('/',@path));	
-		
-		# write the prevBlockHash into ./prevBlockHash
-		open($fh,'>',"$base/headers/".join('/',@path).'/prevBlockHash') 
-			|| die "cannot save prevblock hash";
-		$n = syswrite($fh,$header->prevBlockHash);
-		die "could not save hash" unless $n == length($header->prevBlockHash) && $n > 1;
-		close($fh);
+		CBitcoin::Utilities::recursive_mkdir("$base/headers/".join('/',@path[0..1]));
 		
 		# write the header into ./data
-		open($fh,'>',"$base/headers/".join('/',@path).'/data') || die "cannot save block data";
+		open($fh,'>',"$base/headers/".join('/',@path)) || die "cannot save block data";
 		my $data = $header->serialize_header();
 		$n = 0;
 		while(0 < length($data) - $n){
@@ -349,7 +363,7 @@ sub sort_chain {
 		$curr_hash = $mainref->{$curr_hash}->[1];
 		
 	}
-	warn "finished sorting, new block_height=".scalar(@{$this->{'headers'}})."\n";
+	#warn "finished sorting, new block_height=".scalar(@{$this->{'headers'}})."\n";
 	$this->{'header changed'} = 0;
 }
 
@@ -377,12 +391,12 @@ sub calculate_block_locator {
 	
 	my @ans;
 	foreach my $i (CBitcoin::Utilities::block_locator_indicies($this->block_height())){
-		warn "need block=$i\n";
+		#warn "need block=$i\n";
 		my $hash = $this->block($i);
 		die "bad index, rebuild block header database" unless defined $hash;
 		push(@ans,$hash);
 	}
-	warn "Have index of n=".scalar(@ans)."\n";
+	#warn "Have index of n=".scalar(@ans)."\n";
 	# pack('L',$this->version) 
 #	if(scalar(@ans) == 1){
 #		# need to download whole chain
@@ -495,7 +509,7 @@ sub max_connections {
 sub mark_write {
 	my $this = shift;
 	my $socket = shift;
-	warn "doing mark write\n";
+	#warn "doing mark write\n";
 	return $this->{'mark write sub'}->($socket);
 }
 
@@ -532,8 +546,8 @@ sub block{
 	#require Data::Dumper;
 	#my $xo = Data::Dumper::Dumper($this->{'headers'});
 	#warn "XO=$xo\n"; 
-	warn "Returning block i=$index v=".unpack('H*',$this->{'headers'}->[$index])."\n"
-		if defined $this->{'headers'}->[$index];
+	#warn "Returning block i=$index v=".unpack('H*',$this->{'headers'}->[$index])."\n"
+	#	if defined $this->{'headers'}->[$index];
 	return $this->{'headers'}->[$index];
 }
 
@@ -585,7 +599,7 @@ Find a peer in a pool, and turn it on
 sub activate_peer {
 	my $this = shift;
 	my $connect_sub = $this->{'connect sub'};
-	warn "activating peer - 1\n";
+	#warn "activating peer - 1\n";
 	# if we are maxed out on connections, then exit
 	return undef unless scalar(keys %{$this->{'peers'}}) < $this->max_connections();
 	#warn "activating peer - 1.1\n";
@@ -605,7 +619,7 @@ sub activate_peer {
 	
 	my $numOfpeers = scalar(@peer_files);
 	
-	warn "have num of peers =$numOfpeers\n";
+	#warn "have num of peers =$numOfpeers\n";
 	
 	
 	
@@ -613,7 +627,7 @@ sub activate_peer {
 		$this->{'last getaddr'} = time();
 		
 		# get a connected peer?
-		warn "not enough peers, add more\n";
+		#warn "not enough peers, add more\n";
 		foreach my $fd (keys %{$this->{'peers'}}){
 			$this->{'peers'}->{$fd}->send_getaddr();
 		}
@@ -627,7 +641,7 @@ sub activate_peer {
 	#warn "activating peer - 3\n";
 	while(scalar(@peer_files)>0){
 		$latest = shift(@peer_files);
-		warn "Latest peer to try to connect to is hash=$latest\n";
+		#warn "Latest peer to try to connect to is hash=$latest\n";
 		# untaint
 		if("$latest" =~ m/^(.*)$/){
 			$latest = $1;
@@ -635,14 +649,14 @@ sub activate_peer {
 		
 		
 		eval{
-			warn "part 1\n";
+			#warn "part 1\n";
 			rename($dir_pool.'/'.$latest,$dir_pending.'/'.$latest) || die "alpha";
 			
 			# create connection
 			open($fh,'<',$dir_pending.'/'.$latest) || die "beta";
 			my @guts = <$fh>;
 			close($fh);
-			warn "part 2\n";
+			#warn "part 2\n";
 			die "charlie" unless scalar(@guts) == 3;
 			
 			# connect with ip address and port
@@ -650,7 +664,7 @@ sub activate_peer {
 			# perhaps the end user wants to use tor, or a proxy to connect
 			# so, let that logic be elsewhere, just send an anonymous subroutine
 			$socket = $connect_sub->($this,$guts[1],$guts[2]);
-			warn "part 3 with socket=".fileno($socket)."\n";
+			#warn "part 3 with socket=".fileno($socket)."\n";
 			
 			unless(defined $socket && fileno($socket) > 0){
 				rename($dir_pending.'/'.$latest,$dir_banned.'/'.$latest);
@@ -659,7 +673,7 @@ sub activate_peer {
 			
 			# we have a socket, ready to go
 			$this->add_peer($socket,$guts[1],$guts[2]);
-			warn "part 4\n";
+			#warn "part 4\n";
 			rename($dir_pending.'/'.$latest,$dir_active.'/'.$latest);
 			
 		};
@@ -668,7 +682,7 @@ sub activate_peer {
 			warn "have to try another peer. Error=$error\n";
 		}
 		else{
-			warn "finished looping to find a new peer\n";
+			#warn "finished looping to find a new peer\n";
 			last;
 		}
 
@@ -692,7 +706,7 @@ port
 sub add_peer_to_inmemmory{
 	
 	my ($this,$services, $addr_recv_ip,$addr_recv_port) = (shift,shift,shift,shift);
-	warn "Adding peer to db ($addr_recv_ip,$addr_recv_port)\n";
+	#warn "Adding peer to db ($addr_recv_ip,$addr_recv_port)\n";
 	
 	my $filename = Digest::SHA::sha256_hex("$addr_recv_ip:$addr_recv_port");
 	#warn "Filepath =".$this->db_path().'/peers/pool/'.$filename."\n";
@@ -708,11 +722,11 @@ sub add_peer_to_inmemmory{
 	open($fh, '>',$this->db_path().'/peers/pool/'.$filename) || die "cannot open file for peer\n";
 	#warn "adding peer 3\n";
 	if($services & pack('Q',1)){
-		warn "adding peer offering full blocks, not just headers\n";
+		#warn "adding peer offering full blocks, not just headers\n";
 		print $fh "FULLBLOCKS\n";
 	}
 	else{
-		warn "adding peer offering just headers\n";
+		#warn "adding peer offering just headers\n";
 		print $fh "HEADERSONLY\n";		
 	}
 	#warn "adding peer 4\n";
@@ -733,6 +747,10 @@ Mark that a peer has been connected to and that it is ready to do a handshake.
 
 This is called by activate_peer.
 
+For tor/onion addresses, use the following website:
+
+https://lists.torproject.org/pipermail/tor-talk/2012-June/024591.html
+
 =cut
 
 sub add_peer{
@@ -743,7 +761,8 @@ sub add_peer{
 		'spv' => $this,
 		'socket' => $socket,
 		'address' => $addr_recv_ip, 'port' => $addr_recv_port,
-		'our address' => $ref->[0], 'our port' => $ref->[1]
+		'our address' => $ref->[0], 'our port' => $ref->[1],
+		'read buffer size' => $this->{'read buffer size'}
 	});
 	# basically, this gets overloaded by an inheriting class
 	$this->add_peer_to_db($peer);
@@ -794,12 +813,12 @@ sub peer_by_fileno {
 	my $fileno = shift;
 	#warn "peer_by_fileno=$fileno\n with glob=".ref($this->{'peers'}->{$fileno})."\n";
 	
-	require Data::Dumper;
-	my $xo = Data::Dumper::Dumper($this->{'peers'});
-	open(my $fhout,'>','/tmp/bonus2');
-	print "peer_by_fileno\n";
-	print $fhout $xo;
-	close($fhout);
+	#require Data::Dumper;
+	#my $xo = Data::Dumper::Dumper($this->{'peers'});
+	#open(my $fhout,'>','/tmp/bonus2');
+	#print "peer_by_fileno\n";
+	#print $fhout $xo;
+	#close($fhout);
 	return $this->{'peers'}->{$fileno};
 }
 
@@ -810,17 +829,26 @@ sub peer_by_fileno {
 =cut
 
 sub close_peer {
-	my $this = shift;
-	my $fileno = shift;
+	my ($this,$fileno) = @_;
+	
+	# TODO: untaint everything!
 	
 	my $peer = $this->{'peers'}->{$fileno};
 	
 	close($peer->socket());
 	delete  $this->{'peers'}->{$fileno};
-	
+	# peer and address should already be untainted
 	my $filename = Digest::SHA::sha256_hex($peer->address.':'.$peer->port);
 	my $path_active = $this->db_path().'/peers/active/'.$filename;
 	my $path_banned = $this->db_path().'/peers/banned/'.$filename;
+	
+	if($path_active =~ m/^(.*)$/){
+		$path_active = $1;
+	}
+	if($path_banned =~ m/^(.*)$/){
+		$path_banned = $1;
+	}
+	
 	rename($path_active,$path_banned);
 	
 	delete $this->{'peers by address:port'}->{$peer->address}->{$peer->port};
@@ -852,12 +880,12 @@ This is called when a handshake is finished.
 sub peer_hook_handshake_finished{
 	my $this = shift;
 	my $peer = shift;
-	warn "Running send getblocks since hand shake is finished\n";
+	#warn "Running send getblocks since hand shake is finished\n";
 	
 	#$peer->send_getheaders();
 	$peer->send_getaddr();
 	
-	$peer->send_getblocks();
+	#$peer->send_getblocks();
 }
 
 =pod
@@ -884,7 +912,7 @@ When done, set result=1???
 
 sub hook_inv {
 	my ($this,$type,$hash) = @_;
-	warn "Got inv of type=$type with hash=".unpack('H*',$hash)."\n";
+	#warn "Got inv of type=$type with hash=".unpack('H*',$hash)."\n";
 	
 	return undef unless defined $type && (0 <= $type && $type <= 3 ) &&
 		 defined $hash && length($hash) > 0;
@@ -913,34 +941,42 @@ sub hook_peer_onreadidle {
 	my ($this,$peer) = @_;
 	
 	# check to see if we need to fetch more inv
-	warn "check to see if we need to fetch more inv\n";
-	$peer->send_getdata($this->hook_getdata());
+	#warn "check to see if we need to fetch more inv\n";
+	#$peer->send_getdata($this->hook_getdata());
 	
 	# we might have to wait for a ping before this request goes out to the peer
-	if($this->is_marked_getblocks()){
-		warn "getting blocks\n";
-		$peer->send_getblocks();
-		$this->is_marked_getblocks(0);
-	}
+	#if($this->is_marked_getblocks() && 60 < time() - $this->{'getblocks timeout'} ){
+		#warn "getting blocks\n";
+	#	$peer->send_getblocks();
+	#	$this->is_marked_getblocks(0);
+	#	$this->{'getblocks timeout'} = time();
+	#}
 }
 
 =pod
 
----++ hook_getdata($peer)
+---++ hook_getdata($peer,$max)
 
 This is called by a peer when it is ready to write.  Max count= 500 per peer.  The timeout is 60 seconds.
 
 =cut
 
 sub hook_getdata {
-	my $this = shift;
+	my ($this,$max_count) = @_;
 	my @response;
 	
-	my ($i,$max_count_per_peer) = (0,500);
+	$max_count = 100 unless defined $max_count;
+	
+	my $gd_timeout = 600;
+	
+	my ($i,$max_count_per_peer) = (0,$max_count);
 	#warn "hook_getdata part 1 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[0]}){
 		# error
-		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->[0]->{$hash}->[0] )){
+		if(
+			$i < $max_count_per_peer 
+			&& $gd_timeout < (time() - $this->{'inv search'}->[0]->{$hash}->[0] )
+		){
 			push(@response,pack('L',0).$hash);
 			$this->{'inv search'}->[0]->{$hash}->[0] = time();
 			$i += 1;
@@ -952,7 +988,10 @@ sub hook_getdata {
 	#warn "hook_getdata part 2 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[1]}){
 		# tx
-		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->[1]->{$hash}->[0] )){
+		if(
+			$i < $max_count_per_peer 
+			&& $gd_timeout < (time() - $this->{'inv search'}->[1]->{$hash}->[0] )
+		){
 			push(@response,pack('L',1).$hash);
 			$this->{'inv search'}->[1]->{$hash}->[0] = time();
 			$i += 1;	
@@ -964,7 +1003,10 @@ sub hook_getdata {
 	#warn "hook_getdata part 3 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[2]}){
 		# block
-		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->[2]->{$hash}->[0] )){
+		if(
+			$i < $max_count_per_peer 
+			&& $gd_timeout < (time() - $this->{'inv search'}->[2]->{$hash}->[0] )
+		){
 			push(@response,pack('L',2).$hash);
 			$this->{'inv search'}->[2]->{$hash}->[0] = time();
 			$i += 1;	
@@ -976,7 +1018,10 @@ sub hook_getdata {
 	#warn "hook_getdata part 4 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[3]}){
 		# filtered block
-		if($i < $max_count_per_peer && 60 < (time() - $this->{'inv search'}->[3]->{$hash}->[0] )){
+		if(
+			$i < $max_count_per_peer 
+			&& $gd_timeout < (time() - $this->{'inv search'}->[3]->{$hash}->[0] )
+		){
 			push(@response,pack('L',3).$hash);
 			$this->{'inv search'}->[3]->{$hash}->[0] = time();
 			$i += 1;	
@@ -985,7 +1030,7 @@ sub hook_getdata {
 			last;
 		}
 	}
-	warn "hook_getdata size is ".scalar(@response)."\n";
+	#warn "hook_getdata size is ".scalar(@response)."\n";
 	
 	
 	if(0 < scalar(@response)){
@@ -995,7 +1040,7 @@ sub hook_getdata {
 	# do a check to see if we need to fetch more blocks
 		# hook_getdata
 		# $this->spv->{'inv search'}->[2]
-		warn "need to do another block fetch...";
+		#warn "need to do another block fetch...";
 		$this->sort_chain();
 		
 		# when a peer is not busy, the first peer to see this will fetch a block
@@ -1007,6 +1052,47 @@ sub hook_getdata {
 	 
 
 	
+}
+
+=pod
+
+---+++ hook_getdata_blocks_size
+
+Includes stuff that is waiting on time out.
+
+=cut
+
+sub hook_getdata_blocks_size {
+	my $this = shift;
+	return (keys %{$this->{'inv search'}->[2]});
+}
+
+=pod
+
+---+++ hook_getdata_blocks_preview
+
+Does not include stuff that is waiting on time out.
+
+=cut
+
+sub hook_getdata_blocks_preview {
+	my ($this,$max_count_per_peer) = @_;
+	#warn "hook_getdata part 2 \n";
+	my $i = 0;
+	foreach my $hash (keys %{$this->{'inv search'}->[2]}){
+		# tx
+		if( 
+			60 < (time() - $this->{'inv search'}->[2]->{$hash}->[0] )
+		){
+			#push(@response,pack('L',1).$hash);
+			#$this->{'inv search'}->[1]->{$hash}->[0] = time();
+			$i += 1;	
+		}
+		#elsif($max_count_per_peer < $i){
+		#	last;
+		#}
+	}
+	return $i;
 }
 
 =pod
@@ -1030,6 +1116,439 @@ sub loop {
 	$loopsub->($this,$connectsub);
 }
 
+
+=pod
+
+---+ Broadasting Messages
+
+The logic used to figure out what needs to be uploaded and downloaded is stored here.
+
+=cut
+
+=pod
+
+---++ broadcast_message(@msgs)
+
+Send a message out to the bitcoin network via all peers.
+
+=cut
+
+sub broadcast_message {
+	my $this = shift;
+	
+	foreach my $msg (@_){
+		foreach my $fileno (keys %{$this->{'peers'}}){
+			$this->{'peers'}->{$fileno}->write($msg);
+		}
+	}
+}
+
+
+=pod
+
+---+ Callbacks
+
+When a message is recieved, the command is parsed from the message and used to fetch the subroutine, which is stored in the global hash $callback_mapper.
+
+=cut
+
+=pod
+
+---++ callback_add($peer,$callback,$timeout)->$nonce
+
+Add a custom callback where the args are ($delete_sub,$peer,$message)
+
+The callbacks are run after the default callbacks, not before.  
+
+=cut
+
+sub callback_add {
+	my ($this,$peer,$callback,$timeout) = @_;
+	$timeout = 2*time() unless defined $timeout;
+	
+	unless(defined $callback && ref($callback) eq 'CODE'){
+#		$logger->error("Callback is not an a subroutine");
+		return undef;
+	}
+	
+	
+	$peer = 'any peer' unless defined $peer;
+	
+	my $nonce = $this->{'callbacks nonce'};
+	$this->{'callbacks nonce'} += 1;
+	
+	my $deletesub = sub{
+		my ($t1,$p1,$n1) = ($this,$peer,$nonce);
+		delete $t1->{'callbacks'}->{$p1}->{$n1};
+	};
+	
+	$this->{'callbacks'}->{$peer}->{$nonce} = [$timeout,$callback,$deletesub];
+
+	return $nonce;
+}
+
+
+=pod
+
+---++ get_callback_mapper
+
+Overload this if you want to run a different set of callbacks than default.
+
+=cut
+
+sub get_callback_mapper {
+	return 	$callback_mapper;
+}
+
+=pod
+
+---++ callback_run
+
+When a receiving a message from a peer, handle it.  Callback subroutines must accept @args = ($spv,$msg,$peer).
+
+=cut
+
+
+sub callback_run {
+	my ($this,$msg,$peer) = @_;
+
+	return undef unless defined $peer && defined $msg;
+	
+	# handle default callbacks
+	my $command = $msg->command();
+	my $cm = $this->get_callback_mapper();
+	if(
+		defined $cm->{'command'}->{$command}
+		&& ref($cm->{'command'}->{$command}) eq 'HASH'
+		&& defined $cm->{'command'}->{$command}->{'subroutine'}
+		&& ref($cm->{'command'}->{$command}->{'subroutine'}) eq 'CODE'
+	){
+		# run the default callback
+		$cm->{'command'}->{$command}->{'subroutine'}->($this,$msg,$peer);
+	}
+
+	# handle custom callbacks
+
+	my @x = ('any peer');
+	if(
+		defined $this->{'callbacks'}->{$peer}
+		&& ref($this->{'callbacks'}->{$peer}) eq 'HASH'
+		&& 0 < scalar(keys %{$this->{'callbacks'}->{$peer}})
+	){
+		push(@x,$peer);
+	}
+
+	foreach my $py (@x){
+		
+		foreach my $nonce (keys %{$this->{'callbacks'}->{$py}}){
+			# [$timeout,$callback,$deletesub]
+			if(
+				time() - $this->{'callbacks'}->{$py}->{$nonce}->[0] < 0
+			){
+				# spv,deletesub,peer,msg
+				$this->{'callbacks'}->{$py}->{$nonce}->[1]->(
+					$this,
+					$this->{'callbacks'}->{$py}->{$nonce}->[2],
+					$peer,
+					$msg
+				);				
+			}
+			else{
+				# exceeded timeout, delete callback
+				$this->{'callbacks'}->{$py}->{$nonce}->[2]->();
+			}
+
+		}
+	}
+
+	return undef;
+}
+
+
+=pod
+
+---++ callback_gotaddr
+
+Store the new addr in the peer database.
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'addr'} = {
+		'subroutine' => \&callback_gotaddr
+	}
+};
+
+sub callback_gotaddr {
+	my ($this,$msg,$peer) = @_;
+	#warn "gotaddr\n";
+	open(my $fh,'<',\$msg->{'payload'});
+	my $addr_ref = CBitcoin::Utilities::deserialize_addr($fh);
+	close($fh);
+	if(defined $addr_ref && ref($addr_ref) eq 'ARRAY'){
+		#warn "Got ".scalar(@{$addr_ref})." new addresses\n";
+		
+		foreach my $addr (@{$addr_ref}){
+			# timestamp, services, ipaddress, port
+			$this->add_peer_to_inmemmory(
+				$addr->{'services'},
+				$addr->{'ipaddress'},
+				$addr->{'port'}
+			);
+		}
+		
+		
+	}
+	else{
+		#warn "Got no new addresses\n";
+	}
+	return 1;
+	
+}
+
+
+=pod
+
+---++ callback_gotversion
+
+Used in the handshake between peers.
+
+=cut
+
+sub callback_gotversion {
+	my ($this,$msg,$peer) = @_;
+	
+	# handshake should not be finished
+	if($peer->handshake_finished()){
+		#warn "peer already finished handshake, but received another version\n";
+		$peer->mark_finished();
+		return undef;
+	}
+	
+	# we should not already have a version
+	if($peer->received_version()){
+		#warn "peer already sent a version\n";
+		$peer->mark_finished();
+		return undef;
+	}
+
+
+	# parse version	
+	unless($peer->version_deserialize($msg)){
+		#warn "peer sent bad version\n";
+		$peer->mark_finished();
+		return undef;
+	}
+	
+	
+	#open(my)
+	$peer->{'received version'} = 1;
+	
+	$peer->send_verack();
+	return 1;
+}
+
+
+=pod
+
+---++ callback_gotverack
+
+Used in the handshake.
+
+=cut
+
+sub callback_gotverack {
+	my ($this,$msg,$peer) = @_;
+	
+	
+	# we should not have already received a verack
+	if($peer->received_verack()){
+		#warn "bad peer, already received verack";
+		$peer->mark_finished();
+		return undef;
+	}
+	
+	# we should have sent a version
+	if(!$peer->sent_version()){
+		#warn "no version sent, so we should not be getting a verack\n";
+		$peer->mark_finished();
+		return undef;
+	}
+	
+	$peer->{'received verack'} = 1;
+	
+	$peer->send_ping();
+	return 1;
+}
+
+=pod
+
+---++ callback_ping
+
+Used after a timeout has been reached, to confirm that the connection is still up.
+
+=cut
+
+sub callback_gotping {
+	my ($this,$msg,$peer) = @_;
+	warn "Got ping\n";
+	unless($peer->handshake_finished()){
+		#warn "got ping before handshek finsihed\n";
+		$peer->mark_finished();
+		return undef;
+	}
+	$peer->send_pong($msg->payload());
+	return 1;
+}
+
+=pod
+
+---++ callback_pong
+
+Sent by a peer in response to a ping sent by us.
+
+=cut
+
+sub callback_gotpong {
+	my ($this,$msg,$peer) = @_;
+	
+	if($peer->{'sent ping nonce'} eq $msg->payload() ){
+		warn "got pong and it matches";
+		$peer->{'sent ping nonce'} = undef;
+		$peer->{'last pinged'} = time();
+		return 1;
+	}
+	else{
+		#warn "bad pong received\n";
+		$peer->mark_finished();
+		return undef;
+	}
+	
+}
+
+
+=pod
+
+---++ callback_gotinv
+
+Used when inventory vectors have been received.  The next step is to fetch the corresponding content via getdata.  See hook_getdata for information on how getdata is handled.
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'inv'} = {
+		'subroutine' => \&callback_gotinv
+	}
+};
+
+sub callback_gotinv {
+	my ($this,$msg,$peer) = @_;
+	#warn "Got inv\n";
+	unless($peer->handshake_finished()){
+		#warn "got inv before handshake finsihed\n";
+		$peer->mark_finished();
+		return undef;
+	}
+	open(my $fh,'<',\($msg->payload()));
+	binmode($fh);
+	my $count = CBitcoin::Utilities::deserialize_varint($fh);
+	#warn "gotinv: count=$count\n";
+	for(my $i=0;$i < $count;$i++){
+		$this->hook_inv(@{CBitcoin::Utilities::deserialize_inv($fh)});
+	}
+	close($fh);
+		
+	# go fetch the data
+	#$peer->send_getdata($this->hook_getdata());
+	
+}
+
+
+=pod
+
+---++ callback_gotblock
+
+Got a block, so put it into the database.
+
+
+---+++ Tx Format
+version
+inputs => [..]
+outputs => [..]
+locktime
+
+input = {prevHash, prevIndex, script, sequence}
+output = {value, script}
+
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'block'} = {
+		'subroutine' => \&callback_gotblock
+	}
+};
+
+sub callback_gotblock {
+	my ($this,$msg,$peer) = @_;
+	
+	
+	# write this to disk
+	my $fp = '/tmp/spv/tmp.'.$$.'.block';
+	open(my $fh,'<',\($msg->payload()));
+	if( 100_000_000 < length($msg->payload()) ){
+		open(my $fhout,'>',$fp) || die "cannot write to disk";
+		binmode($fh);
+		binmode($fhout);
+		
+		my ($n,$buf);
+		while($n = read($fh,$buf,8192)){
+			my $m = 0;
+			while(0 < $n - $m){
+				$m += syswrite($fhout,$buf,$n - $m,$m);
+			}
+		}
+		close($fhout);
+		close($fh);
+		open($fh,'<',$fp) || die "cannot read from disk";		
+	}
+	
+	eval{
+		
+		my $block = CBitcoin::Block->deserialize($fh);
+		
+		#warn "Got block with hash=".$block->hash_hex().
+		#	" and transactionNum=".$block->transactionNum.
+		#	" and prevBlockHash=".$block->prevBlockHash_hex()."\n";
+		my $count = $block->transactionNum;
+		#die "let us finish early\n";
+		$this->add_header_to_chain($block);
+		
+		if(0 < $count){
+			for(my $i=0;$i<$count;$i++){
+				#warn "looping\n";		
+				$this->add_tx_to_db(
+					$block->hash(),
+					CBitcoin::Transaction->deserialize($fh)
+				);
+			}
+		}
+		else{
+			die "weird block\n";
+		}
+		
+		# delete it in inv search.
+		delete $this->{'inv search'}->[2]->{$block->hash()};
+		
+	} || do {
+		my $error = $@;
+		warn "Error:$error\n";
+	};
+	
+	
+	#$this->spv->{'inv'}->[2]->{$block->hash()} = $block;
+	unlink($fp) if -f $fp;
+}
 
 
 1;

@@ -191,7 +191,9 @@ sub transactionNum {
 	return shift->{'transactionNum'};
 }
 
-
+sub bits {
+	return unpack('L',shift->{'bits'});
+}
 
 
 sub merkleRoot {

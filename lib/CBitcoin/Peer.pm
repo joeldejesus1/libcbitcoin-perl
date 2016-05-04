@@ -78,8 +78,11 @@ sub init {
 		'message definition' => {'magic' => 4,'command' => 12, 'length' => 4, 'checksum' => 4 },
 		'message definition order' => ['magic','command', 'length', 'checksum','payload' ],
 		'command buffer' => {},
-		'receive rate' => [0,0] 
+		'receive rate' => [0,0] ,
+		'read buffer size' => $options->{'read buffer size'}
 	};
+	$this->{'read buffer size'} ||= 8192;
+	
 	bless($this,$ref);
 	# to have some human readable stuff for later 
 	$this->{'address'} = $options->{'address'};
@@ -241,6 +244,8 @@ sub spv {
 =pod
 
 ---++ block_height
+
+Block height of peer at the time of handshake.
 
 =cut
 
@@ -450,21 +455,25 @@ sub read_data {
 	
 	$this->{'bytes'} = '' unless defined $this->{'bytes'};
 	my $socket = $this->socket();
-	warn "Socket=$socket\n";
-	my $n = sysread($this->socket(),$this->{'bytes'},BUFFSIZE,length($this->{'bytes'}));
+	#warn "Socket=$socket\n";
+	my $n = sysread(
+		$this->socket(),$this->{'bytes'},
+		$this->{'read buffer size'},
+		length($this->{'bytes'})
+	);
 
 	
 	if(defined $n && $n == 0){
-		warn "Closing peer, socket was closed from the other end.\n";
+		#warn "Closing peer, socket was closed from the other end.\n";
 		$this->finish();
 	}
 	elsif(defined $n && $n > 0){
 		$this->bytes_read($n);
-		warn "Have ".$this->bytes_read()." bytes read into the buffer\n";
+		#warn "Have ".$this->bytes_read()." bytes read into the buffer\n";
 
 		while(my $msg = $this->read_data_parse_msg()){
 			if($msg->command eq 'version'){
-				warn "Getting Message=".ref($msg)."\n";
+				#warn "Getting Message=".ref($msg)."\n";
 				$this->callback_gotversion($msg);
 				
 			}
@@ -479,10 +488,11 @@ sub read_data {
 			elsif($this->handshake_finished()){
 				#push(@{$this->{'messages to be processed'}},$msg);
 				#return 1;
-				$this->hook_callback($msg);
+				#$this->hook_callback($msg);
+				$this->spv->callback_run($msg,$this);
 			}
 			else{
-				warn "bad client behavior\n";
+				#warn "bad client behavior\n";
 				$this->mark_finished();
 			}
 		}
@@ -495,7 +505,7 @@ sub read_data {
 	}
 	else{
 		# would block
-		warn "socket is blocking, so skip, error=".$!."\n";
+		#warn "socket is blocking, so skip, error=".$!."\n";
 	}
 	
 	return undef;
@@ -542,10 +552,10 @@ sub read_data_single_msg_item {
 	die "key not defined" unless defined $size;
 	
 	
-	if(!defined $this->{'buffer'}->{$key} &&  $this->{'bytes read'} >= $size){
+	if(!defined $this->{'buffer'}->{$key} &&  $size <= $this->{'bytes read'} ){
 		$this->{'buffer'}->{$key} = substr($this->{'bytes'},0,$size);
 		#warn "Pre $key=".unpack('H*',$this->{'buffer'}->{$key})."\n";
-		substr($this->{'bytes'},0,$size) = ""; # delete  bytes we don't need
+		substr($this->{'bytes'},0,$size) = ''; # delete  bytes we don't need
 		$this->{'bytes read'} = $this->{'bytes read'} - $size;
 		die "sizes do not match" unless $this->{'bytes read'} == length($this->{'bytes'});
 		return 1;
@@ -588,10 +598,10 @@ sub definition_size_mapper {
 sub socket {
 	my $this = shift;
 	require Data::Dumper;
-	my $xo = Data::Dumper::Dumper($this);
-	open(my $fhout,'>','/tmp/bonus');
-	print $fhout $xo;
-	close($fhout);
+	#my $xo = Data::Dumper::Dumper($this);
+	#open(my $fhout,'>','/tmp/bonus');
+	#print $fhout $xo;
+	#close($fhout);
 	return $this->{'socket'};
 }
 
@@ -673,7 +683,7 @@ sub write {
 	return length($this->{'bytes to write'}) unless defined $data && length($data) > 0;
 	$this->{'bytes to write'} .= $data;
 	
-	warn "Added ".length($data)." bytes to the write queue\n";
+	#warn "Added ".length($data)." bytes to the write queue\n";
 	
 	if($this->write_data() == 0 && fileno($this->socket) > 0){
 		$this->spv->mark_write($this->socket);
@@ -709,16 +719,16 @@ sub write_data {
 
 	if (!defined($n) && $! == EAGAIN) {
 		# would block
-		warn "socket is blocking, so skip\n";
+		#warn "socket is blocking, so skip\n";
 		return 0;
 	}
 	elsif($n == 0){
-		warn "Closing peer, socket was closed from the other end.\n";
+		#warn "Closing peer, socket was closed from the other end.\n";
 		$this->finish();
 		return 0;
 	}
 	else{
-		warn "wrote $n bytes";
+		#warn "wrote $n bytes";
 		substr($this->{'bytes to write'},0,$n) = "";
 		return $n;		
 	}
@@ -802,7 +812,7 @@ sub send_pong {
 	my $this = shift;
 	my $nonce = shift;
 	die "bad nonce" unless defined $nonce && length($nonce) == 8;
-	warn "Sending pong\n";
+	#warn "Sending pong\n";
 	return $this->write(CBitcoin::Message::serialize($nonce,'pong',$this->magic));
 }
 
@@ -836,7 +846,7 @@ Ask for info on more peers.
 
 sub send_getaddr{
 	my ($this) = @_;
-	warn "sending getaddr\n";
+	#warn "sending getaddr\n";
 	return $this->write(CBitcoin::Message::serialize(
 		'',
 		'getaddr',
@@ -892,12 +902,12 @@ BEGIN{
 sub callback_gotaddr {
 	my $this = shift;
 	my $msg = shift;
-	warn "gotaddr\n";
+	#warn "gotaddr\n";
 	open(my $fh,'<',\$msg->{'payload'});
 	my $addr_ref = CBitcoin::Utilities::deserialize_addr($fh);
 	close($fh);
 	if(defined $addr_ref && ref($addr_ref) eq 'ARRAY'){
-		warn "Got ".scalar(@{$addr_ref})." new addresses\n";
+		#warn "Got ".scalar(@{$addr_ref})." new addresses\n";
 		
 		foreach my $addr (@{$addr_ref}){
 			# timestamp, services, ipaddress, port
@@ -911,7 +921,7 @@ sub callback_gotaddr {
 		
 	}
 	else{
-		warn "Got no new addresses\n";
+		#warn "Got no new addresses\n";
 	}
 	return 1;
 	
@@ -932,14 +942,14 @@ sub callback_gotversion {
 	
 	# handshake should not be finished
 	if($this->handshake_finished()){
-		warn "peer already finished handshake, but received another version\n";
+		#warn "peer already finished handshake, but received another version\n";
 		$this->mark_finished();
 		return undef;
 	}
 	
 	# we should not already have a version
 	if($this->received_version()){
-		warn "peer already sent a version\n";
+		#warn "peer already sent a version\n";
 		$this->mark_finished();
 		return undef;
 	}
@@ -947,7 +957,7 @@ sub callback_gotversion {
 
 	# parse version	
 	unless($this->version_deserialize($msg)){
-		warn "peer sent bad version\n";
+		#warn "peer sent bad version\n";
 		$this->mark_finished();
 		return undef;
 	}
@@ -975,14 +985,14 @@ sub callback_gotverack {
 	
 	# we should not have already received a verack
 	if($this->received_verack()){
-		warn "bad peer, already received verack";
+		#warn "bad peer, already received verack";
 		$this->mark_finished();
 		return undef;
 	}
 	
 	# we should have sent a version
 	if(!$this->sent_version()){
-		warn "no version sent, so we should not be getting a verack\n";
+		#warn "no version sent, so we should not be getting a verack\n";
 		$this->mark_finished();
 		return undef;
 	}
@@ -1004,9 +1014,9 @@ Used after a timeout has been reached, to confirm that the connection is still u
 sub callback_gotping {
 	my $this = shift;
 	my $msg = shift;
-	warn "Got ping\n";
+	#warn "Got ping\n";
 	unless($this->handshake_finished()){
-		warn "got ping before handshek finsihed\n";
+		#warn "got ping before handshek finsihed\n";
 		$this->mark_finished();
 		return undef;
 	}
@@ -1033,7 +1043,7 @@ sub callback_gotpong {
 		return 1;
 	}
 	else{
-		warn "bad pong received\n";
+		#warn "bad pong received\n";
 		$this->mark_finished();
 		return undef;
 	}
@@ -1058,16 +1068,16 @@ BEGIN{
 sub callback_gotinv {
 	my $this = shift;
 	my $msg = shift;
-	warn "Got inv\n";
+	#warn "Got inv\n";
 	unless($this->handshake_finished()){
-		warn "got inv before handshake finsihed\n";
+		#warn "got inv before handshake finsihed\n";
 		$this->mark_finished();
 		return undef;
 	}
 	open(my $fh,'<',\($msg->payload()));
 	binmode($fh);
 	my $count = CBitcoin::Utilities::deserialize_varint($fh);
-	warn "gotinv: count=$count\n";
+	#warn "gotinv: count=$count\n";
 	for(my $i=0;$i < $count;$i++){
 		$this->spv->hook_inv(@{CBitcoin::Utilities::deserialize_inv($fh)});
 	}
@@ -1133,16 +1143,16 @@ sub callback_gotblock {
 		
 		my $block = CBitcoin::Block->deserialize($fh);
 		
-		warn "Got block with hash=".$block->hash_hex().
-			" and transactionNum=".$block->transactionNum.
-			" and prevBlockHash=".$block->prevBlockHash_hex()."\n";
+		#warn "Got block with hash=".$block->hash_hex().
+		#	" and transactionNum=".$block->transactionNum.
+		#	" and prevBlockHash=".$block->prevBlockHash_hex()."\n";
 		my $count = $block->transactionNum;
 		#die "let us finish early\n";
 		$this->spv->add_header_to_chain($block);
 		
 		if(0 < $count){
 			for(my $i=0;$i<$count;$i++){
-				warn "looping\n";		
+				#warn "looping\n";		
 				$this->spv->add_tx_to_db(
 					$block->hash(),
 					CBitcoin::Transaction->deserialize($fh)
@@ -1184,19 +1194,19 @@ sub hook_callback{
 	my $this = shift;
 	my $msg = shift;
 	
-	warn "Got message of type=".$msg->command."\n";
+	#warn "Got message of type=".$msg->command."\n";
 	if(
 		defined $callback_mapper->{'command'}->{$msg->command()}
 		&&  ref($callback_mapper->{'command'}->{$msg->command()}) eq 'HASH'
 		&& defined $callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}
 		&& ref($callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}) eq 'CODE'
 	){
-		warn "Running subroutine for ".$msg->command()."\n";
+		#warn "Running subroutine for ".$msg->command()."\n";
 		return $callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}->($this,$msg);
 		
 	}
 	else{
-		warn "Not running subroutine for ".$msg->command()."\n";
+		#warn "Not running subroutine for ".$msg->command()."\n";
 		return 1;
 	}
 }
