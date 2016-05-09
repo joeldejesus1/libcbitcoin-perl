@@ -15,6 +15,28 @@
 #define MAIN_PUBLIC 0x1EB28804
 #define MAIN_PRIVATE 0xE4AD8804
 
+////// extra
+
+struct hd_extended_key_serialized {
+	uint8_t data[78];
+};
+
+static bool write_ek_ser_pub(struct hd_extended_key_serialized *out,
+			     const struct hd_extended_key *ek)
+{
+	cstring s = { (char *)(out->data), 0, sizeof(out->data) + 1 };
+	return hd_extended_key_ser_pub(ek, &s);
+}
+
+
+
+static bool write_ek_ser_prv(struct hd_extended_key_serialized *out,
+			     const struct hd_extended_key *ek)
+{
+	cstring s = { (char *)(out->data), 0, sizeof(out->data) + 1 };
+	return hd_extended_key_ser_priv(ek, &s);
+}
+
 /*
  *   Return success=0 hash (typically indicates failure to deserialize)
  */
@@ -74,6 +96,17 @@ HV* picocoin_generatehdkeymaster(char* seed){
 	hv_store(rh, "index", 5, newSViv( hdkey.index), 0);
 	hv_store(rh, "success", 7, newSViv( 1), 0);
 
+	struct hd_extended_key_serialized m_xprv;
+	if(write_ek_ser_prv(&m_xprv, &hdkey)){
+		hv_store(rh, "serialized private", 18, newSVpv(m_xprv.data,78), 0);
+	}
+	
+	struct hd_extended_key_serialized m_xpub;
+	if(write_ek_ser_pub(&m_xprv, &hdkey)){
+		hv_store(rh, "serialized public", 17, newSVpv(m_xpub.data,78), 0);
+	}
+	
+	// public key: static void print_ek_public(const struct hd_extended_key *ek)
 	
 	
 	// integer: hv_store(rh, "nonce", 5, newSViv(x->nonce), 0);

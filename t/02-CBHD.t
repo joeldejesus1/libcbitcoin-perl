@@ -16,16 +16,14 @@ my $xo = Data::Dumper::Dumper($hash);
 warn "Got XO=$xo\n";
 
 $hash = CBitcoin::CBHD::picocoin_generatehdkeymaster("my super secret seed/password");
+CBitcoin::CBHD::print_to_stderr($hash);
 
-require Data::Dumper;
-$xo = Data::Dumper::Dumper($hash);
-warn "Got XO2=$xo\n";
 
-$hash = CBitcoin::CBHD::picocoin_generatehdkeychild($hash->{'data'},1);
+#$hash = CBitcoin::CBHD::picocoin_generatehdkeychild($hash->{'data'},1);
 
-require Data::Dumper;
-$xo = Data::Dumper::Dumper($hash);
-warn "Got XO3=$xo\n";
+#require Data::Dumper;
+#$xo = Data::Dumper::Dumper($hash);
+#warn "Got XO3=$xo\n";
 
 
 ok($hash->{'success'}, 'get success');

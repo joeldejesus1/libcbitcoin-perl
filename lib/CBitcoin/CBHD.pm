@@ -300,6 +300,23 @@ sub publickey {
 }
 
 
+=item print_to_stderr
+
+=cut
+
+sub print_to_stderr {
+	my $this = shift;
+	warn "version=".$this->{'version'}."\n";
+	warn "Depth=".$this->{'depth'}."\n";
+	warn "index=".$this->{'index'}."\n";
+	warn "success=".$this->{'success'}."\n";
+	warn "serialized private=".unpack('H*',$this->{'serialized private'})."\n";
+	warn "serialized public=".unpack('H*',$this->{'serialized public'})."\n";
+	warn "Depth=".$this->{'depth'}."\n";
+
+}
+
+
 =head1 AUTHOR
 
 Joel De Jesus, C<< <dejesus.joel at e-flamingo.jp> >>
