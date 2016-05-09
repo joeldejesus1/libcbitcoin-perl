@@ -89,6 +89,7 @@ sub address_to_script {
 	my $x = shift;
 	die "bad address" unless defined $x && 0 < length($x);
 	$x = addressToHex($x);
+	return '' unless defined $x && 0 < length($x);
 	
 	my $prefix = prefix(hex(substr($x,0,2)));
 	my $hash = substr($x,2,40);

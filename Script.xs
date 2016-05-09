@@ -108,7 +108,10 @@ char* script_to_p2sh(char* scriptstring){
 
 char* addressToHex(char* addressString){
     CBByteArray * addrStr = CBNewByteArrayFromString(addressString, true);
+
     CBAddress * addr = CBNewAddressFromString(addrStr, false);
+    if(addr == NULL)
+    	return "";
     
     uint8_t * pubKeyHash = CBByteArrayGetData(CBGetByteArray(addr)) + 1;
     

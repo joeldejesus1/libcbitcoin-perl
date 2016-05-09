@@ -3,7 +3,7 @@ use strict;
 use warnings;
 
 
-use Test::More tests => 1;
+use Test::More tests => 2;
 
 require CBitcoin::Script;
 require CBitcoin::Base58;
@@ -69,3 +69,7 @@ warn "Follow up:".CBitcoin::Script::address_to_script($address)."\n";
 
 
 ok( $script eq CBitcoin::Script::address_to_script(CBitcoin::Script::script_to_address($script)) );
+
+# test bad addresses
+$script = CBitcoin::Script::address_to_script('asdfiowef');
+ok($script eq '');
