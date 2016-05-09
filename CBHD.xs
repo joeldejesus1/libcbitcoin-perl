@@ -44,6 +44,27 @@ HV* picocoin_returnblankhdkey(HV * rh){
 	hv_store(rh, "success", 7, newSViv((int) 0), 0);
 	return rh;
 }
+// given a full hdkey, fill in a perl hash with relevant data
+HV* picocoin_returnhdkey(HV * rh, const struct hd_extended_key hdkey){
+
+	hv_store(rh, "depth", 5, newSViv( hdkey.depth), 0);
+	hv_store(rh, "version", 7, newSViv( hdkey.version), 0);
+	hv_store(rh, "index", 5, newSViv( hdkey.index), 0);
+	hv_store(rh, "success", 7, newSViv( 1), 0);
+
+	struct hd_extended_key_serialized m_xprv;
+	if(write_ek_ser_prv(&m_xprv, &hdkey)){
+		hv_store(rh, "serialized private", 18, newSVpv(m_xprv.data,78), 0);
+	}
+	
+	struct hd_extended_key_serialized m_xpub;
+	if(write_ek_ser_pub(&m_xprv, &hdkey)){
+		hv_store(rh, "serialized public", 17, newSVpv(m_xpub.data,78), 0);
+	}
+
+	//hd_extended_key_free(&hdkey);
+	return rh;
+}
 
 
 //////////////// picocoin /////////////////
@@ -91,58 +112,27 @@ HV* picocoin_generatehdkeymaster(char* seed){
 	if(!hd_extended_key_generate_master(&hdkey, seed, sizeof(seed))){
 		return picocoin_returnblankhdkey(rh);
 	}
-	hv_store(rh, "depth", 5, newSViv( hdkey.depth), 0);
-	hv_store(rh, "version", 7, newSViv( hdkey.version), 0);
-	hv_store(rh, "index", 5, newSViv( hdkey.index), 0);
-	hv_store(rh, "success", 7, newSViv( 1), 0);
-
-	struct hd_extended_key_serialized m_xprv;
-	if(write_ek_ser_prv(&m_xprv, &hdkey)){
-		hv_store(rh, "serialized private", 18, newSVpv(m_xprv.data,78), 0);
-	}
-	
-	struct hd_extended_key_serialized m_xpub;
-	if(write_ek_ser_pub(&m_xprv, &hdkey)){
-		hv_store(rh, "serialized public", 17, newSVpv(m_xpub.data,78), 0);
-	}
-	
-	// public key: static void print_ek_public(const struct hd_extended_key *ek)
-	
-	
-	// integer: hv_store(rh, "nonce", 5, newSViv(x->nonce), 0);
-	// scalar: hv_store(rh, "hash", 4, newSVpv(hash,32), 0); 
+	picocoin_returnhdkey(rh,hdkey);
 	hd_extended_key_free(&hdkey);
-
 	return rh;
 }
-/*
-HV* picocoin_generatehdkeychild(char* xpriv, int child_index){
+
+HV* picocoin_generatehdkeychild(SV* xpriv, int child_index){
 	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
 	//static const char s_tv1_m_xpub3[] = "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8";
-		
+	STRLEN len; //calculated via SvPV
+	uint8_t * xpriv_msg = (uint8_t*) SvPV(xpriv,len);
+	
 	struct hd_extended_key childhdkey;
 	struct hd_extended_key hdkey;
 	
-	bool works = hd_extended_key_init(&childhkkey);
-	
-	
-	if(works)
-		works = hd_extended_key_generate_master(&hdkey, seed, sizeof(seed));
-
-	if(works){
-		hv_store(rh, "depth", 5, newSViv( hdkey.depth), 0);
-		hv_store(rh, "version", 7, newSViv( hdkey.version), 0);
-		hv_store(rh, "index", 5, newSViv( hdkey.index), 0);
-		hv_store(rh, "success", 7, newSViv( 1), 0);
-		// hd_extended_key_ser_pub(, );
+	struct hd_extended_key hdkey;
+	if(!hd_extended_key_init(&hdkey)){
+		return picocoin_returnblankhdkey(rh);
 	}
-	else{
-		hv_store(rh, "success", 7, newSViv( 0), 0);
-	}
-	// integer: hv_store(rh, "nonce", 5, newSViv(x->nonce), 0);
-	// scalar: hv_store(rh, "hash", 4, newSVpv(hash,32), 0); 
 
-
+	picocoin_returnhdkey(rh,hdkey);
+	hd_extended_key_free(&hdkey);
 	return rh;
 }
 */
