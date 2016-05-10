@@ -122,20 +122,34 @@ HV* picocoin_generatehdkeychild(SV* xpriv, int child_index){
 	//static const char s_tv1_m_xpub3[] = "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8";
 	STRLEN len; //calculated via SvPV
 	uint8_t * xpriv_msg = (uint8_t*) SvPV(xpriv,len);
-	
-	struct hd_extended_key childhdkey;
-	struct hd_extended_key hdkey;
+	if(len != 78){
+		return picocoin_returnblankhdkey(rh);
+	}
 	
 	struct hd_extended_key hdkey;
 	if(!hd_extended_key_init(&hdkey)){
 		return picocoin_returnblankhdkey(rh);
 	}
-
-	picocoin_returnhdkey(rh,hdkey);
+	if(!hd_extended_key_deser(&hdkey,xpriv_msg,len)){
+		return picocoin_returnblankhdkey(rh);
+	}
+	
+	// create the child key
+	struct hd_extended_key childhdkey;
+	if(!hd_extended_key_init(&childhdkey)){
+		return picocoin_returnblankhdkey(rh);
+	}
+	if(!hd_extended_key_generate_child(&hdkey,(uint32_t) child_index,&childhdkey)){
+		return picocoin_returnblankhdkey(rh);
+	}
+	
+	// populate the hash with data from child key
+	picocoin_returnhdkey(rh,childhdkey);
 	hd_extended_key_free(&hdkey);
+	hd_extended_key_free(&childhdkey);
 	return rh;
 }
-*/
+
 
 MODULE = CBitcoin::CBHD	PACKAGE = CBitcoin::CBHD	
 
@@ -149,4 +163,9 @@ picocoin_newhdkey(s_tv1_m_xpub)
 HV*
 picocoin_generatehdkeymaster(seed)
 	char* seed
+
+HV*
+picocoin_generatehdkeychild(xpriv,child_index)
+	SV* xpriv
+	int child_index
 	
