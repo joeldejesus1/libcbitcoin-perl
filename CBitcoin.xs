@@ -18,12 +18,34 @@ int dummy(int arg){
 	return 1;
 }
 
+
+
 char* picocoin_base58_encode(SV* x){
 
 	STRLEN len; //calculated via SvPV
 	uint8_t * xmsg = (uint8_t*) SvPV(x,len);
 	cstring * ans = base58_encode(xmsg,(size_t) len);
-	return ans->str;
+	//char * answer = malloc(len * sizeof(char));
+	//sprintf("%s",ans->str);
+	//cstr_free(ans, true);
+	return ans;
+	/*int i;
+	char * fullans = malloc((1 + ans->len) * sizeof(char));
+	for(i=0;i<ans->len+1;i++){
+		fullans[i] = ans->str[i];
+	}
+	cstr_free(ans, true);
+	return fullans;
+	*/
+}
+
+SV* picocoin_base58_decode(char* x){
+
+	STRLEN len; //calculated via SvPV
+	//uint8_t * xmsg = (uint8_t*) SvPV(x,len);
+	cstring * ans = base58_decode(x);
+	
+	return newSVpv(ans->str,ans->len);
 	/*int i;
 	char * fullans = malloc((1 + ans->len) * sizeof(char));
 	for(i=0;i<ans->len+1;i++){
@@ -62,3 +84,7 @@ dummy (arg)
 char* 
 picocoin_base58_encode(x)
 	SV* x
+
+SV* 
+picocoin_base58_decode(x)
+	char* x

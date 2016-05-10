@@ -10,11 +10,11 @@ require CBitcoin::CBHD;
 require Data::Dumper;
 
 
-
 my $priv = 'xprv9s21ZrQH143K31xYSDQpPDxsXRTUcvj2iNHm5NUtrGiGG5e2DtALGdso3pGz6ssrdK4PFmM8NSpSBHNqPqm55Qn3LqFtT2emdEXVYsCzC2U';
 my $hash = CBitcoin::CBHD::picocoin_newhdkey($priv);
-CBitcoin::CBHD::print_to_stderr($hash);
+#CBitcoin::CBHD::print_to_stderr($hash);
 ok($hash->{'success'},'priv key from base58');
+
 
 my $base58_priv = CBitcoin::picocoin_base58_encode($hash->{'serialized private'});
 warn "Got xpriv=$base58_priv\n";
