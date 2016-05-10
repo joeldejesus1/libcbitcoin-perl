@@ -3,17 +3,30 @@ use strict;
 use warnings;
 
 
-use Test::More tests => 2;
+use Test::More tests => 4;
 
+require CBitcoin;
 require CBitcoin::CBHD;
+require Data::Dumper;
+
+
 
 my $priv = 'xprv9s21ZrQH143K31xYSDQpPDxsXRTUcvj2iNHm5NUtrGiGG5e2DtALGdso3pGz6ssrdK4PFmM8NSpSBHNqPqm55Qn3LqFtT2emdEXVYsCzC2U';
 my $hash = CBitcoin::CBHD::picocoin_newhdkey($priv);
+CBitcoin::CBHD::print_to_stderr($hash);
+ok($hash->{'success'},'priv key from base58');
+
+my $base58_priv = CBitcoin::picocoin_base58_encode($hash->{'serialized private'});
+warn "Got xpriv=$base58_priv\n";
+ok($priv eq $base58_priv,'base58 encode xpriv');
+
 
 $hash = CBitcoin::CBHD::picocoin_generatehdkeymaster("my super secret seed/password");
 
 $hash = CBitcoin::CBHD::picocoin_generatehdkeychild($hash->{'serialized private'},12);
 #warn "child with index=12:\n".CBitcoin::CBHD::print_to_stderr($hash);
+
+
 
 
 ok($hash->{'success'} && $hash->{'depth'} == 1 && $hash->{'index'} == 12, 'get child with index=12');

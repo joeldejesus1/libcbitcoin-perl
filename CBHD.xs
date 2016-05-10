@@ -37,6 +37,22 @@ static bool write_ek_ser_prv(struct hd_extended_key_serialized *out,
 	return hd_extended_key_ser_priv(ek, &s);
 }
 
+
+static bool read_ek_ser_from_base58(const char *base58,
+				    struct hd_extended_key_serialized *out)
+{
+	cstring *str = base58_decode(base58);
+	if (str->len == 82) {
+		memcpy(out->data, str->str, 78);
+		cstr_free(str, true);
+		return true;
+	}
+
+	cstr_free(str, true);
+	return false;
+}
+
+
 /*
  *   Return success=0 hash (typically indicates failure to deserialize)
  */
@@ -67,35 +83,26 @@ HV* picocoin_returnhdkey(HV * rh, const struct hd_extended_key hdkey){
 }
 
 
-//////////////// picocoin /////////////////
-HV* picocoin_newhdkey(char* s_tv1_m_xpub){
+//////////////// picocoin - load from base58 /////////////////
+HV* picocoin_newhdkey(SV* base58x){
 	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
 	
-	struct hd_extended_key hdkey;
-	cstring *tv1data = base58_decode(s_tv1_m_xpub);
-	if(!hd_extended_key_deser(&hdkey, tv1data->str, tv1data->len)){
-		cstr_free(tv1data, true);
+	STRLEN len; //calculated via SvPV
+	char * base58xPointer = (char*) SvPV(base58x,len);
+	
+	struct hd_extended_key_serialized hdkeyser;
+	if(!read_ek_ser_from_base58(base58xPointer,&hdkeyser)){
 		return picocoin_returnblankhdkey(rh);
 	}
-	cstr_free(tv1data, true);
+	struct hd_extended_key hdkey;
+	if(!hd_extended_key_init(&hdkey)){
+		return picocoin_returnblankhdkey(rh);
+	}	
+	if(!hd_extended_key_deser(&hdkey, hdkeyser.data,78)){
+		return picocoin_returnblankhdkey(rh);
+	}
 	
-	
-	// struct bp_key key = hdkey.key;
-	cstring *address = bp_pubkey_get_address(&(hdkey.key), MAIN_PUBLIC);
-	hv_store(rh, "address", 7, newSVpv( address->str, address->len ), 0);
-	
-	//hd_extended_key_ser_pub(const struct hd_extended_key *ek, cstring *s)
-	
-
-	hv_store(rh, "depth", 5, newSViv( hdkey.depth), 0);
-	hv_store(rh, "version", 7, newSViv(hdkey.version), 0);
-	hv_store(rh, "index", 5, newSViv( hdkey.index), 0);
-	hv_store(rh, "success", 7, newSViv( 1), 0);
-
-	
-
-	// integer: hv_store(rh, "nonce", 5, newSViv(x->nonce), 0);
-	// scalar: hv_store(rh, "hash", 4, newSVpv(hash,32), 0); 
+	picocoin_returnhdkey(rh,hdkey);
 	hd_extended_key_free(&hdkey);
 
 	return rh;
@@ -158,8 +165,8 @@ MODULE = CBitcoin::CBHD	PACKAGE = CBitcoin::CBHD
 PROTOTYPES: DISABLED
 
 HV*
-picocoin_newhdkey(s_tv1_m_xpub)
-	char* s_tv1_m_xpub
+picocoin_newhdkey(base58x)
+	SV* base58x
 	
 HV*
 picocoin_generatehdkeymaster(seed)
