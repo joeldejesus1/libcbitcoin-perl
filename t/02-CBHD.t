@@ -8,28 +8,15 @@ use Test::More tests => 2;
 require CBitcoin::CBHD;
 
 my $priv = 'xprv9s21ZrQH143K31xYSDQpPDxsXRTUcvj2iNHm5NUtrGiGG5e2DtALGdso3pGz6ssrdK4PFmM8NSpSBHNqPqm55Qn3LqFtT2emdEXVYsCzC2U';
-#warn "starting\n";
 my $hash = CBitcoin::CBHD::picocoin_newhdkey($priv);
 
-require Data::Dumper;
-my $xo = Data::Dumper::Dumper($hash);
-#warn "Got XO=$xo\n";
-
 $hash = CBitcoin::CBHD::picocoin_generatehdkeymaster("my super secret seed/password");
-warn "..............\n";
-CBitcoin::CBHD::print_to_stderr($hash);
-
-warn "..............\n";
 
 $hash = CBitcoin::CBHD::picocoin_generatehdkeychild($hash->{'serialized private'},12);
-warn "child with index=12:\n".CBitcoin::CBHD::print_to_stderr($hash);
-
-#require Data::Dumper;
-#$xo = Data::Dumper::Dumper($hash);
-#warn "Got XO3=$xo\n";
+#warn "child with index=12:\n".CBitcoin::CBHD::print_to_stderr($hash);
 
 
-ok($hash->{'success'}, 'get success');
+ok($hash->{'success'} && $hash->{'depth'} == 1 && $hash->{'index'} == 12, 'get child with index=12');
 
 my $fail_hash = CBitcoin::CBHD::picocoin_generatehdkeychild($hash->{'serialized private'}.'fjfjf',12);
 

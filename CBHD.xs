@@ -117,6 +117,7 @@ HV* picocoin_generatehdkeymaster(char* seed){
 	return rh;
 }
 
+
 HV* picocoin_generatehdkeychild(SV* xpriv, int child_index){
 	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
 	//static const char s_tv1_m_xpub3[] = "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8";
@@ -168,4 +169,3 @@ HV*
 picocoin_generatehdkeychild(xpriv,child_index)
 	SV* xpriv
 	int child_index
-	
