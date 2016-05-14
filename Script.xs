@@ -13,6 +13,7 @@
 
 #include <assert.h>
 #include <ccoin/util.h>
+#include <ccoin/buffer.h>
 #include <ccoin/script.h>
 #include <ccoin/core.h>
 #include <ccoin/mbr.h>
@@ -192,6 +193,83 @@ SV* picocoin_script_decode(SV* x){
 }
 
 
+
+// const char *opn = GetOpName(OP_PUBKEY);
+
+AV* picocoin_parse_script(SV* serialized_script){
+	AV *r = newAV();
+	
+	STRLEN len; //calculated via SvPV
+	uint8_t * spointer = (uint8_t*) SvPV(serialized_script,len);
+	struct const_buffer buf = { spointer, len };
+	struct bscript_parser bp;
+	struct bscript_op op;
+	//parr *arr = parr_new(16, free);
+
+	
+	bsp_start(&bp, &buf);
+	// const char *GetOpName(enum opcodetype opcode_)
+	while (bsp_getop(&op, &bp)){
+		//parr_add(arr, memdup(&op, sizeof(op)));
+		struct bscript_op *op_p;
+		op_p = memdup(&op, sizeof(op));
+		// av_push( r, newSVnv());
+		if (is_bsp_pushdata(op_p->op)) {
+			//uint8_t * d1 = malloc(op_p->data.len * sizeof(uint8_t));
+			//memcpy(d1,op_p->data.p,op_p->data.len);
+			
+			char * data_withnull = malloc(2*op_p->data.len*sizeof(char) + 1 + 2);
+			char * data_withoutnull = malloc(2*op_p->data.len*sizeof(char) + 1 + 2 - 1);
+			
+			uint8_t lendata[1];
+			lendata[0] = (uint8_t) op_p->data.len;
+			
+			char * datalen = malloc(2 * 1 + 1);
+			datalen[0] = '0';
+			datalen[1] = 'x';
+			encode_hex(datalen + 2, lendata, 1);
+			av_push( r, newSVpv(datalen,  4 ));
+			
+			//memcpy(data, hexprefix, hexprefix_length);
+			data_withnull[0] = '0';
+			data_withnull[1] = 'x';
+			encode_hex(data_withnull + 2, op_p->data.p, op_p->data.len);
+			
+			// strip the null out
+			int i;
+			for(i=0;i<2*op_p->data.len*sizeof(char) + 1 + 2 - 1;i++){
+				data_withoutnull[i] = data_withnull[i];
+			}
+			free(data_withnull);
+			av_push( r, newSVpv(data_withoutnull,  2*op_p->data.len*sizeof(char) + 1 + 2 - 1 ));
+		} else {
+			const char* ox1 = GetOpName(op_p->op);
+			size_t length = strlen(ox1);
+			char * opname = malloc(length * sizeof(char));
+			// max size is 100
+			strncpy(opname,ox1,length);
+			av_push( r, newSVpv(opname,length));
+		}
+		free(op_p);
+	}
+	
+	
+	if (bp.error){
+		av_push( r,  newSViv(0)   );
+	}
+	else{
+		av_push( r,  newSViv(1)   );
+	}
+
+	return r;
+
+err_out:
+	//parr_free(arr, true);
+	return r;
+}
+
+
+
 MODULE = CBitcoin::Script	PACKAGE = CBitcoin::Script
 
 
@@ -203,4 +281,8 @@ dummy2(x)
 	
 SV*
 picocoin_script_decode(x)
+	SV* x
+
+AV*
+picocoin_parse_script(x)
 	SV* x

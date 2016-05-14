@@ -48,6 +48,59 @@ sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 =cut
 
+
+=pod
+
+---++ convert_OP_to_CCOIN($string,$push_bytes_bool)
+
+OP_HASH160 -> ccoin_OP_HASH160;
+
+=cut
+
+sub convert_OP_to_CCOIN {
+	my ($string,$push_bytes_bool) = @_;
+	my @newarray;
+	foreach my $element (split(' ',$string)){
+		if($element =~ m/^OP_/){
+			push(@newarray,'ccoin_'.$element);
+		}
+		elsif($element =~ m/^0x([0-9a-fA-F]+)$/ && $push_bytes_bool){
+			my $x = $1;
+			my $y = pack('C',length($x)/2);
+			push(@newarray,'0x'.unpack('H*',$y),'0x'.$x);
+		}
+		else{
+			push(@newarray,$element);
+		}
+	}
+	return join(' ',@newarray);
+}
+
+=pod
+
+---++ convert_CCOIN_to_OP(@x)
+
+ccoin_OP_HASH160 -> OP_HASH160;
+
+=cut
+
+sub convert_CCOIN_to_OP {
+	my @newarray;
+	foreach my $element (@_){
+		chomp($element);
+		if($element =~ m/^ccoin_(OP_.*)/){
+			push(@newarray,$1);
+		}
+		elsif($element =~ m/^0x(\d{2})$/){
+			# skip, because it is a length
+		}
+		else{
+			push(@newarray,$element);
+		}
+	}
+	return join(' ',@newarray);
+}
+
 =pod
 
 ---++ prefix('p2sh')
