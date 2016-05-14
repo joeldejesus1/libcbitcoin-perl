@@ -23,7 +23,7 @@
 ////// extra
 
 
-int dummy3(int x) {
+int dummy4(int x) {
 	return x;
 }
 
@@ -32,29 +32,15 @@ int dummy3(int x) {
  *  scriptSig is the script that gets ripemd hash160's into a p2sh (need this to make signature)
  *  outpoint = 32 byte tx hash followed by 4 byte uint32_t tx index
  */
-/*
-HV* xyy(SV* outpoint, SV* scriptPubKey){
-	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
-	
-	struct buffer * incomingdata;
-	STRLEN len; //calculated via SvPV
-	incomingdata->p = (const uint8_t*) SvPV(outpoint,len);
-	incomingdata->len = len;
-	
-	struct bp_outpt * prev_output;
-	bp_outpt_init(prev_output);
-	if(!deser_bp_outpt(prev_output,incomingdata)){
-		return picocoin_returnblankhdkey();
-	}
-	
-}*/
 
 
-MODULE = CBitcoin::TransactionInput	PACKAGE = CBitcoin::TransactionInput
+
+
+MODULE = CBitcoin::TransactionOutput	PACKAGE = CBitcoin::TransactionOutput
 
 
 PROTOTYPES: DISABLED
 
 int
-dummy3(x)
+dummy4(x)
 	int x
