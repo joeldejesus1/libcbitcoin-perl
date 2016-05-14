@@ -1,12 +1,29 @@
-use 5.014002;
 use strict;
 use warnings;
 
+use JSON::XS;
 
 use Test::More tests => 1;
 
 require CBitcoin::Script;
-require CBitcoin::Base58;
+
+my $tests;
+
+
+#...........................................
+{
+	my $script = 'OP_DUP OP_HASH160 0x592444aa94e0d8a06442c73f2dc56c5c11de7c5b OP_EQUALVERIFY OP_CHECKSIG';
+	my $serialized_script = CBitcoin::Script::picocoin_script_decode($script);
+	$serialized_script = '' unless defined $serialized_script;
+	#warn "Script:".unpack('H*',$serialized_script)."\n";
+	#warn "length=".length($serialized_script)."\n";
+	ok(0 < length($serialized_script),'can do');
+}
+
+
+
+__END__
+
 use bigint qw/hex oct/;
 =pod
 my $txhash = 'a4e56cf47b0c853d5a9206b262b30bea5dc336926626558e9419e5769f326e07';

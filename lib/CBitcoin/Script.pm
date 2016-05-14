@@ -20,7 +20,7 @@ require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::Script::VERSION = '0.2';
+$CBitcoin::Script::VERSION = '0.1';
 
 DynaLoader::bootstrap CBitcoin::Script $CBitcoin::Script::VERSION;
 

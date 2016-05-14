@@ -46,8 +46,6 @@ $base58_pub = CBitcoin::picocoin_base58_encode(
 
 ok($pub eq $base58_pub,'base58 encode xpub from xpriv');
 
-
-
 # .........................................................
 
 my $parenthash = CBitcoin::CBHD::picocoin_generatehdkeymaster("my super secret seed/password");
