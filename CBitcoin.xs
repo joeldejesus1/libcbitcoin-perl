@@ -8,6 +8,8 @@
 #include <ccoin/hdkeys.h>
 
 #include <assert.h>
+#include <openssl/ripemd.h>
+#include <ccoin/util.h>
 #include <ccoin/base58.h>
 #include <openssl/err.h>
 #include <ccoin/cstr.h>
@@ -18,7 +20,13 @@ int dummy(int arg){
 	return 1;
 }
 
-
+SV* picocoin_ripemd_hash160(SV* x){
+	STRLEN len; //calculated via SvPV
+	uint8_t * xmsg = (uint8_t*) SvPV(x,len);
+	uint8_t md160[RIPEMD160_DIGEST_LENGTH];
+	bu_Hash160(md160,xmsg,len);
+	return newSVpv(md160,RIPEMD160_DIGEST_LENGTH);
+}
 
 SV* picocoin_base58_encode(SV* x){
 
@@ -93,3 +101,7 @@ picocoin_base58_encode(x)
 SV* 
 picocoin_base58_decode(x)
 	char* x
+
+SV*
+picocoin_ripemd_hash160(x)
+	SV* x
