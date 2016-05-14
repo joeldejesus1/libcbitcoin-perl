@@ -86,6 +86,7 @@ MODULE = CBitcoin	PACKAGE = CBitcoin
 BOOT:
 	crutch_stack_wrap(boot_CBitcoin__CBHD(aTHX_ cv));
 	crutch_stack_wrap(boot_CBitcoin__Script(aTHX_ cv));
+	crutch_stack_wrap(boot_CBitcoin__TransactionInput(aTHX_ cv));
 	
 PROTOTYPES: DISABLED
 

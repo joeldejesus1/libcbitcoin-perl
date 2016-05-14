@@ -1,6 +1,5 @@
 package CBitcoin::TransactionInput;
 
-use 5.014002;
 use strict;
 use warnings;
 use CBitcoin::Script;
@@ -19,7 +18,7 @@ require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::TransactionInput::VERSION = '0.2';
+$CBitcoin::TransactionInput::VERSION = '0.1';
 
 DynaLoader::bootstrap CBitcoin::TransactionInput $CBitcoin::TransactionInput::VERSION;
 
@@ -38,60 +37,33 @@ sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 =item new
 
----++ new()
+---++ new($info)
+
+$info = {
+	'prevOutHash' => 0x84320230,
+	'prevOutIndex' => 32,
+	'script' => 'OP_HASH160 ...'
+};
 
 =cut
 
 
 sub new {
-	use bigint;
 	my $package = shift;
 	my $this = bless({}, $package);
 
 	my $x = shift;
-	unless(ref($x) eq 'HASH'){
-		return $this;
-	}
-	if(defined $x->{'data'} && $x->{'data'} =~ m/^([0-9a-zA-Z]+)$/){
-		# we have a tx input which is serialized
-		$this->{'data'} = $x->{'data'};
-	
-	}
-	elsif(
-		defined $x->{'prevOutHash'} && $x->{'prevOutHash'} =~ m/^([0-9a-fA-F]+)$/
-		&& defined $x->{'prevOutIndex'} && $x->{'prevOutIndex'} =~ m/[0-9]+/
-		&& defined $x->{'script'}
+	unless(
+		defined ref($x) eq 'HASH' 
+		&& defined $x->{'script'} 
+		&& defined $x->{'prevOutHash'} 
+		&& defined $x->{'prevOutIndex'}
+		&& $x->{'prevOutIndex'} =~ m/^\d+$/
 	){
-		my $sequence = hex('0xFFFFFFFF') unless defined $x->{'sequence'};
-		# call this function to validate the data, and get serialized data back
-		#char* create_txinput_obj(char* scriptstring, int sequenceInt, char* prevOutHashString, int prevOutIndexInt){
-		$this->{'data'} = create_txinput_obj(
-			$x->{'script'}
-			,$sequence
-			,$x->{'prevOutHash'}
-			,$x->{'prevOutIndex'}
-		);
-		$this->script;
-		$this->prevOutHash;
-		$this->prevOutIndex;
-	}
-	else{
-		die "no arguments to create Transaction::Input";
+		return undef;
 	}
 
 	return $this;
-}
-
-=item serialized_data
-
----++ serialized_data()
-
-=cut
-
-
-sub serialized_data {
-	my $this = shift;
-	return $this->{'data'};
 }
 
 =item script
@@ -101,9 +73,7 @@ sub serialized_data {
 =cut
 
 sub script {
-	my $this = shift;
-	# this is a C function
-	return get_script_from_obj($this->{'data'});
+	return shift->{'script'};
 }
 
 =item type_of_script
@@ -124,10 +94,7 @@ sub type_of_script {
 =cut
 
 sub prevOutHash {
-	#use bigint;
-	my $this = shift;
-	# this is a C function
-	get_prevOutHash_from_obj($this->{'data'});
+	return shift->{'prevOutHash'};
 }
 
 =item prevOutIndex
@@ -137,9 +104,7 @@ sub prevOutHash {
 =cut
 
 sub prevOutIndex {
-	use bigint;
-	my $this = shift;
-	return get_prevOutIndex_from_obj($this->{'data'});
+	return shift->{'prevOutIndex'};
 }
 
 =item sequence
@@ -149,9 +114,7 @@ sub prevOutIndex {
 =cut
 
 sub sequence {
-	use bigint;
-	my $this = shift;
-	return get_sequence_from_obj($this->{'data'});
+	return shift->{'sequence'} || 0;
 }
 
 =head1 AUTHOR
