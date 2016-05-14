@@ -74,7 +74,7 @@ HV* picocoin_returnhdkey(HV * rh, const struct hd_extended_key hdkey){
 	}
 	
 	struct hd_extended_key_serialized m_xpub;
-	if(write_ek_ser_pub(&m_xprv, &hdkey)){
+	if(write_ek_ser_pub(&m_xpub, &hdkey)){
 		hv_store(rh, "serialized public", 17, newSVpv(m_xpub.data,78), 0);
 	}
 

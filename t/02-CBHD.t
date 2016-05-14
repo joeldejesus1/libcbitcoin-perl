@@ -2,38 +2,94 @@
 use strict;
 use warnings;
 
-
-use Test::More tests => 4;
+use Test::More tests => 7;
 
 require CBitcoin;
 require CBitcoin::CBHD;
+require Digest::SHA;
 require Data::Dumper;
 
 
-my $priv = 'xprv9s21ZrQH143K31xYSDQpPDxsXRTUcvj2iNHm5NUtrGiGG5e2DtALGdso3pGz6ssrdK4PFmM8NSpSBHNqPqm55Qn3LqFtT2emdEXVYsCzC2U';
+# .........................................................
+
+my $priv = 'xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi';
 my $hash = CBitcoin::CBHD::picocoin_newhdkey($priv);
 #CBitcoin::CBHD::print_to_stderr($hash);
 ok($hash->{'success'},'priv key from base58');
 
+#warn "Length=".length($hash->{'serialized private'})."\n";
+my $base58_priv = CBitcoin::picocoin_base58_encode(
+	$hash->{'serialized private'}.
+	substr(Digest::SHA::sha256(Digest::SHA::sha256($hash->{'serialized private'})),0,4)
+);
 
-my $base58_priv = CBitcoin::picocoin_base58_encode($hash->{'serialized private'});
-warn "Got xpriv=$base58_priv\n";
 ok($priv eq $base58_priv,'base58 encode xpriv');
 
+# .........................................................
 
-$hash = CBitcoin::CBHD::picocoin_generatehdkeymaster("my super secret seed/password");
+my $pub = 'xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8';
+my $hashxpub = CBitcoin::CBHD::picocoin_newhdkey($pub);
+# CBitcoin::CBHD::print_to_stderr($hashxpub);
+my $base58_pub = CBitcoin::picocoin_base58_encode(
+	$hashxpub->{'serialized public'}.
+	substr(Digest::SHA::sha256(Digest::SHA::sha256($hashxpub->{'serialized public'})),0,4)
+);
 
-$hash = CBitcoin::CBHD::picocoin_generatehdkeychild($hash->{'serialized private'},12);
+ok($pub eq $base58_pub,'base58 encode xpub');
+
+
+# .........................................................
+$base58_pub = CBitcoin::picocoin_base58_encode(
+	$hash->{'serialized public'}.
+	substr(Digest::SHA::sha256(Digest::SHA::sha256($hash->{'serialized public'})),0,4)
+);
+
+ok($pub eq $base58_pub,'base58 encode xpub from xpriv');
+
+
+
+# .........................................................
+
+my $parenthash = CBitcoin::CBHD::picocoin_generatehdkeymaster("my super secret seed/password");
+
+my $privchildhash = CBitcoin::CBHD::picocoin_generatehdkeychild($parenthash->{'serialized private'},12);
 #warn "child with index=12:\n".CBitcoin::CBHD::print_to_stderr($hash);
 
+ok(
+	$privchildhash->{'success'} && $privchildhash->{'depth'} == 1 && $privchildhash->{'index'} == 12,
+	'get child with index=12'
+);
+
+$base58_priv = CBitcoin::picocoin_base58_encode(
+	$privchildhash->{'serialized public'}.
+	substr(Digest::SHA::sha256(Digest::SHA::sha256($privchildhash->{'serialized public'})),0,4)
+);
+
+# .........................................................
 
 
+my $fail_hash = CBitcoin::CBHD::picocoin_generatehdkeychild(
+	$parenthash->{'serialized private'}.'fjfjf',12
+);
 
-ok($hash->{'success'} && $hash->{'depth'} == 1 && $hash->{'index'} == 12, 'get child with index=12');
 
-my $fail_hash = CBitcoin::CBHD::picocoin_generatehdkeychild($hash->{'serialized private'}.'fjfjf',12);
+ok(!$fail_hash->{'success'},'Generate child with bad xpriv');
 
-ok(!$fail_hash->{'success'},'should fail');
+
+# .........................................................
+
+my $pubchildhash = CBitcoin::CBHD::picocoin_generatehdkeychild($parenthash->{'serialized public'},12);
+
+$base58_pub = CBitcoin::picocoin_base58_encode(
+	$pubchildhash->{'serialized public'}.
+	substr(Digest::SHA::sha256(Digest::SHA::sha256($pubchildhash->{'serialized public'})),0,4)
+);
+
+ok(
+	$pubchildhash->{'success'} && $base58_priv eq $base58_pub,
+	'Generate xpub child from xpub'
+);
+
 
 
 __END__
