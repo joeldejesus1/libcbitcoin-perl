@@ -3,7 +3,7 @@ use strict;
 use warnings;
 
 use CBitcoin ':network_bytes';
-use Test::More tests => 7;
+use Test::More tests => 12;
 
 
 require CBitcoin::CBHD;
@@ -91,7 +91,30 @@ ok(
 
 
 #################### test CBHD object ###########################
-
+{
+	my ($address,$h1,$s1,$s1s2);
+	
+	my $root1 = CBitcoin::CBHD->generate("my magic seed! 123456789012345678901234567890");
+	ok(defined $root1->address(),'can we get an address?');
+	
+	my $root2 = CBitcoin::CBHD->generate("my magic seed! 123456789012345678901234567890");
+	ok($root1->address() eq $root2->address(),'can we get the same address?');
+	
+	my $child_hard = $root1->deriveChild(1,323);
+	ok(!$child_hard->is_soft_child(),'get hard child');
+	
+	my $c_1_323_0_20_priv = $child_hard->deriveChild(0,20);
+	ok($c_1_323_0_20_priv->is_soft_child(),'get soft child');
+	
+	# 11 tests so far
+	my $c_1_323_0_20_0_13_priv = $child_hard->deriveChild(0,20)->deriveChild(0,13);
+	
+	my $c_1_323_0_20_0_13_pub = $c_1_323_0_20_priv->deriveChildPubExt(13);
+	ok(
+		$c_1_323_0_20_0_13_pub->address() eq $c_1_323_0_20_0_13_priv->address(),
+		'Do addresses match?'
+	);
+}
 
 
 

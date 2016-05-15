@@ -6,6 +6,7 @@ use strict;
 use warnings;
 
 use CBitcoin ':network_bytes';
+use CBitcoin::Script;
 
 =head1 NAME
 
@@ -169,14 +170,17 @@ sub deriveChild {
 	my ($this,$hardbool,$childid) = @_;
 	
 	my $childkey;
-	if($hardbool){
+	if($hardbool && defined $this->{'serialized private'}){
 		$childkey = picocoin_generatehdkeychild(
 			$this->{'serialized private'},
 			(2 << 31) + $childkey
 		);
 	}
+	elsif(defined $this->{'serialized private'}){
+		$childkey = picocoin_generatehdkeychild($this->{'serialized private'},$childid);
+	}
 	else{
-		$childkey = picocoin_generatehdkeychild($this->{'serialized private'},$childkey);
+		die "no private data";
 	}
 
 	if(!defined $childkey || !($childkey->{'success'})){
@@ -198,8 +202,6 @@ From Hard to Soft.
 
 sub deriveChildPubExt {
 	my ($this,$childid) = @_;
-	
-	my $childkey;
 	
 	# soft key so $childid < 2^31
 	my $childkey = picocoin_generatehdkeychild($this->{'serialized public'},$childid);
@@ -241,7 +243,7 @@ sub is_soft_child {
 		$this->{'is soft child'} = 0;
 	}
 	
-	return shift->{'is soft child'};
+	return $this->{'is soft child'};
 }
 
 
@@ -345,7 +347,7 @@ sub address {
 	
 	return $this->{'address'} if defined $this->{'address'};
 	
-	my $script = 'OP_DUP OP_HASH160 0x'.$this->{'ripemdHASH160'}
+	my $script = 'OP_DUP OP_HASH160 0x'.unpack('H*',$this->{'ripemdHASH160'})
 		.' OP_EQUALVERIFY OP_CHECKSIG';
 	
 	$this->{'address'} = CBitcoin::Script::script_to_address($script);
