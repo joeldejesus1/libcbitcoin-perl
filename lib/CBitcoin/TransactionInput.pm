@@ -134,6 +134,42 @@ sub sequence {
 	return shift->{'sequence'} || 0;
 }
 
+=pod
+
+---++ add_scriptSig($scriptSig)
+
+For checking the signature or making a signature, we need the script that gets transformed into scriptPubKey.
+
+=cut
+
+sub add_scriptSig {
+	my ($this,$script) = @_;
+	die "bad script" unless defined $script && 0 < length($script);
+	
+	$this->{'script Sig'} = CBitcoin::Script::serialize_script($script);
+	die "bad script 1" unless defined $this->{'script Sig'};
+	$this->{'script Sig'} = CBitcoin::Script::deserialize_script($this->{'script Sig'});
+	die "bad script 2" unless defined $this->{'script Sig'};
+	
+	return $this->{'script Sig'};
+}
+
+=pod
+
+---++ add_cbhdkey($cbhd_key)
+
+For making the signature, we need to add the $cbhd_key.
+
+=cut
+
+sub add_cbhdkey {
+	my ($this,$cbhdkey) = @_;
+	die "bad cbhd key" unless defined $cbhdkey && $cbhdkey->{'success'};
+	$this->{'cbhd key'} = $cbhdkey;
+	return $cbhdkey;
+}
+
+
 =head1 AUTHOR
 
 Joel De Jesus, C<< <dejesus.joel at e-flamingo.jp> >>
