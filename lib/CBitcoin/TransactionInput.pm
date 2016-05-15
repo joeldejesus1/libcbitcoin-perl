@@ -54,11 +54,9 @@ sub new {
 
 	my $x = shift;
 	unless(
-		defined ref($x) eq 'HASH' 
-		&& defined $x->{'script'} 
-		&& defined $x->{'prevOutHash'} 
-		&& defined $x->{'prevOutIndex'}
-		&& $x->{'prevOutIndex'} =~ m/^\d+$/
+		defined $x && ref($x) eq 'HASH' 
+		&& defined $x->{'script'} && defined $x->{'prevOutHash'} 
+		&& defined $x->{'prevOutIndex'} && $x->{'prevOutIndex'} =~ m/^\d+$/
 	){
 		return undef;
 	}

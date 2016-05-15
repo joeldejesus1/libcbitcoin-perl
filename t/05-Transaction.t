@@ -3,6 +3,7 @@ use warnings;
 
 use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
+use CBitcoin::Transaction;
 
 use Test::More tests => 1;
 
@@ -68,6 +69,12 @@ my @outs;
 
 
 ok(1,'hello');
+
+{
+	my $tx = CBitcoin::Transaction->new({
+		'inputs' => \@ins, 'outputs' => \@outs
+	});
+}
 
 
 __END__

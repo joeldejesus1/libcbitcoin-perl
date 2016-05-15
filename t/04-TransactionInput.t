@@ -2,12 +2,12 @@ use strict;
 use warnings;
 
 
-use Test::More tests => 1;
+use Test::More tests => 2;
 
 #require CBitcoin::Script;
 require CBitcoin::TransactionInput;
 
-ok(1,'hello');
+
 
 my @inputs = (
 	{
@@ -36,6 +36,7 @@ foreach my $in (@inputs){
 		,'prevOutIndex' => $in->{'index'}
 		,'script' => $in->{'script'} # scriptPubKey (after being turned into p2sh)
 	});
+	ok(defined $t_in,'tx inputs');
 	
 	
 }

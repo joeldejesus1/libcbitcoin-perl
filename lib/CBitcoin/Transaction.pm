@@ -24,7 +24,7 @@ require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::Transaction::VERSION = '0.2';
+$CBitcoin::Transaction::VERSION = '0.1';
 
 DynaLoader::bootstrap CBitcoin::Transaction $CBitcoin::Transaction::VERSION;
 
@@ -43,63 +43,47 @@ sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 =item new
 
----++ new()
+---++ new($options)
 
-By default, all non-p2pkh scripts are converted to p2sh.
+<verbatim>$options = {
+	'inputs' => \@txinputs, 'outputs' => \@txoutputs
+};</verbatim>
+
 
 =cut
 
 sub new {
-	use bigint;
 	my $package = shift;
 	my $this = bless({}, $package);
-	$this->{'inputs'} = [];
-	$this->{'outputs'} = [];
-	$this->{'original scripts'} = {};
-	$this->{'p2sh'} = 1 unless defined $this->{'p2sh'};
-	my $x = shift;
-	unless(ref($x) eq 'HASH'){
-		return $this;
-	}
-	if(defined $x->{'data'} && $x->{'data'} =~ m/^([0-9a-zA-Z]+)$/){
-		# we have a tx input which is serialized
-		$this->{'data'} = $x->{'data'};
-		# test to see if the data is valid
-	}
-	elsif(
-		defined $x->{'inputs'} && ref($x->{'inputs'}) eq 'ARRAY'
-		&& defined $x->{'outputs'} && ref($x->{'outputs'}) eq 'ARRAY'
+	my $options = shift;
+
+
+	if(
+		defined $options && ref($options) eq 'HASH'
+		&& defined $options->{'inputs'} && ref($options->{'inputs'}) eq 'ARRAY'
+		&& defined $options->{'outputs'} && ref($options->{'outputs'}) eq 'ARRAY'
 	){
-		# we have the data, let's get the serialized data
-		$x->{'lockTime'} ||= 0;
-		$x->{'version'} ||= 1;
-		my @inputs;
-		foreach my $i1 (@{$x->{'inputs'}}){
-			#warn "Input:".$i1->serialized_data."\n";			
-
-			push(@inputs,$i1->serialized_data);	
-
+		my ($n,$m,$i,$j);
+		
+		$j = 'inputs';
+		$n = scalar(@{$options->{$j}});
+		for($i=0;$i<$n;$i++){
+			die "bad type in $j with ref=".ref($options->{$j}->[$i]) 
+				unless ref($options->{$j}->[$i]) eq 'CBitcoin::TransactionInput';
+			$this->{$j}->[$i] = $options->{$j}->[$i];
 		}
-		my @outputs;
-		foreach my $i1 (@{$x->{'outputs'}}){
-			#warn "Output:".$i1->serialized_data."\n";
-			push(@outputs,$i1->serialized_data);
+
+		$j = 'outputs';
+		$n = scalar(@{$options->{$j}});
+		for($i=0;$i<$n;$i++){
+			die "bad type in $j with ref=".ref($options->{$j}->[$i]) 
+				unless ref($options->{$j}->[$i]) eq 'CBitcoin::TransactionOutput';
+			$this->{$j}->[$i] = $options->{$j}->[$i];
 		}
-		# char* create_tx_obj(int lockTime, int version, SV* inputs, SV* outputs, int numOfInputs, int numOfOutputs){
-		$this->{'data'} = create_tx_obj(
-			$x->{'lockTime'}
-			,$x->{'version'}
-			,\@inputs
-			,\@outputs
-			,scalar(@inputs)
-			,scalar(@outputs)
-		);
-		# make sure the data is properly formatted
-		$this->lockTime();
-		$this->version();
+			
 	}
 	else{
-		die "no arguments to create transaction";
+		die "bad inputs";
 	}
 	
 	
@@ -108,7 +92,7 @@ sub new {
 
 =pod
 
----++ deserialize($fh)
+---++ deserialize($serialized_tx)
 
 
 Get a hash back, not a blessed object.
@@ -124,141 +108,12 @@ output = {value, script}
 =cut
 
 sub deserialize{
-	my ($package,$fh) = @_;
-	my $shaobj = Digest::SHA->new(256);
-	my ($n,$buf,$count,$tx);
-	$n = read($fh,$buf,4);
-	die "not enough bytes to read tx" unless $n == 4;
-	$shaobj->add($buf);
-	$tx->{'version'} = unpack('l',$buf);
+	my ($package,$data) = @_;
 	
-	# get tx inputs
-	my $txin_count = CBitcoin::Utilities::deserialize_varint($fh);
-	$shaobj->add(CBitcoin::Utilities::serialize_varint($txin_count));
-	die "count is 0" unless 0 <=  $txin_count;
-
-	my @inputs;
-	if(0 < $txin_count){
-		for(my $i=0;$i < $txin_count;$i++){
-			my $txin;
-
-			$n = read($fh,$buf,32);
-			die "could not read tx" unless $n == 32;
-			$shaobj->add($buf);
-			$txin->{'prevHash'} = $buf;
-			
-			$n = read($fh,$buf,4);
-			die "could not read tx" unless $n == 4;
-			$shaobj->add($buf);
-			$txin->{'prevIndex'} = unpack('L',$buf);
-
-			# read script length
-			my $scriptlength = CBitcoin::Utilities::deserialize_varint($fh);
-			$shaobj->add(CBitcoin::Utilities::serialize_varint($scriptlength));
-			die "bad script length" unless 0 < $scriptlength;
-			
-			# read script
-			$n = read($fh,$buf,$scriptlength);
-			die "bad read of tx" unless $n == $scriptlength;
-			$shaobj->add($buf);
-			$txin->{'script'} = $buf;
-			
-			# read sequence
-			$n = read($fh,$buf,4);
-			die "bad read of tx" unless $n == 4;
-			$shaobj->add($buf);
-			$txin->{'sequence'} = $buf;			
-
-			push(@inputs,$txin);
-		}
-		
-	}
-	else{
-		die "tx has no inputs";
-	}
-	$tx->{'inputs'} = \@inputs;
 	
-	# read outputs
-	my $txout_count = CBitcoin::Utilities::deserialize_varint($fh);
-	$shaobj->add(CBitcoin::Utilities::serialize_varint($txout_count));
-	die "count is 0" unless 0 <=  $txout_count;
-	my @outputs;
-	if(0 < $txout_count){
-		for(my $i=0;$i < $txout_count;$i++){
-			my $txout;
-			# tx value
-			$n = read($fh,$buf,8);
-			die "not enough bytes" unless $n == 8;
-			$shaobj->add($buf);
-			$txout->{'value'} = unpack('q',$buf);
 
-			# script length
-			my $scriptlength = CBitcoin::Utilities::deserialize_varint($fh);
-			$shaobj->add(CBitcoin::Utilities::serialize_varint($scriptlength));
-			die "bad script length" unless 0 < $scriptlength;
-			
-			# read script
-			$n = read($fh,$buf,$scriptlength);
-			die "bad read of script of length=$scriptlength" unless $n == $scriptlength;
-			$shaobj->add($buf);
-	 		$txout->{'script'} = $buf;
-	 		
-	 		push(@outputs,$txout);
-		}
-	}
-	else{
-		die "tx has no outputs";
-	}
-	$tx->{'outputs'} = \@outputs;
-	
-	$n = read($fh,$buf,4);
-	die "bad locktime" unless $n == 4;
-	$shaobj->add($buf);
-	$tx->{'locktime'} = unpack('L',$buf);
-
-	$tx->{'hash'} = Digest::SHA::sha256($shaobj->digest());
-
-	return $tx;
+#	return $tx;
 }
-
-
-=pod
-
----++ original_script($txhash,$txid)->script
-
-=cut
-
-sub original_script{
-	my $this = shift;
-	my ($txid,$index) = @_;
-	die "no txid or index ($txid,$index)" unless
-		defined $txid && defined $index;
-	return $this->{'original scripts'}->{$txid.$index};	
-	
-}
-
-=item serialized_data
-
----++ serialized_data
-
-=cut
-
-sub serialized_data {
-	my $this = shift;
-	my $newdata = shift;
-	if(defined $newdata && $newdata =~ m/^([0-9a-zA-Z]+)$/){
-		$this->{'data'} = $newdata;
-		return $this->{'data'};
-	}
-	elsif(!(defined $newdata)){
-		return $this->{'data'};
-	}
-	else{
-		die "malformed serialized data";
-	}
-
-}
-
 
 
 
@@ -270,9 +125,7 @@ sub serialized_data {
 =cut
 
 sub lockTime {
-	my $this = shift;
-	# this is a C function
-	return get_lockTime_from_obj($this->{'data'});
+	return shift->{'lockTime'};
 }
 
 =item version
@@ -282,9 +135,7 @@ sub lockTime {
 =cut
 
 sub version {
-	my $this = shift;
-	# this is a C function
-	return get_version_from_obj($this->{'data'});
+	return shift->{'version'};
 }
 
 =item hash
@@ -294,8 +145,7 @@ sub version {
 =cut
 
 sub hash {
-	my $this = shift;
-	return hash_of_tx($this->{'data'});	
+	return shift->{'hash'};
 }
 
 
@@ -312,61 +162,6 @@ Sign the ith ($index) output with the private key corresponding to the inputs.  
 sub sign_single_input {
 	my $this = shift;
 	
-	my ($index,$keypair,$signtype) = @_;
-	
-	unless(defined $signtype){
-		$signtype = 'p2pkh';
-	}
-	
-	
-	unless($index =~ m/\d+/ && 0 <= $index && $index < $this->numOfInputs){
-		die "index is not in the proper range ($index).\n";
-	}
-	unless($keypair->address =~ m/^[0-9a-zA-Z]+$/){
-		die "keypair is not a CBitcoin::CBHD object.\n";
-	}
-	
-	unless($this->serialized_data()){
-		die "serialize the tx data first, before trying to sign prevOuts.\n";
-	}
-	my $OldData = $this->serialized_data();
-	
-	# get the input
-	my $prevOutInput = $this->input($index);
-	
-
-	my $script = $prevOutInput->script();
-	#my $address_type = CBitcoin::Script::address_type($script);
-	my $data;
-
-
-	if($signtype eq 'p2pkh'){
-		# this is a p2pkh script
-		$data = CBitcoin::Transaction::sign_tx_pubkeyhash(
-			$this->serialized_data()
-			,$keypair->serialized_data()
-			,$prevOutInput->script()
-			,$index
-			,'CB_SIGHASH_ALL'
-		);
-	}
-	elsif($signtype eq 'multisig'){
-		# do multisig with the OP_HASH160 0x3289gfedcabc OP_EQUALVERIFY	
-		$data = CBitcoin::Transaction::sign_tx_multisig(
-			$this->serialized_data()
-			,$keypair->serialized_data()
-			,$prevOutInput->script() 
-			,$index
-			,'CB_SIGHASH_ALL'
-		);
-	}
-	else{
-		die "unsupported script($script)";
-	}
-	# make sure that the new data contains something different
-	die "signature failed" if $data eq $OldData;
-	#warn "New Signature ($data)\n";
-	return $this->serialized_data($data);		
 }
 
 
@@ -376,27 +171,13 @@ sub sign_single_input {
 
 ---++ addRedeemScript($input_index,$script)
 
-This adds the redeem script to the end of the stack.
+This adds the redeem script to the end of the stack. (scriptSig in picocoin parlance)
 
 =cut
 
 sub add_redeem_script {
 	my $this = shift;
-	my ($index,$redeem_script) = @_;
-	die "no redeem script" unless defined $redeem_script;
-	die "bad index" unless defined $index
-		&& $index =~ m/^(\d+)$/ && $index < $this->numOfInputs();
 	
-	my $OldData = $this->serialized_data();
-	#warn "redeem - part 1\n";
-	my $data = CBitcoin::Transaction::addredeemscript(
-		$OldData
-		,$redeem_script
-		,$index
-	);
-	#warn "redeem - part 2\n";
-	die "adding p2sh redeeming script failed" if $data eq $OldData;
-	return $this->serialized_data($data);
 }
 
 
@@ -407,8 +188,7 @@ sub add_redeem_script {
 =cut
 
 sub numOfInputs {
-	my $this = shift;
-	return get_numOfInputs($this->{'data'});	
+	return scalar(@{shift->{'inputs'}});
 }
 
 =item input
@@ -418,13 +198,7 @@ sub numOfInputs {
 =cut
 
 sub input {
-	my $this = shift;
-	my $index = shift;
-	unless($index =~ m/\d+/ && $index >= 0 && $index < $this->numOfInputs() ){
-		die "index is not an integer or in the proper range\n";
-	}
-	# char* get_Input(char* serialized_dataString,int InputIndex)
-	return CBitcoin::TransactionInput->new({'data' => get_Input($this->{'data'},$index) });
+	return shift->{'inputs'}->[shift];
 }
 
 =item numOfOutputs
@@ -434,24 +208,17 @@ sub input {
 =cut
 
 sub numOfOutputs {
-	my $this = shift;
-	return get_numOfOutputs($this->{'data'});
+	return scalar(@{shift->{'outputs'}});
 }
 
-=item output
+=pod
 
----++ output
+---++ output($index)
 
 =cut
 
 sub output {
-	my $this = shift;
-	my $index = shift;
-	unless($index =~ m/\d+/ && $index >= 0 && $index < $this->numOfOutputs() ){
-		die "index is not an integer or in the proper range\n";
-	}
-	# char* get_Input(char* serialized_dataString,int InputIndex)
-	return CBitcoin::TransactionOutput->new({'data' => get_Output($this->{'data'},$index) });
+	return shift->{'output'}->[shift];
 }
 
 =head1 AUTHOR
