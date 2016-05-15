@@ -62,7 +62,26 @@ sub new {
 	){
 		return undef;
 	}
-
+	foreach my $col ('script','prevOutHash','prevOutIndex'){
+		$this->{$col} = $x->{$col};
+	}
+	
+	
+	if($this->type_of_script() eq 'multisig'){
+		$this->{'this is a p2sh'} = 1;
+		
+		# change the script to p2sh
+		my $x = $this->{'script'};
+		$x = CBitcoin::Script::script_to_address($x);
+		die "no valid script" unless defined $x;
+		$this->{'script'} = CBitcoin::Script::address_to_script($x);
+		die "no valid script" unless defined $x;
+	}
+	elsif($this->type_of_script() eq 'p2sh'){
+		$this->{'this is a p2sh'} = 1;
+		
+	}
+	
 	return $this;
 }
 

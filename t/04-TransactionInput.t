@@ -34,7 +34,7 @@ foreach my $in (@inputs){
 	my $t_in = CBitcoin::TransactionInput->new({
 		'prevOutHash' => pack('H*',$in->{'hash'}) #should be 32 byte hash
 		,'prevOutIndex' => $in->{'index'}
-		,'script' => CBitcoin::Script::serialize_script($in->{'script'}) # scriptPubKey
+		,'script' => $in->{'script'} # scriptPubKey (after being turned into p2sh)
 	});
 	
 	
