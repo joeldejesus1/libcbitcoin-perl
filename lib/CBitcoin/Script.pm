@@ -3,7 +3,7 @@ package CBitcoin::Script;
 use strict;
 use warnings;
 
-use CBitcoin;
+use CBitcoin ':network_bytes';
 
 =head1 NAME
 
@@ -101,14 +101,32 @@ Map prefixes to integer.
 See https://en.bitcoin.it/wiki/List_of_address_prefixes.
 
 =cut
+our $mapper_mainnet = {
+	'p2pkh' => 0x00, 'p2sh' => 0x05,
+	0x00 => 'p2pkh', 0x05 => 'p2sh'
+};
+
+our $mapper_testnet = {
+	'p2pkh' => 0x6F, 'p2sh' => 0xC4,
+	0x6F => 'p2pkh', 0xC4 => 'p2sh'
+};
+
 
 sub prefix {
 	my $type = shift;
 	
-	my $mapper = {
-		'p2pkh' => 0x00, 'p2sh' => 0x05,
-		0x00 => 'p2pkh', 0x05 => 'p2sh'
-	};
+	my $mapper;
+
+	if($CBitcoin::network_bytes eq MAINNET){
+		$mapper = $mapper_mainnet;
+	}
+	elsif($CBitcoin::network_bytes eq TESTNET){
+		$mapper = $mapper_testnet;
+	}
+	else{
+		die "bad network bytes";
+	}
+
 
 	if(defined $type && defined $mapper->{$type}){
 		return $mapper->{$type};
@@ -119,6 +137,32 @@ sub prefix {
 	
 }
 
+=pod
+
+---++ what_network_is_address()
+
+Are we on MAINNET ('production') or TESTNET ('test')?
+
+=cut
+
+sub what_network_is_address {
+	my $x = shift;
+	die "bad address" unless defined $x && 0 < length($x);
+	$x = CBitcoin::picocoin_base58_decode($x);
+	die "bad address" unless defined $x && 0 < length($x);
+	my $prefix = unpack('C',substr($x,0,1) );
+	
+	
+	if(defined $mapper_mainnet->{$prefix}){
+		return 'production';
+	}
+	elsif(defined $mapper_testnet->{$prefix}){
+		return 'test';
+	}
+	else{
+		return 'unknown';
+	}
+}
 
 =pod
 
@@ -133,6 +177,7 @@ sub address_to_script {
 	
 	die "bad address" unless defined $x && 0 < length($x);
 	$x = CBitcoin::picocoin_base58_decode($x);
+	die "bad address" unless defined $x && 0 < length($x);
 	
 	my $prefix = prefix(unpack('C',substr($x,0,1)));
 	my $hash = substr($x,1,20);

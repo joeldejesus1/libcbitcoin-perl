@@ -9,8 +9,10 @@
 
 #include <assert.h>
 #include <ccoin/base58.h>
+#include <openssl/ripemd.h>
 #include <openssl/err.h>
 #include <ccoin/cstr.h>
+#include <ccoin/util.h>
 
 #define MAIN_PUBLIC 0x1EB28804
 #define MAIN_PRIVATE 0xE4AD8804
@@ -78,6 +80,25 @@ HV* picocoin_returnhdkey(HV * rh, const struct hd_extended_key hdkey){
 		hv_store(rh, "serialized public", 17, newSVpv(m_xpub.data,78), 0);
 	}
 
+	// cstring* address = bp_pubkey_get_address(const struct bp_key *key, unsigned char addrtype);
+	
+	// get the public key
+	void *pubkey = NULL;
+	size_t pk_len = 0;
+	
+	if(bp_pubkey_get(&hdkey.key, &pubkey, &pk_len)){
+		hv_store(rh, "public key", 10, newSVpv(pubkey,pk_len), 0);
+		
+		uint8_t *pk2 = malloc(pk_len * sizeof(uint8_t));
+		memcpy(pk2,pubkey,pk_len);
+		// don't create address here because we need the network bytes
+		// do the network bytes in perl code, it is more convenient
+		uint8_t md160[RIPEMD160_DIGEST_LENGTH];
+		bu_Hash160(md160, pk2, pk_len);
+		free(pk2);
+		hv_store(rh, "ripemdHASH160", 13, newSVpv(md160,RIPEMD160_DIGEST_LENGTH), 0);
+	}
+	
 	//hd_extended_key_free(&hdkey);
 	return rh;
 }
@@ -108,15 +129,18 @@ HV* picocoin_newhdkey(SV* base58x){
 	return rh;
 }
 
-HV* picocoin_generatehdkeymaster(char* seed){
+HV* picocoin_generatehdkeymaster(SV* seed){
 	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
 		
+	STRLEN len; //calculated via SvPV
+	uint8_t * seed_raw = (uint8_t*) SvPV(seed,len);
+	
 	struct hd_extended_key hdkey;
 	if(!hd_extended_key_init(&hdkey)){
 		return picocoin_returnblankhdkey(rh);
 	}
 	
-	if(!hd_extended_key_generate_master(&hdkey, seed, sizeof(seed))){
+	if(!hd_extended_key_generate_master(&hdkey, seed_raw, len)){
 		return picocoin_returnblankhdkey(rh);
 	}
 	picocoin_returnhdkey(rh,hdkey);
@@ -170,7 +194,7 @@ picocoin_newhdkey(base58x)
 	
 HV*
 picocoin_generatehdkeymaster(seed)
-	char* seed
+	SV* seed
 
 HV*
 picocoin_generatehdkeychild(xpriv,child_index)

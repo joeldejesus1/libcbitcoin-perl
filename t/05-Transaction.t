@@ -1,6 +1,7 @@
 use strict;
 use warnings;
 
+use CBitcoin ':network_bytes';
 use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
 use CBitcoin::Transaction;
@@ -74,7 +75,12 @@ ok(1,'hello');
 	my $tx = CBitcoin::Transaction->new({
 		'inputs' => \@ins, 'outputs' => \@outs
 	});
+	
+	
+	
 }
+
+
 
 
 __END__

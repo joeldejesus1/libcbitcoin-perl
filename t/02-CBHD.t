@@ -2,9 +2,10 @@
 use strict;
 use warnings;
 
+use CBitcoin ':network_bytes';
 use Test::More tests => 7;
 
-require CBitcoin;
+
 require CBitcoin::CBHD;
 require Digest::SHA;
 require Data::Dumper;
@@ -87,6 +88,12 @@ ok(
 	$pubchildhash->{'success'} && $base58_priv eq $base58_pub,
 	'Generate xpub child from xpub'
 );
+
+
+#################### test CBHD object ###########################
+
+
+
 
 
 
