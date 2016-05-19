@@ -7,7 +7,7 @@ use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
 use CBitcoin::Transaction;
 
-use Test::More tests => 1;
+use Test::More tests => 3;
 
 my $root = CBitcoin::CBHD->generate("for doing a test. 60163bdd79e0b67b33eb07dd941af5dfd9ca79b85866c9d69993d95488e71f2d");
 
@@ -54,37 +54,41 @@ my @outputs;
 		{
 			'address' => '198Lb2wtUEMzAAMdxBjqhGsUPG1RkKFUgh'
 			,'script' => 'OP_DUP OP_HASH160 0x592444aa94e0d8a06442c73f2dc56c5c11de7c5b OP_EQUALVERIFY OP_CHECKSIG'
-			,'value' => 0.01032173*100000000
+			,'value' => 0.010173*100_000_000
 		}
 		,{
 			'address' => '1L9cXroh15fCoegiNqbsrxZg7wemc7a2r1'
 			,'script' => 'OP_DUP OP_HASH160 0xd20b60d4a931079074d43c92fc4686dc37ac5f7b OP_EQUALVERIFY OP_CHECKSIG'
-			,'value' => 0.01042172*100000000
+			,'value' => 0.010472*100_000_000
 		}
 	);
-	
-	foreach my $in (@outputs){
-		push(@outs,
-			CBitcoin::TransactionOutput->new({
-				'value' => $in->{'value'}
-				,'script' => $in->{'script'}
-			})
-		);
+	foreach my $x (@outputs){
+		push(@outs,CBitcoin::TransactionOutput->new($x));
 	}
 }
 
 
-ok(1,'hello');
 
 {
 	my $tx = CBitcoin::Transaction->new({
 		'inputs' => \@ins, 'outputs' => \@outs
 	});
-
-	for(my $i=0;$i< $tx->numOfInputs();$i++){
-		$tx->input($i)->add_cbhdkey($root->deriveChild(1,$i + 1));
-		$tx->input($i)->add_scriptSig($inputs[$i]->{'script'});
-	}
+	my $nIn = 0;
+	my $data = $tx->serialize();
+	#warn "TX:".unpack('H*',$data)."\n";
+	
+	ok(!$tx->validate('make me garbage'.$data),'should not be valid tx');
+	ok($tx->validate($data),'should be valid tx');
+	
+	ok($tx->sign_single_input_p2pkh($root->deriveChild(1,$nIn + 1),$nIn) eq 1, 'tx sign');
+	
+	
+	
+	#for(my $i=0;$i< $tx->numOfInputs();$i++){
+	#	$tx->input($i)->add_cbhdkey($root->deriveChild(1,$i + 1));
+		#$tx->input($i)->add_scriptSig($inputs[$i]->{'script'});
+	#}
+	
 	
 	
 }

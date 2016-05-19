@@ -289,6 +289,14 @@ sub export_xpiv {
 	return $this->{'xpriv'};
 }
 
+sub serialized_private {
+	return shift->{'serialized private'};
+}
+
+sub serialized_public {
+	return shift->{'serialized public'};
+}
+
 =pod
 
 ---++ network_bytes()

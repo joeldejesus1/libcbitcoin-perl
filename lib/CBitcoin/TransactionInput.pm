@@ -83,15 +83,28 @@ sub new {
 	return $this;
 }
 
-=item script
+=pod
 
 ---++ script
+
+AKA scriptPubKey
 
 =cut
 
 sub script {
 	return shift->{'script'};
 }
+
+=pod
+
+---++ scriptSig
+
+=cut
+
+sub scriptSig {
+	return shift->{'scriptSig'};
+}
+
 
 =item type_of_script
 
@@ -108,6 +121,8 @@ sub type_of_script {
 
 ---++ prevOutHash()
 
+This is packed.
+
 =cut
 
 sub prevOutHash {
@@ -117,6 +132,8 @@ sub prevOutHash {
 =item prevOutIndex
 
 ---++ prevOutIndex()
+
+Not packed.
 
 =cut
 
@@ -167,6 +184,29 @@ sub add_cbhdkey {
 	die "bad cbhd key" unless defined $cbhdkey && $cbhdkey->{'success'};
 	$this->{'cbhd key'} = $cbhdkey;
 	return $cbhdkey;
+}
+
+
+=pod
+
+---+ i/o
+
+=cut
+
+=pod
+
+---++ serialize
+
+=cut
+
+sub serialize {
+	my ($this) = @_;
+
+	# scriptSig
+	my $script = $this->scriptSig || '';
+	return $this->prevOutHash().pack('L',$this->prevOutIndex()).
+		CBitcoin::Utilities::serialize_varint(length($script)).$script.
+		pack('L',$this->sequence());
 }
 
 

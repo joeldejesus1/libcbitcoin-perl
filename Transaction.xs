@@ -20,7 +20,134 @@
 #include <ccoin/key.h>
 //#include <ccoin/compat.h>
 
+
+
+
+
 ////// extra
+struct hd_extended_key_serialized {
+	uint8_t data[78];
+};
+
+
+struct hd_extended_key * read_hdkey_from_SV(SV* hdkey_data){
+	STRLEN len; //calculated via SvPV
+	uint8_t * hdkey_pointer = (uint8_t*) SvPV(hdkey_data,len);
+	
+	if(len != 78)
+		return NULL;
+	
+	struct hd_extended_key_serialized hdkeyser;
+	//hdkeyser->data = calloc(78*sizeof(uint8_t));
+	memcpy(hdkeyser.data, hdkey_pointer, 78);
+	
+	struct hd_extended_key hdkey;
+	if(!hd_extended_key_init(&hdkey)){
+		//free(hdkeyser->data);
+		//free(hdkeyser);
+		return NULL;
+	}
+	
+	if(!hd_extended_key_deser(&hdkey, hdkeyser.data,78)){
+		//free(hdkeyser->data);
+		//free(hdkeyser);
+		hd_extended_key_free(&hdkey);
+		return NULL;
+	}
+	//free(hdkeyser->data);
+	//free(hdkeyser);
+	
+	return &hdkey;
+}
+
+
+////////// picocoin
+
+int picocoin_tx_validate (SV* txdata){
+	STRLEN len; //calculated via SvPV
+	uint8_t * txdata_pointer = (uint8_t*) SvPV(txdata,len);
+
+	
+	
+	struct const_buffer buf = { txdata_pointer, len };
+	
+	
+	struct bp_tx tx;
+	
+	bp_tx_init(&tx);
+	
+	
+	if(!deser_bp_tx(&tx,&buf)){
+		bp_tx_free(&tx);
+		return 0;
+	}
+	
+	if(!bp_tx_valid(&tx)){
+		bp_tx_free(&tx);
+		return 0;		
+	}
+
+	bp_tx_free(&tx);
+	return 1;
+}
+
+// SV* hdkey,
+int picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType){
+	struct hd_extended_key * hdkey = read_hdkey_from_SV(hdkey_data);
+	if(hdkey == NULL){
+		hd_extended_key_free(hdkey);
+		return 0;
+	}
+	
+	uint32_t nIn = (uint32_t) nIn;
+	
+	STRLEN len; //calculated via SvPV
+	uint8_t * txdata_pointer = (uint8_t*) SvPV(txdata,len);
+	struct const_buffer buf = { txdata_pointer, len };
+	struct bp_tx tx;
+	bp_tx_init(&tx);
+	// validate the transaction
+	if(!deser_bp_tx(&tx,&buf)){
+		bp_tx_free(&tx);
+		return 0;
+	}
+	
+	if(!bp_tx_valid(&tx)){
+		bp_tx_free(&tx);
+		return 0;		
+	}
+	
+	// for convenience reasons, change the name
+	struct bp_tx * txTo = &tx;
+	if (!txTo || !txTo->vin || nIn >= txTo->vin->len)
+			return false;
+	
+	STRLEN len_frompubkey; //calculated via SvPV
+	uint8_t * fromPubKey_pointer = (uint8_t*) SvPV(fromPubKey_data,len_frompubkey);
+	cstring frompubkey = { fromPubKey_pointer, len_frompubkey};
+	
+	bu256_t hash;
+	bp_tx_sighash(&hash, &frompubkey, txTo, nIn, nHashType);
+	
+	struct bp_txin *txin = parr_idx(txTo->vin, nIn);
+	// find the input
+	return 1;
+	
+	void *sig = NULL;
+	size_t siglen = 0;
+	if (!bp_sign(&hdkey->key, &hash, sizeof(hash), &sig, &siglen))
+		return 0;
+	uint8_t ch = (uint8_t) nHashType;
+	sig = realloc(sig, siglen + 1);
+	memcpy(sig + siglen, &ch, 1);
+	siglen++;
+	
+	// find out how to return the signature...
+	
+	bp_tx_free(&tx);
+	return 1;
+}
+
 
 
 SV* hello (SV* hdkeydata){
@@ -120,3 +247,16 @@ SV*
 picocoin_generate_rawtx(ins,outs)
 	SV* ins
 	SV* outs
+
+	
+int 
+picocoin_tx_validate(txdata)
+	SV* txdata
+
+int	
+picocoin_tx_sign_p2pkh(hdkey_data,fromPubKey_data,txdata,index,HashType)
+	SV* hdkey_data
+	SV* fromPubKey_data
+	SV* txdata
+	int index
+	int HashType

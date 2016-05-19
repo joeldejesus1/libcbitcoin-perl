@@ -2,6 +2,7 @@ package CBitcoin::TransactionOutput;
 
 use strict;
 use warnings;
+use bigint;
 
 =head1 NAME
 
@@ -14,6 +15,7 @@ Version 0.01
 =cut
 
 use CBitcoin::Script;
+use CBitcoin::Utilities;
 
 require Exporter;
 *import = \&Exporter::import;
@@ -40,15 +42,13 @@ sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 =cut
 
 sub new {
-	use bigint;
 	my $package = shift;
 	my $this = bless({}, $package);
-	
+
 	my $x = shift;
 	unless(ref($x) eq 'HASH'){
 		return $this;
 	}
-	
 	if(
 		defined $x->{'value'} && $x->{'value'} =~ m/^[0-9]+$/
 		&& defined $x->{'script'} && 0 < length($x->{'script'})
@@ -56,6 +56,7 @@ sub new {
 		# call this function to validate the data, and get serialized data back
 		# this is a C function
 		$this->{'value'} = $x->{'value'};
+		$this->{'script'} = $x->{'script'};
 	}
 	else{
 		die "no arguments to create Transaction::Output";
@@ -97,6 +98,27 @@ sub type_of_script {
 
 sub value {
 	return shift->{'value'};
+}
+
+=pod
+
+---+ i/o
+
+=cut
+
+=pod
+
+---++ serialize
+
+=cut
+
+sub serialize {
+	my ($this) = @_;
+
+	my $script = CBitcoin::Script::serialize_script($this->script);
+	die "bad script" unless defined $script;
+	
+	return pack('q',$this->value).CBitcoin::Utilities::serialize_varint(length($script)).$script;
 }
 
 =head1 AUTHOR

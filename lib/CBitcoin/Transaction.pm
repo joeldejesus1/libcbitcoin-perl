@@ -4,6 +4,13 @@ use 5.014002;
 use strict;
 use warnings;
 
+use constant {
+	SIGHASH_ALL => 0x00000001, # <--- this is the default
+	SIGHASH_NONE => 0x00000002,
+	SIGHASH_SINGLE => 0x00000003,
+	SIGHASH_ANYONECANPAY => 0x00000080
+};
+
 =head1 NAME
 
 CBitcoin::Transaction - The great new CBitcoin::Transaction!
@@ -39,7 +46,8 @@ Nothing to see here.
 
 sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
-
+our $default_version = 1;
+our $default_locktime = 0;
 
 =item new
 
@@ -54,7 +62,9 @@ sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 sub new {
 	my $package = shift;
-	my $this = bless({}, $package);
+	my $this = bless({
+		'version' => $default_version
+	}, $package);
 	my $options = shift;
 
 
@@ -85,6 +95,10 @@ sub new {
 	else{
 		die "bad inputs";
 	}
+	
+	
+	$this->{'lockTime'} = $default_locktime unless defined $this->{'lockTime'};
+	$this->{'version'} = $default_version unless defined $this->{'version'};
 	
 	
 	return $this;
@@ -148,25 +162,6 @@ sub hash {
 	return shift->{'hash'};
 }
 
-
-# signatures....
-
-=item sign_single_input
-
----+++ sign_single_input($index,$cbhdkey)
-
-Sign the ith ($index) output with the private key corresponding to the inputs.  The index starts from 0!!!!!
-
-=cut
-
-sub sign_single_input {
-	my $this = shift;
-	
-}
-
-
-
-
 =pod
 
 ---++ addRedeemScript($input_index,$script)
@@ -218,8 +213,101 @@ sub numOfOutputs {
 =cut
 
 sub output {
-	return shift->{'output'}->[shift];
+	return shift->{'outputs'}->[shift];
 }
+
+=pod
+
+---+ i/o
+
+=cut
+
+=pod
+
+---++ serialize
+
+4 	version 	int32_t 	Transaction data format version (note, this is signed)
+1+ 	tx_in count 	var_int 	Number of Transaction inputs
+41+ 	tx_in 	tx_in[] 	A list of 1 or more transaction inputs or sources for coins
+1+ 	tx_out count 	var_int 	Number of Transaction outputs
+9+ 	tx_out 	tx_out[] 	A list of 1 or more transaction outputs or destinations for coins 
+
+=cut
+
+sub serialize {
+	my ($this) = @_;
+	
+	my $data = pack('l',$this->version);
+	
+	$data .= CBitcoin::Utilities::serialize_varint($this->numOfInputs);
+	for(my $i=0;$i<$this->numOfInputs;$i++){
+		$data .= $this->input($i)->serialize();
+	}
+	
+	$data .= CBitcoin::Utilities::serialize_varint($this->numOfOutputs);
+	for(my $i=0;$i<$this->numOfOutputs;$i++){
+		$data .= $this->output($i)->serialize();
+	}
+	
+	$data .= pack('L',$this->lockTime);
+	
+	return $data;
+}
+
+
+=pod
+
+---++ validate($data)
+
+=cut
+
+sub validate{
+	my ($this,$data) = @_;
+	die "no data provided" unless defined $data && 0 < length($data);
+	
+	return picocoin_tx_validate($data);
+
+}
+
+=pod
+
+---++ sign_single_input_p2pkh($key,$index)
+
+https://en.bitcoin.it/wiki/OP_CHECKSIG - has the hash type explanantion
+| SIGHASH_ALL | 0x00000001 |
+| SIGHASH_NONE | 0x00000002 |
+| SIGHASH_SINGLE | 0x00000003 |
+| SIGHASH_ANYONECANPAY | 0x00000080 | 
+
+=cut
+
+
+
+sub sign_single_input_p2pkh {
+	my ($this,$cbhdkey,$i) = @_;
+	
+	die "bad key" unless defined $cbhdkey && ref($cbhdkey) =~ m/CBHD/;
+	
+	my $xpriv = $cbhdkey->serialized_private();
+	die "bad key" unless defined $xpriv && length($xpriv) == 78;
+	
+	die "bad index" unless defined $i && 0 <= $i && $i < $this->numOfInputs();
+	
+	# SV* fromPubKey_data, SV* txdata,int nIndex, int HashType
+	my $script = CBitcoin::Script::serialize_script($this->input($i)->script());
+	my $data = $this->serialize();
+	
+	return picocoin_tx_sign_p2pkh(
+		$cbhdkey->serialized_private(),
+		$script,
+		$data,
+		$i,
+		SIGHASH_ALL
+	);
+	
+}
+
+
 
 =head1 AUTHOR
 
