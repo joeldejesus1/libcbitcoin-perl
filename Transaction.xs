@@ -33,7 +33,7 @@ struct hd_extended_key_serialized {
 
 ////////// picocoin
 
-int picocoin_tx_validate (SV* txdata){
+int picocoin_tx_validate ( SV* txdata){
 	STRLEN len; //calculated via SvPV
 	uint8_t * txdata_pointer = (uint8_t*) SvPV(txdata,len);
 
@@ -56,13 +56,96 @@ int picocoin_tx_validate (SV* txdata){
 		bp_tx_free(&tx);
 		return 0;		
 	}
-
 	bp_tx_free(&tx);
+	return 1;
+	//bp_script_verify(txin->scriptSig, txout->scriptPubKey,txTo, nIn, flags, nHashType)
+/*	
+	unsigned int flags;
+	if(sigvalidate == 1){
+		flags = SCRIPT_VERIFY_NONE;
+	}
+	else if(sigvalidate == 2){
+		flags = SCRIPT_VERIFY_STRICTENC;
+	}
+	else if(sigvalidate == 3){
+		flags = SCRIPT_VERIFY_P2SH;
+	}
+	else if(sigvalidate == 4){
+		flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC;
+	}
+	else{
+		sighash = 0;
+	}
+	// bp_script_verify(txin->scriptSig, txout->scriptPubKey,txTo, nIn, flags, nHashType)
+	int i;
+	for(i=0;i<txTo->vin->len;i++){
+		struct bp_txin *txin = parr_idx(txTo->vin, nIn);
+		if(!bp_script_verify(txin->scriptSig, txout->scriptPubKey,txTo, nIn, flags, nHashType)){
+			i = txTo->vin->len + 1;
+		}
+	}
+	
+*/
+}
+
+
+int picocoin_tx_validate_input (
+		int index, SV* scriptPubKey_data, SV* txdata,int sigvalidate, int nHashType
+){
+	// deserialize scriptPubKey (from txFrom->vout)
+	STRLEN len_spk; 
+	uint8_t * spk_pointer = (uint8_t*) SvPV(scriptPubKey_data,len_spk);
+	cstring * scriptPubKey = cstr_new_buf((const void*) spk_pointer, (size_t) len_spk);
+	// deserialize transaction
+	STRLEN len; //calculated via SvPV
+	uint8_t * txdata_pointer = (uint8_t*) SvPV(txdata,len);
+	struct const_buffer buf = { txdata_pointer, len };
+	struct bp_tx tx;
+	bp_tx_init(&tx);
+
+	if(!deser_bp_tx(&tx,&buf)){
+		bp_tx_free(&tx);
+		cstr_free(scriptPubKey,true);
+		return 0;
+	}
+
+	if(!bp_tx_valid(&tx)){
+		bp_tx_free(&tx);
+		cstr_free(scriptPubKey,true);
+		return 0;		
+	}
+	unsigned int nIn = (unsigned int) index;
+	
+	
+	unsigned int flags;
+	if(sigvalidate == 1){
+		flags = SCRIPT_VERIFY_STRICTENC;
+	}
+	else if(sigvalidate == 2){
+		flags = SCRIPT_VERIFY_P2SH;
+	}
+	else if(sigvalidate == 3){
+		flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC;
+	}
+	else{
+		flags = SCRIPT_VERIFY_NONE;
+	}
+	// bp_script_verify(txin->scriptSig, txout->scriptPubKey,txTo, nIn, flags, nHashType)
+	struct bp_txin *txin = parr_idx(tx.vin, nIn);
+	
+	if(!bp_script_verify(txin->scriptSig, scriptPubKey, &tx, nIn, flags, nHashType)){
+		bp_tx_free(&tx);
+		cstr_free(scriptPubKey,true);
+		return 0;
+	}
+	
+	bp_tx_free(&tx);
+	cstr_free(scriptPubKey,true);
 	return 1;
 }
 
 
-SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType){
+SV* picocoin_tx_sign(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType){
 	
 	////////////// import hdkey ////////////////////////////
 	STRLEN len_hdkey; //calculated via SvPV
@@ -125,7 +208,6 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 	if (!bp_sign(&hdkey.key, &hash, sizeof(*&hash), &sig, &siglen))
 		return picocoin_returnblankSV();
 	
-	
 	uint8_t ch = (uint8_t) nHashType;
 	sig = realloc(sig, siglen + 1);
 	memcpy(sig + siglen, &ch, 1);
@@ -157,14 +239,20 @@ MODULE = CBitcoin::Transaction	PACKAGE = CBitcoin::Transaction
 
 PROTOTYPES: DISABLED
 
-
-	
 int 
 picocoin_tx_validate(txdata)
 	SV* txdata
+	
+int 
+picocoin_tx_validate_input(index,scriptPubKey_data,txdata,sigvalidate,nHashType)
+	int index
+	SV* scriptPubKey_data
+	SV* txdata
+	int sigvalidate
+	int nHashType
 
 SV*	
-picocoin_tx_sign_p2pkh(hdkey_data,fromPubKey_data,txdata,index,HashType)
+picocoin_tx_sign(hdkey_data,fromPubKey_data,txdata,index,HashType)
 	SV* hdkey_data
 	SV* fromPubKey_data
 	SV* txdata

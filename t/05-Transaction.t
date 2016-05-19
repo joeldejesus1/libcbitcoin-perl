@@ -7,7 +7,9 @@ use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
 use CBitcoin::Transaction;
 
-use Test::More tests => 3;
+use Test::More tests => 4;
+
+$CBitcoin::network_bytes = TESTNET;
 
 my $root = CBitcoin::CBHD->generate("for doing a test. 60163bdd79e0b67b33eb07dd941af5dfd9ca79b85866c9d69993d95488e71f2d");
 
@@ -37,8 +39,11 @@ my @outputs;
 		}
 	);
 	
+	my $i = 1;
 	foreach my $in (@inputs){
-
+		my $address = CBitcoin::Script::script_to_address($in->{'script'});
+		# warn "Address=".$root->deriveChild(1,$i)->address()."\n";
+		$i++;
 		push(@ins,CBitcoin::TransactionInput->new({
 			'prevOutHash' => pack('H*',$in->{'hash'}) #should be 32 byte hash
 			,'prevOutIndex' => $in->{'index'}
@@ -77,21 +82,30 @@ my @outputs;
 	my $data = $tx->serialize();
 	#warn "TX:".unpack('H*',$data)."\n";
 	
-	ok(!$tx->validate('make me garbage'.$data),'should not be valid tx');
-	ok($tx->validate($data),'should be valid tx');
-	my $signature = $tx->sign_single_input_p2pkh($root->deriveChild(1,$nIn + 1),$nIn);
+	ok(!$tx->validate_syntax('make me garbage'.$data),'should not be valid tx');
+	ok($tx->validate_syntax($data),'should be valid tx');
+	
+	
+	for(my $j=0;$j<scalar(@inputs);$j++){
+		$tx->assemble_p2pkh($j,$root->deriveChild(1,$j + 1));
+	}
+	
+	# my $full = $tx->serialize();
+	
+	my $signature = $tx->calculate_signature($nIn,$root->deriveChild(1,$nIn + 1));
 	ok(65 < length($signature), 'tx signature is not long enough');
 	
 	
+	
+	ok($tx->validate_sigs() ,' is the signed transaction valid?');
 	
 	#for(my $i=0;$i< $tx->numOfInputs();$i++){
 	#	$tx->input($i)->add_cbhdkey($root->deriveChild(1,$i + 1));
 		#$tx->input($i)->add_scriptSig($inputs[$i]->{'script'});
 	#}
 	
-	
-	
 }
+
 
 
 

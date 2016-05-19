@@ -163,12 +163,9 @@ sub add_scriptSig {
 	my ($this,$script) = @_;
 	die "bad script" unless defined $script && 0 < length($script);
 	
-	$this->{'script Sig'} = CBitcoin::Script::serialize_script($script);
-	die "bad script 1" unless defined $this->{'script Sig'};
-	$this->{'script Sig'} = CBitcoin::Script::deserialize_script($this->{'script Sig'});
-	die "bad script 2" unless defined $this->{'script Sig'};
+	$this->{'scriptSig'} = $script;
 	
-	return $this->{'script Sig'};
+	return $this->{'scriptSig'};
 }
 
 =pod

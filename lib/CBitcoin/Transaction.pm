@@ -8,7 +8,11 @@ use constant {
 	SIGHASH_ALL => 0x00000001, # <--- this is the default
 	SIGHASH_NONE => 0x00000002,
 	SIGHASH_SINGLE => 0x00000003,
-	SIGHASH_ANYONECANPAY => 0x00000080
+	SIGHASH_ANYONECANPAY => 0x00000080,
+	
+	OP_PUSHDATA1 => 0x4c,
+	OP_PUSHDATA2 => 0x4d,
+	OP_PUSHDATA4 => 0x4e
 };
 
 =head1 NAME
@@ -224,24 +228,22 @@ sub output {
 
 =pod
 
----++ serialize
-
-4 	version 	int32_t 	Transaction data format version (note, this is signed)
-1+ 	tx_in count 	var_int 	Number of Transaction inputs
-41+ 	tx_in 	tx_in[] 	A list of 1 or more transaction inputs or sources for coins
-1+ 	tx_out count 	var_int 	Number of Transaction outputs
-9+ 	tx_out 	tx_out[] 	A list of 1 or more transaction outputs or destinations for coins 
+---++ serialize($raw_bool)
 
 =cut
 
 sub serialize {
-	my ($this) = @_;
+	my ($this,$raw_bool) = @_;
+	
+	if($raw_bool && defined $this->{'serialized raw'}){
+		return $this->{'serialized raw'};
+	}
 	
 	my $data = pack('l',$this->version);
 	
 	$data .= CBitcoin::Utilities::serialize_varint($this->numOfInputs);
 	for(my $i=0;$i<$this->numOfInputs;$i++){
-		$data .= $this->input($i)->serialize();
+		$data .= $this->input($i)->serialize($raw_bool);
 	}
 	
 	$data .= CBitcoin::Utilities::serialize_varint($this->numOfOutputs);
@@ -251,9 +253,12 @@ sub serialize {
 	
 	$data .= pack('L',$this->lockTime);
 	
+	if($raw_bool && !(defined $this->{'serialized raw'})){
+		$this->{'serialized raw'} = $data;
+	}
+	
 	return $data;
 }
-
 
 =pod
 
@@ -263,17 +268,55 @@ https://en.bitcoin.it/w/images/en/7/70/Bitcoin_OpCheckSig_InDetail.png
 
 =cut
 
-sub validate{
-	my ($this,$data) = @_;
+sub validate_syntax{
+	my ($this,$data,$full) = @_;
 	die "no data provided" unless defined $data && 0 < length($data);
-	
-	return picocoin_tx_validate($data);
 
+	if($full){
+		
+		return $this->validate_full($data,@_);
+	}
+	else{
+		return picocoin_tx_validate($data);
+	}
+	
 }
 
 =pod
 
----++ sign_single_input_p2pkh($key,$index)
+---++ validate_sigs($data)
+
+https://en.bitcoin.it/w/images/en/7/70/Bitcoin_OpCheckSig_InDetail.png
+
+SCRIPT_VERIFY_NONE -> 1
+SCRIPT_VERIFY_STRICTENC -> 2
+SCRIPT_VERIFY_P2SH -> 3
+SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC -> 4
+=cut
+
+sub validate_sigs {
+	my ($this) = @_;
+	
+	# picocoin_tx_validate_input int index, SV* scriptPubKey_data,
+	#    SV* txdata,int sigvalidate, int nHashType
+
+	my $bool = 1;
+	for(my $i=0;$i<$this->numOfInputs;$i++){
+		$bool = picocoin_tx_validate_input(
+			$i
+			, $this->input($i)->script() # scriptPubKey
+			, $this->serialize()  # includes scriptSig
+			, 0 # sigvalidate
+			, SIGHASH_ALL # default;
+		);
+		return 0 unless $bool;
+	}
+	return 1;
+}
+
+=pod
+
+---++ calculate_signature($key,$index)
 
 https://en.bitcoin.it/wiki/OP_CHECKSIG - has the hash type explanantion
 | SIGHASH_ALL | 0x00000001 |
@@ -285,8 +328,8 @@ https://en.bitcoin.it/wiki/OP_CHECKSIG - has the hash type explanantion
 
 
 
-sub sign_single_input_p2pkh {
-	my ($this,$cbhdkey,$i) = @_;
+sub calculate_signature {
+	my ($this,$i,$cbhdkey) = @_;
 	
 	die "bad key" unless defined $cbhdkey && ref($cbhdkey) =~ m/CBHD/;
 	
@@ -297,9 +340,9 @@ sub sign_single_input_p2pkh {
 	
 	# SV* fromPubKey_data, SV* txdata,int nIndex, int HashType
 	my $script = CBitcoin::Script::serialize_script($this->input($i)->script());
-	my $data = $this->serialize();
+	my $data = $this->serialize(1); # 1 for raw_bool=TRUE
 	
-	return picocoin_tx_sign_p2pkh(
+	return picocoin_tx_sign(
 		$cbhdkey->serialized_private(),
 		$script,
 		$data,
@@ -308,6 +351,86 @@ sub sign_single_input_p2pkh {
 	);
 }
 
+
+=pod
+
+---++ assemble_multisig_p2sh($i,$n,@keys)
+
+=cut
+
+sub assemble_multisig_p2sh {
+	my ($this,$i,$n,@keys) = @_;
+	# do some testing
+	die "bad index" unless defined $i && 0 <= $i && $i < $this->numOfInputs();
+	
+	die "bad multisig params" unless
+		defined $n && 0 < $n && $n < 15
+		&& 0 < scalar(@keys) && scalar(@keys) <= $n;
+	my $m = scalar(@keys);
+	
+	# grab all the sigs
+	my @sigs;
+	foreach my $key (@keys){
+		push(@sigs,$this->calculate_signature($i,$key));
+		die "bad signature" unless defined $sigs[-1] && 0 < length($sigs[-1]);
+	}
+	# OP_PUSHDATA1
+}
+
+
+=pod
+
+---++ assemble_p2pkh($i,$key)
+
+=cut
+
+sub assemble_p2pkh {
+	my ($this,$i,$key) = @_;
+	# do some testing
+	die "bad index" unless defined $i && 0 <= $i && $i < $this->numOfInputs();
+	
+	die "no key" unless defined $key;
+	
+	my $sig = $this->calculate_signature($i,$key);
+	die "bad signature" unless defined $sig && 0 < length($sig);
+	$this->input($i)->add_scriptSig(
+		push_data($sig).push_data($key->publickey())
+	);
+}
+
+
+=pod
+
+---+ utilities
+
+=cut
+
+=pod
+
+---++ push_data($data)->$adddata
+
+
+=cut
+
+sub push_data{
+	my ($data) = @_;
+	return undef unless defined $data && 0 < length($data);
+	my $n = length($data);
+	
+	
+	if($n < OP_PUSHDATA1){
+		return pack('C',$n).$data;
+	}
+	elsif($n <= 0xff){
+		return pack('C',OP_PUSHDATA1).pack('C',$n).$data;
+	}
+	elsif($n <= 0xffff){
+		return pack('C',OP_PUSHDATA2).pack('S',$n).$data;
+	}
+	else{
+		return pack('C',OP_PUSHDATA4).pack('L',$n).$data;
+	}
+}
 
 
 =head1 AUTHOR
