@@ -30,36 +30,6 @@ struct hd_extended_key_serialized {
 };
 
 
-struct hd_extended_key * read_hdkey_from_SV(SV* hdkey_data){
-	STRLEN len; //calculated via SvPV
-	uint8_t * hdkey_pointer = (uint8_t*) SvPV(hdkey_data,len);
-	
-	if(len != 78)
-		return NULL;
-	
-	struct hd_extended_key_serialized hdkeyser;
-	//hdkeyser->data = calloc(78*sizeof(uint8_t));
-	memcpy(hdkeyser.data, hdkey_pointer, 78);
-	
-	struct hd_extended_key hdkey;
-	if(!hd_extended_key_init(&hdkey)){
-		//free(hdkeyser->data);
-		//free(hdkeyser);
-		return NULL;
-	}
-	
-	if(!hd_extended_key_deser(&hdkey, hdkeyser.data,78)){
-		//free(hdkeyser->data);
-		//free(hdkeyser);
-		hd_extended_key_free(&hdkey);
-		return NULL;
-	}
-	//free(hdkeyser->data);
-	//free(hdkeyser);
-	
-	return &hdkey;
-}
-
 
 ////////// picocoin
 
@@ -91,14 +61,29 @@ int picocoin_tx_validate (SV* txdata){
 	return 1;
 }
 
-// SV* hdkey,
-int picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType){
-	struct hd_extended_key * hdkey = read_hdkey_from_SV(hdkey_data);
-	if(hdkey == NULL){
-		hd_extended_key_free(hdkey);
-		return 0;
+
+SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType){
+	
+	////////////// import hdkey ////////////////////////////
+	STRLEN len_hdkey; //calculated via SvPV
+	uint8_t * hdkey_pointer = (uint8_t*) SvPV(hdkey_data,len_hdkey);
+	if(len_hdkey != 78)
+		return picocoin_returnblankSV();
+	struct hd_extended_key_serialized hdkeyser;
+	//hdkeyser->data = calloc(78*sizeof(uint8_t));
+	memcpy(hdkeyser.data, hdkey_pointer, 78);
+	struct hd_extended_key hdkey;
+	if(!hd_extended_key_init(&hdkey)){
+		return picocoin_returnblankSV();
+	}
+	if(!hd_extended_key_deser(&hdkey, hdkeyser.data,78)){
+		//free(hdkeyser->data);
+		//free(hdkeyser);
+		hd_extended_key_free(&hdkey);
+		return picocoin_returnblankSV();
 	}
 	
+	///////////// import tx //////////////////
 	uint32_t nIn = (uint32_t) nIn;
 	
 	STRLEN len; //calculated via SvPV
@@ -109,18 +94,18 @@ int picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 	// validate the transaction
 	if(!deser_bp_tx(&tx,&buf)){
 		bp_tx_free(&tx);
-		return 0;
+		return picocoin_returnblankSV();
 	}
 	
 	if(!bp_tx_valid(&tx)){
 		bp_tx_free(&tx);
-		return 0;		
+		return picocoin_returnblankSV();		
 	}
 	
 	// for convenience reasons, change the name
 	struct bp_tx * txTo = &tx;
 	if (!txTo || !txTo->vin || nIn >= txTo->vin->len)
-			return false;
+			return picocoin_returnblankSV();
 	
 	STRLEN len_frompubkey; //calculated via SvPV
 	uint8_t * fromPubKey_pointer = (uint8_t*) SvPV(fromPubKey_data,len_frompubkey);
@@ -131,98 +116,31 @@ int picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 	
 	struct bp_txin *txin = parr_idx(txTo->vin, nIn);
 	// find the input
-	return 1;
 	
+	///////////////////////// do signature //////////////////////////
 	void *sig = NULL;
 	size_t siglen = 0;
-	if (!bp_sign(&hdkey->key, &hash, sizeof(hash), &sig, &siglen))
-		return 0;
+	struct bp_key privateKey = hdkey.key;
+	
+	if (!bp_sign(&hdkey.key, &hash, sizeof(*&hash), &sig, &siglen))
+		return picocoin_returnblankSV();
+	
+	
 	uint8_t ch = (uint8_t) nHashType;
 	sig = realloc(sig, siglen + 1);
 	memcpy(sig + siglen, &ch, 1);
 	siglen++;
+	//fprintf(stderr,"hello(%d)(%s)",siglen,sig);
 	
-	// find out how to return the signature...
-	
+	cstring * scriptSig = cstr_new_sz(0);
+	bsp_push_data(scriptSig, sig, siglen);
+	//sprintf("%s",ans->str);
+	hd_extended_key_free(&hdkey);
 	bp_tx_free(&tx);
-	return 1;
-}
-
-
-
-SV* hello (SV* hdkeydata){
-	STRLEN len; //calculated via SvPV
-	uint8_t * hdkeydata_pointer = (uint8_t*) SvPV(hdkeydata,len);
+	free(sig);
+	return newSVpv(scriptSig->str,scriptSig->len);
 	
-	struct bp_keystore *ks;
-	bkeys_init(ks);
-	
-	struct hd_extended_key *hdkey;
-	hd_extended_key_init(hdkey);
-	if(!hd_extended_key_deser(hdkey, hdkeydata_pointer,len)){
-		hd_extended_key_free(hdkey);
-		bkeys_free(ks);
-		// returnblank defined in Script.xs
-		return picocoin_returnblankSV();
-	}
-	
-	if(!bkeys_add(ks, &hdkey->key)){
-		hd_extended_key_free(hdkey);
-		bkeys_free(ks);
-		return picocoin_returnblankSV();
-	}
-	
-	bkeys_free(ks);
-}
 
-
-SV* picocoin_generate_rawtx(SV* txinputs_array, SV* txoutputs_array){
-	int n;
-	
-	
-	I32 txinputs_length = 0;
-    if (
-    	(! SvROK(txinputs_array))
-    	|| (SvTYPE(SvRV(txinputs_array)) != SVt_PVAV)
-    	|| ((txinputs_length = av_len((AV *)SvRV(txinputs_array))) < 0)
-    ){
-        return picocoin_returnblankSV();
-    }
-    
-	for (n=0; n<=txinputs_length; n++) {
-		STRLEN l;
-
-		uint8_t * fn = SvPV (*av_fetch ((AV *) SvRV (txinputs_array), n, 0), l);
-		
-		// fn    length
-		
-	}
-	
-	I32 txoutputs_length = 0;
-    if (
-    	(! SvROK(txoutputs_array))
-    	|| (SvTYPE(SvRV(txoutputs_array)) != SVt_PVAV)
-    	|| ((txoutputs_length = av_len((AV *)SvRV(txoutputs_array))) < 0)
-    ){
-        return picocoin_returnblankSV();
-    }
-    //uint8_t** multisig = (uint8_t**)malloc(nKeysInt * sizeof(uint8_t*));
-    
-	for (n=0; n<=txoutputs_length; n++) {
-		STRLEN l;
-
-		uint8_t * fn = SvPV (*av_fetch ((AV *) SvRV (txoutputs_array), n, 0), l);
-		
-		// fn    length
-		
-	}
-    
-}
-
-
-
-int dummy5(int x) {
-	return x;
 }
 
 /*
@@ -239,21 +157,13 @@ MODULE = CBitcoin::Transaction	PACKAGE = CBitcoin::Transaction
 
 PROTOTYPES: DISABLED
 
-int
-dummy5(x)
-	int x
-	
-SV*
-picocoin_generate_rawtx(ins,outs)
-	SV* ins
-	SV* outs
 
 	
 int 
 picocoin_tx_validate(txdata)
 	SV* txdata
 
-int	
+SV*	
 picocoin_tx_sign_p2pkh(hdkey_data,fromPubKey_data,txdata,index,HashType)
 	SV* hdkey_data
 	SV* fromPubKey_data

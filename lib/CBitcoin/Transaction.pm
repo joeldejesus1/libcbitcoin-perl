@@ -259,6 +259,8 @@ sub serialize {
 
 ---++ validate($data)
 
+https://en.bitcoin.it/w/images/en/7/70/Bitcoin_OpCheckSig_InDetail.png
+
 =cut
 
 sub validate{
@@ -304,7 +306,6 @@ sub sign_single_input_p2pkh {
 		$i,
 		SIGHASH_ALL
 	);
-	
 }
 
 

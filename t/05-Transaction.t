@@ -79,8 +79,8 @@ my @outputs;
 	
 	ok(!$tx->validate('make me garbage'.$data),'should not be valid tx');
 	ok($tx->validate($data),'should be valid tx');
-	
-	ok($tx->sign_single_input_p2pkh($root->deriveChild(1,$nIn + 1),$nIn) eq 1, 'tx sign');
+	my $signature = $tx->sign_single_input_p2pkh($root->deriveChild(1,$nIn + 1),$nIn);
+	ok(65 < length($signature), 'tx signature is not long enough');
 	
 	
 	
