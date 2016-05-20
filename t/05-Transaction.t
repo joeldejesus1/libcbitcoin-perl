@@ -7,7 +7,7 @@ use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
 use CBitcoin::Transaction;
 
-use Test::More tests => 4;
+use Test::More tests => 1;
 
 $CBitcoin::network_bytes = TESTNET;
 
@@ -116,10 +116,11 @@ my @outputs;
 	});
 	
 	my $txdata = $tx->assemble_p2pkh(0,$root->deriveChild(1,1));
-	warn "Txdata:".unpack('H*',$txdata)."\n";
+	#warn "Txdata:".unpack('H*',$txdata)."\n";
 	$txdata = $tx->assemble_p2pkh(1,$root->deriveChild(1,2),$txdata);
 	
-	warn "TX:".unpack('H*',$txdata )."\n";
+	#warn "TX:".unpack('H*',$txdata )."\n";
+	ok($tx->validate_sigs($txdata),'good tx');
 }
 
 

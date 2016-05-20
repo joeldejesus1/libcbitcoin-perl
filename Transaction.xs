@@ -167,7 +167,7 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 	
 	///////////// import tx //////////////////
 	uint32_t nIn = (uint32_t) nIndex;
-	fprintf(stderr,"Index1=%d\n",nIn);
+	//fprintf(stderr,"Index1=%d\n",nIn);
 	STRLEN len; //calculated via SvPV
 	uint8_t * txdata_pointer = (uint8_t*) SvPV(txdata,len);
 	struct const_buffer buf = { txdata_pointer, len };
@@ -215,11 +215,8 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 		hd_extended_key_free(&hdkey);
 		return picocoin_returnblankSV();		
 	}
-	fprintf(stderr,"Index2=%d\n",nIn);
-	if(nIn == 1){
-		struct bp_txin *txinalpha = parr_idx(txTo->vin, 0);
-		fprintf(stderr,"size=%d\n",txinalpha->scriptSig->len);
-	}
+	//fprintf(stderr,"Index2=%d\n",nIn);
+
 	
 	
 	uint8_t ch = (uint8_t) nHashType;

@@ -295,17 +295,24 @@ SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC -> 4
 =cut
 
 sub validate_sigs {
-	my ($this) = @_;
+	my ($this,$data) = @_;
 	
 	# picocoin_tx_validate_input int index, SV* scriptPubKey_data,
 	#    SV* txdata,int sigvalidate, int nHashType
-
+	my $txdata;
+	if(defined $data){
+		$txdata = $data;
+	}
+	else{
+		$txdata = $this->serialize();
+	}
+	
 	my $bool = 1;
 	for(my $i=0;$i<$this->numOfInputs;$i++){
 		$bool = picocoin_tx_validate_input(
 			$i
 			, $this->input($i)->script() # scriptPubKey
-			, $this->serialize()  # includes scriptSig
+			, $txdata  # includes scriptSig
 			, 0 # sigvalidate
 			, SIGHASH_ALL # default;
 		);
