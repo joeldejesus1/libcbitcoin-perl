@@ -212,7 +212,7 @@ SV* picocoin_tx_sign(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex,
 	sig = realloc(sig, siglen + 1);
 	memcpy(sig + siglen, &ch, 1);
 	siglen++;
-	//fprintf(stderr,"hello(%d)(%s)",siglen,sig);
+	//fprintf(stderr,"hello(%d)",siglen);
 	
 	cstring * scriptSig = cstr_new_sz(0);
 	bsp_push_data(scriptSig, sig, siglen);

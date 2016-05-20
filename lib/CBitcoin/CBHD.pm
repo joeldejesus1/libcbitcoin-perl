@@ -173,7 +173,7 @@ sub deriveChild {
 	if($hardbool && defined $this->{'serialized private'}){
 		$childkey = picocoin_generatehdkeychild(
 			$this->{'serialized private'},
-			(2 << 31) + $childkey
+			(2 << 30) + $childid
 		);
 	}
 	elsif(defined $this->{'serialized private'}){
@@ -236,7 +236,7 @@ sub is_soft_child {
 	
 	return $this->{'is soft child'} if defined $this->{'is soft child'};
 	
-	if( $this->{'index'} < ( 2 << 31) && $this->{'index'} != 0){
+	if( $this->{'index'} < ( 2 << 30) && $this->{'index'} != 0){
 		$this->{'is soft child'} = 1;
 	}
 	else{
@@ -270,11 +270,11 @@ sub export_xpub {
 
 =pod
 
----++ export_xpiv
+---++ export_xpriv
 
 =cut
 
-sub export_xpiv {
+sub export_xpriv {
 	my $this = shift;
 	
 	return $this->{'xpriv'} if defined $this->{'xpriv'};

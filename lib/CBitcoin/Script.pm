@@ -50,6 +50,7 @@ OP_HASH160 -> ccoin_OP_HASH160;
 
 sub convert_OP_to_CCOIN {
 	my ($string,$push_bytes_bool) = @_;
+	die "no script" unless defined $string;
 	my @newarray;
 	foreach my $element (split(' ',$string)){
 		if($element =~ m/^OP_/){
@@ -224,16 +225,19 @@ sub script_to_address {
 		$hash = CBitcoin::picocoin_ripemd_hash160($serialized_script);
 	}
 	elsif($type eq 'p2sh'){
-		# we have: OP_HASH160 0x3dbcec384e5b32bb426cc011382c4985990a1895 OP_EQUAL
+		# we have: OP_HASH160 0x14 0x3dbcec384e5b32bb426cc011382c4985990a1895 OP_EQUAL
+		die "bad script length" unless length($serialized_script) == 23;
 		$prefix = pack('C',prefix('p2sh'));
-		$hash = substr($serialized_script,1,20);
+		$hash = substr($serialized_script,2,20);
 	}
 	elsif($type eq 'pubkey'){
 		die "cannot handle pubkey";
 	}
 	elsif($type eq 'p2pkh'){
+		# we have: OP_DUP OP_HASH160 0x14 0x3dbcec384e5b32bb426cc011382c4985990a1895 OP_EQUALVERIFY OP_CHECKSIG
 		$prefix = pack('C',prefix('p2pkh'));
-		$hash = substr($serialized_script,2,20);
+		die "bad script length" unless length($serialized_script) == 25;
+		$hash = substr($serialized_script,3,20);
 	}
 	else{
 		die "bad type";
@@ -280,7 +284,7 @@ sub whatTypeOfScript {
 sub serialize_script {
 	my $x = shift;
 	return undef unless defined $x;
-	return picocoin_script_decode(convert_OP_to_CCOIN($x));
+	return picocoin_script_decode(convert_OP_to_CCOIN($x,1));
 }
 
 

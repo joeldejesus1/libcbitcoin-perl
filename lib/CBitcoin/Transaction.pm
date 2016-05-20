@@ -343,7 +343,7 @@ sub calculate_signature {
 	my $data = $this->serialize(1); # 1 for raw_bool=TRUE
 	
 	return picocoin_tx_sign(
-		$cbhdkey->serialized_private(),
+		$xpriv,
 		$script,
 		$data,
 		$i,
@@ -390,12 +390,28 @@ sub assemble_p2pkh {
 	die "bad index" unless defined $i && 0 <= $i && $i < $this->numOfInputs();
 	
 	die "no key" unless defined $key;
-	
-	my $sig = $this->calculate_signature($i,$key);
-	die "bad signature" unless defined $sig && 0 < length($sig);
-	$this->input($i)->add_scriptSig(
-		push_data($sig).push_data($key->publickey())
+
+	my $scriptSig = picocoin_tx_sign_p2pkh(
+		$xpriv,
+		$script,
+		$data,
+		$i,
+		SIGHASH_ALL
 	);
+
+=pod	
+	my $sig_with_pushbytes = $this->calculate_signature($i,$key);
+	die "bad signature" unless defined $sig_with_pushbytes && 0 < length($sig_with_pushbytes);
+
+
+	warn "Script Sig:".unpack('H*',$sig_with_pushbytes.push_data($key->publickey()))."\n";
+	warn "Script Pub:".unpack('H*',CBitcoin::Script::serialize_script(
+		$this->input($i)->script()
+	))."\n";
+	$this->input($i)->add_scriptSig(
+		$sig_with_pushbytes.push_data($key->publickey())
+	);
+=cut
 }
 
 

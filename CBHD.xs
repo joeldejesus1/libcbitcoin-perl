@@ -157,6 +157,8 @@ HV* picocoin_generatehdkeychild(SV* xpriv, int child_index){
 	if(len != 78){
 		return picocoin_returnblankhdkey(rh);
 	}
+
+	//fprintf(stderr,"Child index:(%lu)\n",(uint32_t) child_index);
 	
 	struct hd_extended_key hdkey;
 	if(!hd_extended_key_init(&hdkey)){

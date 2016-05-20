@@ -90,7 +90,8 @@ my @outputs;
 		$tx->assemble_p2pkh($j,$root->deriveChild(1,$j + 1));
 	}
 	
-	# my $full = $tx->serialize();
+	my $full = $tx->serialize();
+	#warn "Full:".unpack('H*',$full)."\n";
 	
 	my $signature = $tx->calculate_signature($nIn,$root->deriveChild(1,$nIn + 1));
 	ok(65 < length($signature), 'tx signature is not long enough');
@@ -106,6 +107,54 @@ my @outputs;
 	
 }
 
+
+{
+	# got these from a block explorer, but we have to reverse the bytes
+	my @hashes = (
+		'6105e342232a9e67e4fa4ee0651eb8efd146dc0d7d346c788f45d8ad591c4577',
+		'da16a3ea5101e9f2ff975ec67a4ad85767dd306c27b94ef52500c26bc88af5c9'
+	);
+	
+	@ins = (
+		# mwUaFw3zQ8M4iaeuhFiiGWy4QbTphAeSxh 0.01394
+		CBitcoin::TransactionInput->new({
+			'prevOutHash' => pack('H*',join('',reverse($hashes[0] =~ m/([[:xdigit:]]{2})/g) )  ) #should be 32 byte hash
+			,'prevOutIndex' => 1
+			,'script' =>  CBitcoin::Script::address_to_script($root->deriveChild(1,1)->address()) # scriptPubKey
+		}),
+		# ms2Kt13CEL5jTMs98qXMAD15WpmnsK5ZGg 0.01408
+		CBitcoin::TransactionInput->new({
+			'prevOutHash' => pack('H*',join('',reverse($hashes[1] =~ m/([[:xdigit:]]{2})/g) ) ) #should be 32 byte hash
+			,'prevOutIndex' => 1
+			,'script' =>  CBitcoin::Script::address_to_script($root->deriveChild(1,2)->address()) # scriptPubKey
+		})	
+	);
+	my $balance = int( (0.01394 + 0.01408) * 100_000_000);
+	my $fee = int(0.0001 * 100_000_000);
+	
+	#warn "Address:".$root->export_xpriv()."\n";
+	#warn "Address:".$root->deriveChild(1,1)->address()."\n";
+	#warn "Address:".$root->deriveChild(1,2)->address()."\n";
+	#warn "Address:".$root->deriveChild(1,3)->address()."\n";
+	
+	@outs = (CBitcoin::TransactionOutput->new({
+		'script' => CBitcoin::Script::address_to_script($root->deriveChild(1,3)->address())
+		,'value' => ($balance - $fee)
+	}));
+	
+	# mi5W6CfThYwzTDsJg8Swu223dmyPPXDc8w
+	# mi5W6CfThYwzTDsJg8Swu223dmyPPXDc8w
+	
+	my $tx = CBitcoin::Transaction->new({
+		'inputs' => \@ins, 'outputs' => \@outs
+	});
+	
+	for(my $j=0;$j<scalar(@ins);$j++){
+		$tx->assemble_p2pkh($j,$root->deriveChild(1,$j + 1));
+	}
+	
+	warn "TX:".unpack('H*',$tx->serialize() )."\n";
+}
 
 
 

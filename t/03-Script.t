@@ -111,14 +111,17 @@ my $tests;
 
 
 {
-	my $address = '3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy';
+	my $address = '3DS7Y6bdePdnFCoXqddkevovh4s5M8NhgM';
+
 	my $script = CBitcoin::Script::address_to_script($address);
+	
 	ok(
 		defined $script
 		&&  CBitcoin::Script::script_to_address($script) eq $address
 		, 'test p2sh address'
 	);	
 	
+
 }
 
 

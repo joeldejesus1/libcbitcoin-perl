@@ -3,7 +3,7 @@ use strict;
 use warnings;
 
 use CBitcoin ':network_bytes';
-use Test::More tests => 12;
+use Test::More tests => 15;
 
 
 require CBitcoin::CBHD;
@@ -113,6 +113,22 @@ ok(
 	ok(
 		$c_1_323_0_20_0_13_pub->address() eq $c_1_323_0_20_0_13_priv->address(),
 		'Do addresses match?'
+	);
+	
+	
+	ok(
+		$root1->deriveChild(0,1)->address() ne $root1->deriveChild(0,2)->address(),
+		'should be different addresses (0,1) vs (0,2)'
+	);
+	
+	ok(
+		$root1->deriveChild(0,1)->address() ne $root1->deriveChild(1,1)->address(),
+		'should be different addresses (0,1) vs (1,1)'
+	);
+	
+	ok(
+		$root1->deriveChild(1,1)->address() ne $root1->deriveChild(1,2)->address(),
+		'should be different addresses (1,1) vs (1,2)'
 	);
 }
 

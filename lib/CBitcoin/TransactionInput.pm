@@ -197,13 +197,23 @@ sub add_cbhdkey {
 =cut
 
 sub serialize {
-	my ($this) = @_;
+	my ($this,$raw_bool) = @_;
 
 	# scriptSig
 	my $script = $this->scriptSig || '';
-	return $this->prevOutHash().pack('L',$this->prevOutIndex()).
-		CBitcoin::Utilities::serialize_varint(length($script)).$script.
-		pack('L',$this->sequence());
+	
+	if($raw_bool){
+		return $this->prevOutHash().pack('L',$this->prevOutIndex()).
+			CBitcoin::Utilities::serialize_varint(0).
+			pack('L',$this->sequence());	
+	}
+	else{
+		return $this->prevOutHash().pack('L',$this->prevOutIndex()).
+			CBitcoin::Utilities::serialize_varint(length($script)).$script.
+			pack('L',$this->sequence());
+	}
+	
+
 }
 
 
