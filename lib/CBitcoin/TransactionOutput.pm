@@ -1,8 +1,8 @@
 package CBitcoin::TransactionOutput;
 
-use 5.014002;
 use strict;
 use warnings;
+use bigint;
 
 =head1 NAME
 
@@ -15,12 +15,13 @@ Version 0.01
 =cut
 
 use CBitcoin::Script;
+use CBitcoin::Utilities;
 
 require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::TransactionOutput::VERSION = '0.2';
+$CBitcoin::TransactionOutput::VERSION = '0.1';
 
 DynaLoader::bootstrap CBitcoin::TransactionOutput $CBitcoin::TransactionOutput::VERSION;
 
@@ -34,35 +35,28 @@ DynaLoader::bootstrap CBitcoin::TransactionOutput $CBitcoin::TransactionOutput::
 
 sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
-=item new
+=pod
 
 ---++ new()
 
 =cut
 
 sub new {
-	use bigint;
 	my $package = shift;
 	my $this = bless({}, $package);
-	
+
 	my $x = shift;
 	unless(ref($x) eq 'HASH'){
 		return $this;
 	}
-	if(defined $x->{'data'} && $x->{'data'} =~ m/^([0-9a-zA-Z]+)$/){
-		# we have a tx input which is serialized
-		$this->{'data'} = $x->{'data'};
-		# check if we can set up script and value to make sure that the data is valid
-		$this->script;
-		$this->value;
-	}
-	elsif(
+	if(
 		defined $x->{'value'} && $x->{'value'} =~ m/^[0-9]+$/
-		&& defined $x->{'script'} 
+		&& defined $x->{'script'} && 0 < length($x->{'script'})
 	){
 		# call this function to validate the data, and get serialized data back
 		# this is a C function
-		$this->{'data'} = create_txoutput_obj($x->{'script'},$x->{'value'});
+		$this->{'value'} = $x->{'value'};
+		$this->{'script'} = $x->{'script'};
 	}
 	else{
 		die "no arguments to create Transaction::Output";
@@ -71,30 +65,19 @@ sub new {
 	return $this;
 }
 
-=item serialized_data
-
----++ serialized_data
-
-=cut
-
-sub serialized_data {
-	my $this = shift;
-	return $this->{'data'};
-}
 
 
-=item script
+=pod
 
 ---++ script
 
 =cut
 
 sub script {
-	my $this = shift;
-	return get_script_from_obj($this->{'data'});
+	return shift->{'script'};
 }
 
-=item type_of_script
+=pod
 
 ---++ type_of_script
 
@@ -102,19 +85,40 @@ sub script {
 
 sub type_of_script {
 	my $this = shift;
-	return CBitcoin::Script::whatTypeOfScript( $this->script );
+	return CBitcoin::Script::whatTypeOfScript( 
+		CBitcoin::Script::deserialize_script($this->script)
+	);
 }
 
-=item value
+=pod
 
 ---++ value
 
 =cut
 
 sub value {
-	my $this = shift;
-	# this is a C function
-	return get_value_from_obj($this->{'data'});
+	return shift->{'value'};
+}
+
+=pod
+
+---+ i/o
+
+=cut
+
+=pod
+
+---++ serialize
+
+=cut
+
+sub serialize {
+	my ($this) = @_;
+
+	my $script = CBitcoin::Script::serialize_script($this->script);
+	die "bad script" unless defined $script;
+	
+	return pack('q',$this->value).CBitcoin::Utilities::serialize_varint(length($script)).$script;
 }
 
 =head1 AUTHOR

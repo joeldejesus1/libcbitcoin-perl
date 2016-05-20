@@ -4,338 +4,292 @@
 
 #include <stdio.h>
 #include <ctype.h>
-#include <openssl/ssl.h>
-#include <openssl/ripemd.h>
-#include <openssl/rand.h>
-#include <CBHDKeys.h>
-#include <CBChecksumBytes.h>
-#include <CBAddress.h>
-#include <CBWIF.h>
-#include <CBByteArray.h>
-#include <CBBase58.h>
-#include <CBScript.h>
-#include <CBTransaction.h>
-#include <CBTransactionInput.h>
-#include <CBTransactionOutput.h>
+#include <errno.h>
+
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <assert.h>
+#include <ccoin/util.h>
+#include <ccoin/key.h>
+#include <ccoin/script.h>
+#include <ccoin/core.h>
+#include <ccoin/hdkeys.h>
+#include <ccoin/key.h>
+#include <ccoin/serialize.h>
+//#include <ccoin/compat.h>
 
 
 
-CBTransaction* CBTransaction_serializeddata_to_obj(char* datastring){
 
-	CBByteArray* data = hexstring_to_bytearray(datastring);
 
-	CBTransaction* tx = CBNewTransactionFromData(data);
-	uint32_t dlen = CBTransactionDeserialise(tx);
-
-	//CBDestroyByteArray(data);
-	return tx;
-}
-
-char* CBTransaction_obj_to_serializeddata(CBTransaction * tx){
-	CBTransactionPrepareBytes(tx);
-	int dlen = CBTransactionSerialise(tx,1);
-	CBByteArray* serializeddata = CBGetMessage(tx)->bytes;
-
-	char* answer = bytearray_to_hexstring(serializeddata,dlen);
-
-	return answer;
-}
+////// extra
+struct hd_extended_key_serialized {
+	uint8_t data[78];
+};
 
 
 
-//////////////////////// perl export functions /////////////
-//CBTransactionInput * CBNewTransactionInput(CBScript * script, uint32_t sequence, CBByteArray * prevOutHash, uint32_t prevOutIndex)
+////////// picocoin
 
-char* create_tx_obj(int lockTime, int version, SV* inputs, SV* outputs, int numOfInputs, int numOfOutputs){
-	CBTransaction* tx = CBNewTransaction((uint32_t) lockTime, (uint32_t) version);
+int picocoin_tx_validate ( SV* txdata){
+	STRLEN len; //calculated via SvPV
+	uint8_t * txdata_pointer = (uint8_t*) SvPV(txdata,len);
 
-	int n;
-	int in_length, out_length;
-    if ((! SvROK(inputs))
-    || (SvTYPE(SvRV(inputs)) != SVt_PVAV)
-    || ((in_length = av_len((AV *)SvRV(inputs))) < 0))
-    {
-        return 0;
-    }
-    if ((! SvROK(outputs))
-    || (SvTYPE(SvRV(outputs)) != SVt_PVAV)
-    || ((out_length = av_len((AV *)SvRV(outputs))) < 0))
-    {
-        return 0;
-    }
-
-    // load TransactionInput
-	for (n=0; n<=in_length; n++) {
-		STRLEN l;
-
-		char * fn = SvPV (*av_fetch ((AV *) SvRV (inputs), n, 0), l);
-		CBTransactionInput * inx = CBTransactionInput_serializeddata_to_obj(fn);
-		CBTransactionAddInput(tx,inx);
+	
+	
+	struct const_buffer buf = { txdata_pointer, len };
+	
+	
+	struct bp_tx tx;
+	
+	bp_tx_init(&tx);
+	
+	
+	if(!deser_bp_tx(&tx,&buf)){
+		bp_tx_free(&tx);
+		return 0;
 	}
-	for (n=0; n<=out_length; n++) {
-		STRLEN l;
-
-		char * fn = SvPV (*av_fetch ((AV *) SvRV (outputs), n, 0), l);
-		CBTransactionOutput * outx = CBTransactionOutput_serializeddata_to_obj(fn);
-		CBTransactionAddOutput(tx,outx);
+	
+	if(!bp_tx_valid(&tx)){
+		bp_tx_free(&tx);
+		return 0;		
 	}
-	char* answer = CBTransaction_obj_to_serializeddata(tx);
-	//CBFreeTransaction(tx);
-	return answer;
-}
-
-int get_numOfInputs(char* serializedDataString){
-	CBTransaction* tx = CBTransaction_serializeddata_to_obj(serializedDataString);
-	uint32_t numOfInputs = tx->inputNum;
-	CBFreeTransaction(tx);
-	return (int)numOfInputs;	
-}
-int get_numOfOutputs(char* serializedDataString){
-	CBTransaction* tx = CBTransaction_serializeddata_to_obj(serializedDataString);
-	uint32_t numOfOutputs = tx->outputNum;
-	CBFreeTransaction(tx);
-	return (int)numOfOutputs;
-}
-char* get_Input(char* serializedDataString,int InputIndex){
-	CBTransaction* tx = CBTransaction_serializeddata_to_obj(serializedDataString);
-	CBTransactionInput** inputs = tx->inputs;
-	char* answer = CBTransactionInput_obj_to_serializeddata(inputs[InputIndex]);
-	CBFreeTransaction(tx);
-	return answer;
-}
-char* get_Output(char* serializedDataString,int OutputIndex){
-	CBTransaction* tx = CBTransaction_serializeddata_to_obj(serializedDataString);
-	CBTransactionOutput** outputs = tx->outputs;
-	char* answer = CBTransactionOutput_obj_to_serializeddata(outputs[OutputIndex]);
-	CBFreeTransaction(tx);
-	return answer;
-}
-
-char* hash_of_tx(char* serializedDataString){
-	CBTransaction* tx = CBTransaction_serializeddata_to_obj(serializedDataString);
-	CBByteArray * data = CBNewByteArrayWithData(CBTransactionGetHash(tx), (uint32_t)32);
-	CBFreeTransaction(tx);
-	return bytearray_to_hexstring(data,32);
-}
-
-int get_lockTime_from_obj(char* serializedDataString){
-	CBTransaction* tx = CBTransaction_serializeddata_to_obj(serializedDataString);
-	uint32_t lockTime = tx->lockTime;
-	CBFreeTransaction(tx);
-	return (int)lockTime;
-}
-
-int get_version_from_obj(char* serializedDataString){
-	CBTransaction* tx = CBTransaction_serializeddata_to_obj(serializedDataString);
-	uint32_t version = tx->version;
-	CBFreeTransaction(tx);
-	return (int)version;
-}
-// CBTransaction * self, CBKeyPair * key, CBByteArray * prevOutSubScript, uint32_t input, CBSignType signType
-char* sign_tx_pubkeyhash(char* txString, char* keypairString, char* prevOutSubScriptString, int input, char* signTypeString){
-        //CBLogError("sign 0.");
-	//fprintf(stderr, "sign 0.");
-	CBTransaction * tx = CBTransaction_serializeddata_to_obj(txString);
-        //fprintf(stderr, "sign 0.1");
-	CBHDKey * keypair = CBHDKey_serializeddata_to_obj(keypairString);
-        //fprintf(stderr, "sign 0.2");
-	//CBScript * prevOutSubScript = CBScript_serializeddata_to_obj(prevOutSubScriptString);
-	CBScript * prevOutSubScript = tx->inputs[input]->scriptObject;
-	//CBLogError("sign 1.");
-	// figure out the signature type
-	CBSignType signtype;
-	if (strcmp(signTypeString, "CB_SIGHASH_ALL") == 0) {
-		signtype = CB_SIGHASH_ALL;
+	bp_tx_free(&tx);
+	return 1;
+	//bp_script_verify(txin->scriptSig, txout->scriptPubKey,txTo, nIn, flags, nHashType)
+/*	
+	unsigned int flags;
+	if(sigvalidate == 1){
+		flags = SCRIPT_VERIFY_NONE;
 	}
-	else if(strcmp(signTypeString, "CB_SIGHASH_NONE") == 0){
-		signtype = CB_SIGHASH_NONE;
+	else if(sigvalidate == 2){
+		flags = SCRIPT_VERIFY_STRICTENC;
 	}
-	else if(strcmp(signTypeString, "CB_SIGHASH_SINGLE") == 0){
-		signtype = CB_SIGHASH_SINGLE;
+	else if(sigvalidate == 3){
+		flags = SCRIPT_VERIFY_P2SH;
 	}
-	else if(strcmp(signTypeString, "CB_SIGHASH_ANYONECANPAY") == 0){
-		signtype = CB_SIGHASH_ANYONECANPAY;
+	else if(sigvalidate == 4){
+		flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC;
 	}
 	else{
-		// we have to fail here
-		return "NULL";
+		sighash = 0;
 	}
-        //CBLogError("sign 2.(%d)",input);
-/*
-	CBTransactionSignPubKeyHashInput(
-		tx
-		,keypair->keyPair
-		, prevOutSubScript
-		, (uint32_t)input
-		, CB_SIGHASH_ALL
-	);*/
-	CBScript * oldprevOutSubScript = tx->inputs[input]->scriptObject;
-        //CBLogError("sign 3.");
-	if (!CBTransactionSignPubKeyHashInput(tx, keypair->keyPair,
-			oldprevOutSubScript, input, signtype)){
-		CBLogError("Unable to add a signature to a pubkey hash transaction input.");
-		return "NULL";
+	// bp_script_verify(txin->scriptSig, txout->scriptPubKey,txTo, nIn, flags, nHashType)
+	int i;
+	for(i=0;i<txTo->vin->len;i++){
+		struct bp_txin *txin = parr_idx(txTo->vin, nIn);
+		if(!bp_script_verify(txin->scriptSig, txout->scriptPubKey,txTo, nIn, flags, nHashType)){
+			i = txTo->vin->len + 1;
+		}
 	}
-/*
-	tx->inputs[input]->scriptObject = CBNewScriptOfSize(CB_PUBKEY_SIZE + CB_MAX_DER_SIG_SIZE + 3);
-	uint8_t sigLen = CBTransactionAddSignature(tx, tx->inputs[input]->scriptObject, 0,
-			keypair->keyPair, oldprevOutSubScript, input, signtype);
-	if (!sigLen){
-		CBLogError("Unable to add a signature to a pubkey hash transaction input.");
-		return "NULL";
-	}
-
-	// add the public key
-	CBByteArraySetByte(tx->inputs[input]->scriptObject, sigLen, CB_PUBKEY_SIZE);
-	memcpy(CBByteArrayGetData(tx->inputs[input]->scriptObject) + sigLen + 1, keypair->keyPair->pubkey.key, CB_PUBKEY_SIZE);
-	//return txString;
+	
 */
-	return CBTransaction_obj_to_serializeddata(tx);
-
-}
-bool CBTransactionSignMultisigInputV2(CBTransaction * self, CBKeyPair * key, CBByteArray * prevOutSubScript, uint32_t input, CBSignType signType) {
-	CBScript * inScript;
-	uint16_t offset;
-	if (self->inputs[input]->scriptObject) {
-		offset = self->inputs[input]->scriptObject->length;
-		inScript = CBNewByteArrayOfSize(offset + CB_MAX_DER_SIG_SIZE + 2);
-		CBByteArrayCopyByteArray(inScript, 0, self->inputs[input]->scriptObject);
-		CBReleaseObject(self->inputs[input]->scriptObject);
-		self->inputs[input]->scriptObject = inScript;
-	}else{
-		inScript = self->inputs[input]->scriptObject = CBNewScriptOfSize(CB_MAX_DER_SIG_SIZE + 3);
-		CBByteArraySetByte(inScript, 0, CB_SCRIPT_OP_0);
-		offset = 1;
-	}
-	return CBTransactionAddSignature(self, inScript, offset, key, prevOutSubScript, input, signType);
 }
 
-char* sign_tx_multisig(char* txString, char* keypairString, char* prevOutSubScriptString, int input, char* signTypeString){
-	CBTransaction * tx = CBTransaction_serializeddata_to_obj(txString);
-	CBHDKey * keypair = CBHDKey_serializeddata_to_obj(keypairString);
-	//CBScript * prevOutSubScript = CBScript_serializeddata_to_obj(prevOutSubScriptString);
-	CBScript * prevOutSubScript = CBByteArrayCopy((CBByteArray*) tx->inputs[input]->scriptObject);
 
+int picocoin_tx_validate_input (
+		int index, SV* scriptPubKey_data, SV* txdata,int sigvalidate, int nHashType
+){
+	// deserialize scriptPubKey (from txFrom->vout)
+	STRLEN len_spk; 
+	uint8_t * spk_pointer = (uint8_t*) SvPV(scriptPubKey_data,len_spk);
+	cstring * scriptPubKey = cstr_new_buf((const void*) spk_pointer, (size_t) len_spk);
+	// deserialize transaction
+	STRLEN len; //calculated via SvPV
+	uint8_t * txdata_pointer = (uint8_t*) SvPV(txdata,len);
+	struct const_buffer buf = { txdata_pointer, len };
+	struct bp_tx tx;
+	bp_tx_init(&tx);
 
-	// figure out the signature type
-	CBSignType signtype;
-	if (strcmp(signTypeString, "CB_SIGHASH_ALL") == 0) {
-		signtype = CB_SIGHASH_ALL;
+	if(!deser_bp_tx(&tx,&buf)){
+		bp_tx_free(&tx);
+		cstr_free(scriptPubKey,true);
+		return 0;
 	}
-	else if(strcmp(signTypeString, "CB_SIGHASH_NONE") == 0){
-		signtype = CB_SIGHASH_NONE;
+
+	if(!bp_tx_valid(&tx)){
+		bp_tx_free(&tx);
+		cstr_free(scriptPubKey,true);
+		return 0;		
 	}
-	else if(strcmp(signTypeString, "CB_SIGHASH_SINGLE") == 0){
-		signtype = CB_SIGHASH_SINGLE;
+	unsigned int nIn = (unsigned int) index;
+	
+	
+	unsigned int flags;
+	if(sigvalidate == 1){
+		flags = SCRIPT_VERIFY_STRICTENC;
 	}
-	else if(strcmp(signTypeString, "CB_SIGHASH_ANYONECANPAY") == 0){
-		signtype = CB_SIGHASH_ANYONECANPAY;
+	else if(sigvalidate == 2){
+		flags = SCRIPT_VERIFY_P2SH;
+	}
+	else if(sigvalidate == 3){
+		flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC;
 	}
 	else{
-		// we have to fail here
-		return "NULL";
+		flags = SCRIPT_VERIFY_NONE;
 	}
-
-	//CBScript * oldprevOutSubScript = tx->inputs[input]->scriptObject;
-	/*
-	 * CBTransactionSignMultisigInput(
-			CBTransaction * self, CBKeyPair * key, CBByteArray * prevOutSubScript, uint32_t input, CBSignType signType
-		)
-	 */
-	if (!CBTransactionSignMultisigInputV2(tx, keypair->keyPair, prevOutSubScript, input, signtype)){
-		CBLogError("Unable to add a signature to a pubkey hash transaction input.");
-		return "NULL";
-	}
-
-	return CBTransaction_obj_to_serializeddata(tx);
-}
-
-char* addredeemscript(char* txString, char* redeemScript,int input){
-	// CBTransactionAddP2SHScript(CBTransaction * self, CBScript * p2shScript, uint32_t input)
-	CBTransaction * self = CBTransaction_serializeddata_to_obj(txString);
-	//fprintf(stderr,"...part 3.1\n...script=%s\n",redeemScript);
-	CBScript * p2shScript = CBNewScriptFromString(redeemScript);
-	//CBTransactionAddP2SHScript(self, tx_stringToScript(redeemScript),(uint32_t) index);
-	//fprintf(stderr,"...part 3.2\n");
-	uint16_t offset = self->inputs[input]->scriptObject->length;
-	//fprintf(stderr,"...part 3.3 with offset=%d\n",offset);
-	CBScript * inScript = CBNewByteArrayOfSize(offset + p2shScript->length + CBScriptGetLengthOfPushOp(p2shScript->length));
-	//fprintf(stderr,"...part 4\n");
-	CBByteArrayCopyByteArray(inScript, 0, self->inputs[input]->scriptObject);
-	//fprintf(stderr,"...part 5\n");
-	CBReleaseObject(self->inputs[input]->scriptObject);
-	//fprintf(stderr,"...part 6\n");
-	self->inputs[input]->scriptObject = inScript;
-	//fprintf(stderr,"...part 7\n");
-	CBScriptWritePushOp(inScript, offset, CBByteArrayGetData(p2shScript), p2shScript->length);
-	return CBTransaction_obj_to_serializeddata(self);
+	// bp_script_verify(txin->scriptSig, txout->scriptPubKey,txTo, nIn, flags, nHashType)
+	struct bp_txin *txin = parr_idx(tx.vin, nIn);
+	
+	
+	
+	bp_tx_free(&tx);
+	cstr_free(scriptPubKey,true);
+	return 1;
 }
 
 
-MODULE = CBitcoin::Transaction	PACKAGE = CBitcoin::Transaction	
+SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType){
+	
+	////////////// import hdkey ////////////////////////////
+	STRLEN len_hdkey; //calculated via SvPV
+	uint8_t * hdkey_pointer = (uint8_t*) SvPV(hdkey_data,len_hdkey);
+	if(len_hdkey != 78)
+		return picocoin_returnblankSV();
+	
+	struct hd_extended_key_serialized hdkeyser;
+	//hdkeyser->data = calloc(78*sizeof(uint8_t));
+	memcpy(hdkeyser.data, hdkey_pointer, 78);
+	struct hd_extended_key hdkey;
+	if(!hd_extended_key_init(&hdkey)){
+		return picocoin_returnblankSV();
+	}
+	
+	if(!hd_extended_key_deser(&hdkey, hdkeyser.data,78)){
+		//free(hdkeyser->data);
+		//free(hdkeyser);
+		hd_extended_key_free(&hdkey);
+		return picocoin_returnblankSV();
+	}
+	
+	///////////// import tx //////////////////
+	uint32_t nIn = (uint32_t) nIndex;
+	//fprintf(stderr,"Index1=%d\n",nIn);
+	STRLEN len; //calculated via SvPV
+	uint8_t * txdata_pointer = (uint8_t*) SvPV(txdata,len);
+	struct const_buffer buf = { txdata_pointer, len };
+	struct bp_tx tx;
+	bp_tx_init(&tx);
+	// validate the transaction
+	if(!deser_bp_tx(&tx,&buf)){
+		bp_tx_free(&tx);
+		hd_extended_key_free(&hdkey);
+		return picocoin_returnblankSV();
+	}
+	
+	if(!bp_tx_valid(&tx)){
+		bp_tx_free(&tx);
+		hd_extended_key_free(&hdkey);
+		return picocoin_returnblankSV();		
+	}
+	
+	// for convenience reasons, change the name
+	struct bp_tx * txTo = &tx;
+	if (!txTo || !txTo->vin || nIn >= txTo->vin->len){
+		bp_tx_free(&tx);
+		hd_extended_key_free(&hdkey);
+		return picocoin_returnblankSV();
+	}
 
-PROTOTYPES: DISABLE
+	STRLEN len_frompubkey; //calculated via SvPV
+	uint8_t * fromPubKey_pointer = (uint8_t*) SvPV(fromPubKey_data,len_frompubkey);
+	cstring frompubkey = { fromPubKey_pointer, len_frompubkey};
+	
+	bu256_t hash;
+	//fprintf(stderr,"Hash Type=%d\n",nHashType);
+	bp_tx_sighash(&hash, &frompubkey, txTo, nIn, nHashType);
+	
+	struct bp_txin *txin = parr_idx(txTo->vin, nIn);
+	// find the input
+	
+	///////////////////////// do signature //////////////////////////
+	void *sig = NULL;
+	size_t siglen = 0;
+	struct bp_key privateKey = hdkey.key;
+	
+	if (!bp_sign(&hdkey.key, &hash, sizeof(*&hash), &sig, &siglen)){
+		bp_tx_free(&tx);
+		hd_extended_key_free(&hdkey);
+		return picocoin_returnblankSV();		
+	}
+	//fprintf(stderr,"Index2=%d\n",nIn);
+
+	
+	
+	uint8_t ch = (uint8_t) nHashType;
+	sig = realloc(sig, siglen + 1);
+	memcpy(sig + siglen, &ch, 1);
+	siglen++;
+	
+	
+	cstring * scriptSig = cstr_new_sz(64);
+	bsp_push_data(scriptSig, sig, siglen);
+	
+	// append public key
+	void *pubkey = NULL;
+	size_t pk_len = 0;
+	if (!bp_pubkey_get(&hdkey.key, &pubkey, &pk_len)){
+		free(sig);
+		bp_tx_free(&tx);
+		free(pubkey);  // is this necessary?
+		hd_extended_key_free(&hdkey);
+		return picocoin_returnblankSV();	
+	}
+	
+	bsp_push_data(scriptSig, pubkey, pk_len);
+	
+	if (txin->scriptSig)
+		cstr_free(txin->scriptSig, true);
+	txin->scriptSig = scriptSig;
+	scriptSig = NULL;
+	
+	cstring *txanswer = cstr_new_sz(bp_tx_ser_size(&tx));
+	
+	ser_bp_tx(txanswer, &tx);
+	
+	//sprintf("%s",ans->str);
+	hd_extended_key_free(&hdkey);
+	bp_tx_free(&tx);
+	free(sig);
+	free(pubkey);
+	return newSVpv(txanswer->str,txanswer->len);
+	
+
+}
+
+/*
+ *  scriptPubKey is the script in the previous transaction output.
+ *  scriptSig is the script that gets ripemd hash160's into a p2sh (need this to make signature)
+ *  outpoint = 32 byte tx hash followed by 4 byte uint32_t tx index
+ */
 
 
 
 
-char *
-create_tx_obj (lockTime, version, inputs, outputs, numOfInputs, numOfOutputs)
-	int	lockTime
-	int	version
-	SV *	inputs
-	SV *	outputs
-	int	numOfInputs
-	int	numOfOutputs
+MODULE = CBitcoin::Transaction	PACKAGE = CBitcoin::Transaction
 
-int
-get_numOfInputs (serializedDataString)
-	char *	serializedDataString
 
-int
-get_numOfOutputs (serializedDataString)
-	char *	serializedDataString
+PROTOTYPES: DISABLED
 
-char *
-get_Input (serializedDataString, InputIndex)
-	char *	serializedDataString
-	int	InputIndex
+int 
+picocoin_tx_validate(txdata)
+	SV* txdata
+	
+int 
+picocoin_tx_validate_input(index,scriptPubKey_data,txdata,sigvalidate,nHashType)
+	int index
+	SV* scriptPubKey_data
+	SV* txdata
+	int sigvalidate
+	int nHashType
 
-char *
-get_Output (serializedDataString, OutputIndex)
-	char *	serializedDataString
-	int	OutputIndex
-
-char *
-hash_of_tx (serializedDataString)
-	char *	serializedDataString
-
-int
-get_lockTime_from_obj (serializedDataString)
-	char *	serializedDataString
-
-int
-get_version_from_obj (serializedDataString)
-	char *	serializedDataString
-
-char *
-sign_tx_pubkeyhash (txString, keypairString, prevOutSubScriptString, input, signTypeString)
-	char *	txString
-	char *	keypairString
-	char *	prevOutSubScriptString
-	int	input
-	char *	signTypeString
-
-char *
-sign_tx_multisig (txString, keypairString, prevOutSubScriptString, input, signTypeString)
-	char *	txString
-	char *	keypairString
-	char *	prevOutSubScriptString
-	int	input
-	char *	signTypeString
-
-char *
-addredeemscript(txString,redeemScript,input)
-	char * txString
-	char * redeemScript
-	int input
+SV*	
+picocoin_tx_sign_p2pkh(hdkey_data,fromPubKey_data,txdata,index,HashType)
+	SV* hdkey_data
+	SV* fromPubKey_data
+	SV* txdata
+	int index
+	int HashType

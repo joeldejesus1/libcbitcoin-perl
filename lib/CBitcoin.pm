@@ -1,7 +1,15 @@
 package CBitcoin;
 
+#use 5.014002;
 use strict;
 use warnings;
+
+use constant {
+	MAINNET => 0xD9B4BEF9,
+	TESTNET => 0xDAB5BFFA,
+	TESTNET3 => 0x0709110B,
+	NAMECOIN => 0xFEB4BEF9
+};
 
 =head1 NAME
 
@@ -17,13 +25,13 @@ require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::VERSION = '0.2';
+$CBitcoin::VERSION = '0.1';
 
 DynaLoader::bootstrap CBitcoin $CBitcoin::VERSION;
 
 @CBitcoin::EXPORT = ();
-@CBitcoin::EXPORT_OK = ();
-
+@CBitcoin::EXPORT_OK = ( 'MAINNET', 'TESTNET', 'TESTNET3');
+%CBitcoin::EXPORT_TAGS = ( network_bytes => [ 'MAINNET', 'TESTNET', 'TESTNET3' ] );
 
 =item dl_load_flags
 
@@ -46,6 +54,8 @@ sub hello {
 	return "hello!";
 }
 
+
+our $network_bytes = 0xD9B4BEF9;
 
 
 =head1 AUTHOR

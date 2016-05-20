@@ -6,14 +6,14 @@ Unfortunately, in some situations (unknown to the author), require symlinking th
 For example, bootloader looks for the XS binary in auto/CBitcoin/CBHD/CBHD.so when running CBHD::xs_sub.  
 So, we have to symlink auto/CBitcoin/CBitcoin.so to auto/CBitcoin/CBHD/CBHD.so.
 
-To create Hierarchial Deterministic keys, see CBitcoin::CBHD.  
-To create scripts, see CBitcoin::Script. To create transactions, see CBitcoin::Transaction, CBitcoin::TransactionInput and CBitcoin::TransactionOutput.
+To create Hierarchial Deterministic keys, see CBitcoin::CBHD and t/02-CBHD.t
+To create scripts, see CBitcoin::Script. To create transactions, see CBitcoin::Transaction, CBitcoin::TransactionInput and CBitcoin::TransactionOutput, and more importantly see t/05-Transaction.t
 
 To see how an spv client works, check out the t/spv.t.no script.  It contains an example of how to implement an spv client in perl.  Though, this section is work in progress.
 
 ## DEBIAN INSTALLATION
 
-To compile a debian package, first install libcbitcoin0, which is https://github.com/favioflamingo/cbitcoin.  
+To compile a debian package, first install libccoin0, which is https://github.com/favioflamingo/picocoin.  
 Once you compile and install the cbitcoin source package, go into the main directory and tyoe:
 ```bash
     dh_make -p libcbitcoin-perl_0.01 --createorig -l
@@ -44,7 +44,7 @@ perldoc command.
 
 ## LICENSE AND COPYRIGHT
 
-    CBitcoin perl modules is a wrapper for the CBitcoin library written by Matthew Mitchell.
+    CBitcoin perl modules is a wrapper for the picocoin library written by Jeff Garzik.
     Copyright (C) 2015  Joel De Jesus
 
     This program is free software; you can redistribute it and/or modify

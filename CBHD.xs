@@ -4,264 +4,185 @@
 
 #include <stdio.h>
 #include <ctype.h>
-#include <openssl/ssl.h>
-#include <openssl/ripemd.h>
-#include <openssl/rand.h>
-#include <CBHDKeys.h>
-#include <CBChecksumBytes.h>
-#include <CBAddress.h>
-#include <CBWIF.h>
-#include <CBByteArray.h>
-#include <CBBase58.h>
-#include <CBByteArray.h>
 #include <errno.h>
+#include <ccoin/hdkeys.h>
 
-CBHDKey* CBHDKey_serializeddata_to_obj(char* privstring){
-	CBByteArray * masterString = CBNewByteArrayFromString(privstring, true);
-	CBChecksumBytes * masterData = CBNewChecksumBytesFromString(masterString, false);
-	CBReleaseObject(masterString);
-	CBHDKey * masterkey = CBNewHDKeyFromData(CBByteArrayGetData(CBGetByteArray(masterData)));
-	CBReleaseObject(masterData);
-	return (CBHDKey *)masterkey;
+#include <assert.h>
+#include <ccoin/base58.h>
+#include <openssl/ripemd.h>
+#include <openssl/err.h>
+#include <ccoin/cstr.h>
+#include <ccoin/util.h>
+
+#define MAIN_PUBLIC 0x1EB28804
+#define MAIN_PRIVATE 0xE4AD8804
+
+////// extra
+
+struct hd_extended_key_serialized {
+	uint8_t data[78];
+};
+
+static bool write_ek_ser_pub(struct hd_extended_key_serialized *out,
+			     const struct hd_extended_key *ek)
+{
+	cstring s = { (char *)(out->data), 0, sizeof(out->data) + 1 };
+	return hd_extended_key_ser_pub(ek, &s);
 }
 
-char* CBHDKey_obj_to_serializeddata(CBHDKey * keypair){
-	uint8_t * keyData = malloc(CB_HD_KEY_STR_SIZE);
-	CBHDKeySerialise(keypair, keyData);
 
-	CBChecksumBytes * checksumBytes = CBNewChecksumBytesFromBytes(keyData, 82, false);
-	// need to figure out how to free keyData memory
-	CBByteArray * str = CBChecksumBytesGetString(checksumBytes);
-	CBReleaseObject(checksumBytes);
-	return (char *)CBByteArrayGetData(str);
+
+static bool write_ek_ser_prv(struct hd_extended_key_serialized *out,
+			     const struct hd_extended_key *ek)
+{
+	cstring s = { (char *)(out->data), 0, sizeof(out->data) + 1 };
+	return hd_extended_key_ser_priv(ek, &s);
 }
 
-CBHDKey* importDataToCBHDKey(char* privstring) {
-	CBByteArray * masterString = CBNewByteArrayFromString(privstring, true);
-	CBChecksumBytes * masterData = CBNewChecksumBytesFromString(masterString, false);
-	CBReleaseObject(masterString);
-	CBHDKey * masterkey = CBNewHDKeyFromData(CBByteArrayGetData(CBGetByteArray(masterData)));
-	CBReleaseObject(masterData);
-	return (CBHDKey *)masterkey;
+
+static bool read_ek_ser_from_base58(const char *base58,
+				    struct hd_extended_key_serialized *out)
+{
+	cstring *str = base58_decode(base58);
+	if (str->len == 82) {
+		memcpy(out->data, str->str, 78);
+		cstr_free(str, true);
+		return true;
+	}
+
+	cstr_free(str, true);
+	return false;
 }
-//////////////////////// perl export functions /////////////
 
-char* newMasterKey(int arg){
-	CBHDKey * masterkey = CBNewHDKey(true);
-	CBHDKeyGenerateMaster(masterkey,true);
 
-	uint8_t * keyData = malloc(CB_HD_KEY_STR_SIZE);
-	CBHDKeySerialise(masterkey, keyData);
-	free(masterkey);
-	CBChecksumBytes * checksumBytes = CBNewChecksumBytesFromBytes(keyData, 82, false);
-	// need to figure out how to free keyData memory
-	CBByteArray * str = CBChecksumBytesGetString(checksumBytes);
-	CBReleaseObject(checksumBytes);
-	return (char *)CBByteArrayGetData(str);
+/*
+ *   Return success=0 hash (typically indicates failure to deserialize)
+ */
+HV* picocoin_returnblankhdkey(HV * rh){
+	hv_store(rh, "success", 7, newSViv((int) 0), 0);
+	return rh;
 }
-// hard parent to soft child
-char* deriveChildPublicExtended(char* privstring,int child){
-	CBHDKey* masterkey = importDataToCBHDKey(privstring);
+// given a full hdkey, fill in a perl hash with relevant data
+HV* picocoin_returnhdkey(HV * rh, const struct hd_extended_key hdkey){
 
-	//fprintf(stderr,"hello - 1");
-	// generate child key that does not contain private bits
-	CBHDKey * childkey = CBNewHDKey(true);
-	//fprintf(stderr,"hello - 1.1");
-	CBHDKeyChildID childID = { false, child};
-	//fprintf(stderr,"hello - 1.2");
-	CBHDKeyDeriveChild(masterkey, childID, childkey);
-	//fprintf(stderr,"hello - 1.3");
-	free(masterkey);
+	hv_store(rh, "depth", 5, newSViv( hdkey.depth), 0);
+	hv_store(rh, "version", 7, newSViv( hdkey.version), 0);
+	hv_store(rh, "index", 5, newSViv( hdkey.index), 0);
+	hv_store(rh, "success", 7, newSViv( 1), 0);
+
+	struct hd_extended_key_serialized m_xprv;
+	if(write_ek_ser_prv(&m_xprv, &hdkey)){
+		hv_store(rh, "serialized private", 18, newSVpv(m_xprv.data,78), 0);
+	}
 	
-	// delete the private bits from childkey by setting versionBytes to PUBLIC
-	// when the childkey is serialized, the private bits will be skipped
-	childkey->versionBytes = CB_HD_KEY_VERSION_PROD_PUBLIC;
+	struct hd_extended_key_serialized m_xpub;
+	if(write_ek_ser_pub(&m_xpub, &hdkey)){
+		hv_store(rh, "serialized public", 17, newSVpv(m_xpub.data,78), 0);
+	}
+
+	// cstring* address = bp_pubkey_get_address(const struct bp_key *key, unsigned char addrtype);
 	
-	//fprintf(stderr,"hello - 2");
+	// get the public key
+	void *pubkey = NULL;
+	size_t pk_len = 0;
 	
-	uint8_t * keyData = malloc(CB_HD_KEY_STR_SIZE);
-	CBHDKeySerialise(childkey, keyData);
-	free(childkey);
-	//fprintf(stderr,"hello - 3");
-	CBChecksumBytes * checksumBytes = CBNewChecksumBytesFromBytes(keyData, 82, false);
-	// need to figure out how to free keyData memory
-	CBByteArray * str = CBChecksumBytesGetString(checksumBytes);
-	CBReleaseObject(checksumBytes);
-	return (char *)CBByteArrayGetData(str);
+	if(bp_pubkey_get(&hdkey.key, &pubkey, &pk_len)){
+		hv_store(rh, "public key", 10, newSVpv(pubkey,pk_len), 0);
+		
+		uint8_t *pk2 = malloc(pk_len * sizeof(uint8_t));
+		memcpy(pk2,pubkey,pk_len);
+		// don't create address here because we need the network bytes
+		// do the network bytes in perl code, it is more convenient
+		uint8_t md160[RIPEMD160_DIGEST_LENGTH];
+		bu_Hash160(md160, pk2, pk_len);
+		free(pk2);
+		hv_store(rh, "ripemdHASH160", 13, newSVpv(md160,RIPEMD160_DIGEST_LENGTH), 0);
+	}
+	
+	//hd_extended_key_free(&hdkey);
+	return rh;
 }
 
-char* exportPublicExtendedKey(char* privstring){
-	CBHDKey* childkey = importDataToCBHDKey(privstring);
-	childkey->versionBytes = CB_HD_KEY_VERSION_PROD_PUBLIC;
-	uint8_t * keyData = malloc(CB_HD_KEY_STR_SIZE);
-	CBHDKeySerialise(childkey, keyData);
-	free(childkey);
-	CBChecksumBytes * checksumBytes = CBNewChecksumBytesFromBytes(keyData, 82, false);
-	CBByteArray * str = CBChecksumBytesGetString(checksumBytes);
-	CBReleaseObject(checksumBytes);
-	return (char *)CBByteArrayGetData(str);
-}
 
-int exportNetworkBytes(char* privstring){
-	CBHDKey* childkey = importDataToCBHDKey(privstring);
-	CBNetwork networkbytes = CBHDKeyGetNetwork(childkey->versionBytes);
-	free(childkey);
-
-	if(networkbytes == CB_NETWORK_PRODUCTION){
-		return 1;
+//////////////// picocoin - load from base58 /////////////////
+HV* picocoin_newhdkey(SV* base58x){
+	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
+	
+	STRLEN len; //calculated via SvPV
+	char * base58xPointer = (char*) SvPV(base58x,len);
+	
+	struct hd_extended_key_serialized hdkeyser;
+	if(!read_ek_ser_from_base58(base58xPointer,&hdkeyser)){
+		return picocoin_returnblankhdkey(rh);
 	}
-	else if(networkbytes == CB_NETWORK_TEST){
-		return 2;
-	}
-	else{
-		return 3;
-	}
-}
-
-int exportCBHDType(char* privstring){
-	CBHDKey* childkey = importDataToCBHDKey(privstring);
-	CBHDKeyType type = CBHDKeyGetType(childkey->versionBytes);
-	free(childkey);
-	if(type == CB_HD_KEY_TYPE_PRIVATE){
-		return 1;
-	}
-	else if(type == CB_HD_KEY_TYPE_PUBLIC){
-		return 2;
-	}
-	else{
-		return 3;
+	struct hd_extended_key hdkey;
+	if(!hd_extended_key_init(&hdkey)){
+		return picocoin_returnblankhdkey(rh);
 	}	
+	if(!hd_extended_key_deser(&hdkey, hdkeyser.data,78)){
+		return picocoin_returnblankhdkey(rh);
+	}
+	
+	picocoin_returnhdkey(rh,hdkey);
+	hd_extended_key_free(&hdkey);
+
+	return rh;
+}
+
+HV* picocoin_generatehdkeymaster(SV* seed){
+	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
+		
+	STRLEN len; //calculated via SvPV
+	uint8_t * seed_raw = (uint8_t*) SvPV(seed,len);
+	
+	struct hd_extended_key hdkey;
+	if(!hd_extended_key_init(&hdkey)){
+		return picocoin_returnblankhdkey(rh);
+	}
+	
+	if(!hd_extended_key_generate_master(&hdkey, seed_raw, len)){
+		return picocoin_returnblankhdkey(rh);
+	}
+	picocoin_returnhdkey(rh,hdkey);
+	hd_extended_key_free(&hdkey);
+	return rh;
 }
 
 
-char* deriveChildPrivate(char* privstring,bool private,int child){
-	CBHDKey* masterkey = importDataToCBHDKey(privstring);
+HV* picocoin_generatehdkeychild(SV* xpriv, int child_index){
+	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
+	//static const char s_tv1_m_xpub3[] = "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8";
+	STRLEN len; //calculated via SvPV
+	uint8_t * xpriv_msg = (uint8_t*) SvPV(xpriv,len);
+	if(len != 78){
+		return picocoin_returnblankhdkey(rh);
+	}
 
-	// generate child key
-	CBHDKey * childkey = CBNewHDKey(true);
-	CBHDKeyChildID childID = { private, child};
-	CBHDKeyDeriveChild(masterkey, childID, childkey);
-	free(masterkey);
-
-	uint8_t * keyData = malloc(CB_HD_KEY_STR_SIZE);
-	CBHDKeySerialise(childkey, keyData);
-	free(childkey);
-
-	CBChecksumBytes * checksumBytes = CBNewChecksumBytesFromBytes(keyData, 82, false);
-	// need to figure out how to free keyData memory
-	CBByteArray * str = CBChecksumBytesGetString(checksumBytes);
-	CBReleaseObject(checksumBytes);
-	return (char *)CBByteArrayGetData(str);
+	//fprintf(stderr,"Child index:(%lu)\n",(uint32_t) child_index);
+	
+	struct hd_extended_key hdkey;
+	if(!hd_extended_key_init(&hdkey)){
+		return picocoin_returnblankhdkey(rh);
+	}
+	if(!hd_extended_key_deser(&hdkey,xpriv_msg,len)){
+		return picocoin_returnblankhdkey(rh);
+	}
+	
+	// create the child key
+	struct hd_extended_key childhdkey;
+	if(!hd_extended_key_init(&childhdkey)){
+		return picocoin_returnblankhdkey(rh);
+	}
+	if(!hd_extended_key_generate_child(&hdkey,(uint32_t) child_index,&childhdkey)){
+		return picocoin_returnblankhdkey(rh);
+	}
+	
+	// populate the hash with data from child key
+	picocoin_returnhdkey(rh,childhdkey);
+	hd_extended_key_free(&hdkey);
+	hd_extended_key_free(&childhdkey);
+	return rh;
 }
-
-char* exportWIFFromCBHDKey(char* privstring){
-	CBHDKey* cbkey = importDataToCBHDKey(privstring);
-	CBWIF * wif = CBHDKeyGetWIF(cbkey);
-	free(cbkey);
-	CBByteArray * str = CBChecksumBytesGetString(wif);
-	CBFreeWIF(wif);
-	return (char *)CBByteArrayGetData(str);
-}
-
-int exportChildIDFromCBHDKey(char* privstring){
-	CBHDKey* cbkey = importDataToCBHDKey(privstring);
-	int childnumber = (int)cbkey->childID.childNumber;
-	free(cbkey);
-	return childnumber;
-}
-int exportPrivChildIDFromCBHDKey(char* privstring){
-	CBHDKey* cbkey = importDataToCBHDKey(privstring);
-	int priv = (int)cbkey->childID.priv;
-	free(cbkey);
-	return priv;
-}
-
-char* exportAddressFromCBHDKey(char* privstring){
-	CBHDKey* cbkey = importDataToCBHDKey(privstring);
-	CBAddress * address = CBNewAddressFromRIPEMD160Hash(CBHDKeyGetHash(cbkey), CB_PREFIX_PRODUCTION_ADDRESS, false);
-	free(cbkey);
-	CBByteArray * addressstring = CBChecksumBytesGetString(CBGetChecksumBytes(address));
-	CBReleaseObject(address);
-	return (char *)CBByteArrayGetData(addressstring);
-}
-char* exportPublicKeyFromCBHDKey(char* privstring){
-	CBHDKey* cbkey = importDataToCBHDKey(privstring);
-	//uint8_t* pubkey = CBHDKeyGetPublicKey(cbkey);
-	CBByteArray* ans2 = CBNewByteArrayWithData(CBHDKeyGetPublicKey(cbkey),CB_PUBKEY_SIZE);
-	char* answer = bytearray_to_hexstring(ans2,CB_PUBKEY_SIZE);
-	free(cbkey);
-	return answer;
-	//return (char*) pubkey;
-}
-
-
-char* newWIF(int arg){
-	CBKeyPair * key = CBNewKeyPair(true);
-	CBKeyPairGenerate(key);
-	CBWIF * wif = CBNewWIFFromPrivateKey(key->privkey, true, CB_NETWORK_PRODUCTION, false);
-	free(key);
-	CBByteArray * str = CBChecksumBytesGetString(wif);
-	CBFreeWIF(wif);
-	return (char *)CBByteArrayGetData(str);
-}
-
-
-char* publickeyFromWIF(char* wifstring){
-	CBByteArray * old = CBNewByteArrayFromString(wifstring,true);
-	CBWIF * wif = CBNewWIFFromString(old, false);
-	CBDestroyByteArray(old);
-	uint8_t  privKey[32];
-	CBWIFGetPrivateKey(wif,privKey);
-	CBFreeWIF(wif);
-	CBKeyPair * key = CBNewKeyPair(true);
-	CBInitKeyPair(key);
-	memcpy(key->privkey, privKey, 32);
-	CBKeyGetPublicKey(key->privkey, key->pubkey.key);
-	return (char *)CBByteArrayGetData(CBNewByteArrayWithDataCopy(key->pubkey.key,CB_PUBKEY_SIZE));
-
-}
-
-char* addressFromPublicKey(char* pubkey){
-	CBByteArray * pubkeystring = CBNewByteArrayFromString(pubkey, false);
-	//CBChecksumBytes * walletKeyData = CBNewChecksumBytesFromString(walletKeyString, false);
-	//CBHDKey * cbkey = CBNewHDKeyFromData(CBByteArrayGetData(CBGetByteArray(walletKeyData)));
-
-
-	//CBByteArray * old = CBNewByteArrayFromString(pubkey,false);
-
-	CBKeyPair * key = CBNewKeyPair(false);
-	memcpy(key->pubkey.key, CBByteArrayGetData(CBGetByteArray(pubkeystring)), CB_PUBKEY_SIZE);
-	CBDestroyByteArray(pubkeystring);
-	// this code came from CBKeyPairGetHash definition
-	uint8_t hash[32];
-	CBSha256(key->pubkey.key, 33, hash);
-	CBRipemd160(hash, 32, key->pubkey.hash);
-
-	CBAddress * address = CBNewAddressFromRIPEMD160Hash(key->pubkey.hash, CB_PREFIX_PRODUCTION_ADDRESS, true);
-	free(key);
-	CBByteArray * addressstring = CBChecksumBytesGetString(CBGetChecksumBytes(address));
-	CBReleaseObject(address);
-
-	return (char *)CBByteArrayGetData(addressstring);
-}
-
-char* createWIF(int arg){
-	CBKeyPair * key = CBNewKeyPair(true);
-	CBKeyPairGenerate(key);
-	CBWIF * wif = CBNewWIFFromPrivateKey(key->privkey, true, CB_NETWORK_PRODUCTION, false);
-	CBByteArray * str = CBChecksumBytesGetString(wif);
-	CBReleaseObject(wif);
-	//return (char *)CBByteArrayGetData(str);
-	CBReleaseObject(str);
-	CBAddress * address = CBNewAddressFromRIPEMD160Hash(CBKeyPairGetHash(key), CB_PREFIX_PRODUCTION_ADDRESS, false);
-	CBByteArray * string = CBChecksumBytesGetString(CBGetChecksumBytes(address));
-	return (char *)CBByteArrayGetData(string);
-	//CBReleaseObject(key);
-	//CBReleaseObject(address);
-}
-
-
-
 
 
 MODULE = CBitcoin::CBHD	PACKAGE = CBitcoin::CBHD	
@@ -269,70 +190,15 @@ MODULE = CBitcoin::CBHD	PACKAGE = CBitcoin::CBHD
 
 PROTOTYPES: DISABLED
 
-
-int 
-exportNetworkBytes(privstring)
-	char * privstring
-
-int
-exportCBHDType(privstring)
-	char * privstring
+HV*
+picocoin_newhdkey(base58x)
+	SV* base58x
 	
-char *
-exportPublicExtendedKey(privstring)
-	char * privstring
+HV*
+picocoin_generatehdkeymaster(seed)
+	SV* seed
 
-char *
-newMasterKey (arg)
-	int	arg
-
-char *
-deriveChildPrivate (privstring, private, child)
-	char *	privstring
-	bool	private
-	int	child
-
-	
-
-char *
-deriveChildPublicExtended (privstring, child)
-	char *	privstring
-	int	child
-	
-char *
-exportWIFFromCBHDKey (privstring)
-	char *	privstring
-
-int
-exportChildIDFromCBHDKey (privstring)
-	char *	privstring
-
-int
-exportPrivChildIDFromCBHDKey (privstring)
-	char *	privstring
-
-char *
-exportAddressFromCBHDKey (privstring)
-	char *	privstring
-
-char *
-exportPublicKeyFromCBHDKey (privstring)
-	char *	privstring
-
-char *
-newWIF (arg)
-	int	arg
-
-char *
-publickeyFromWIF (wifstring)
-	char *	wifstring
-
-char *
-addressFromPublicKey (pubkey)
-	char *	pubkey
-
-char *
-createWIF (arg)
-	int	arg
-
-
+HV*
+picocoin_generatehdkeychild(xpriv,child_index)
+	SV* xpriv
+	int child_index

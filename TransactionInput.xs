@@ -4,132 +4,57 @@
 
 #include <stdio.h>
 #include <ctype.h>
-#include <openssl/ssl.h>
-#include <openssl/ripemd.h>
-#include <openssl/rand.h>
-#include <CBHDKeys.h>
-#include <CBChecksumBytes.h>
-#include <CBAddress.h>
-#include <CBWIF.h>
-#include <CBByteArray.h>
-#include <CBBase58.h>
-#include <CBScript.h>
-#include <CBTransactionInput.h>
+#include <errno.h>
+
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <assert.h>
+#include <ccoin/util.h>
+#include <ccoin/buffer.h>
+#include <ccoin/script.h>
+#include <ccoin/core.h>
+#include <ccoin/mbr.h>
+#include <ccoin/message.h>
+//#include <ccoin/compat.h>
+
+////// extra
 
 
-
-
-CBTransactionInput* stringToTransactionInput(char* scriptstring, int sequenceInt, char* prevOutHashString, int prevOutIndexInt){
-	// prevOutHash is stored as a hex
-	CBByteArray* prevOutHashInReverse =  CBNewByteArrayFromHex(prevOutHashString);
-	CBScript* script = CBNewScriptFromString(scriptstring);
-
-
-	// need to reverse the prevOutHashString...
-	CBByteArray* prevOutHash = CBByteArrayCopy(prevOutHashInReverse);
-        CBByteArrayReverseBytes(prevOutHash);
-	CBFreeByteArray(prevOutHashInReverse);
-
-	CBTransactionInput* txinput = CBNewTransactionInput(
-				script,
-				(uint32_t)sequenceInt,
-				prevOutHash,
-				(uint32_t)prevOutIndexInt
-			);
-
-	//CBFreeScript(script);
-	//CBDestroyByteArray(prevOutHash);
-	return txinput;
+int dummy3(int x) {
+	return x;
 }
 
-CBTransactionInput* CBTransactionInput_serializeddata_to_obj(char* datastring){
-
-	CBByteArray* data = hexstring_to_bytearray(datastring);
-
-	CBTransactionInput* txinput = CBNewTransactionInputFromData(data);
-	int dlen = (int)CBTransactionInputDeserialise(txinput);
-
-	//CBTransactionInputDeserialise(txinput);
-	//CBDestroyByteArray(data);
-	return txinput;
-}
-
-char* CBTransactionInput_obj_to_serializeddata(CBTransactionInput * txinput){
-	CBTransactionInputPrepareBytes(txinput);
-	int dlen = CBTransactionInputSerialise(txinput);
-	CBByteArray* serializeddata = CBGetMessage(txinput)->bytes;
-
-	char* answer = bytearray_to_hexstring(serializeddata,dlen);
-
-	return answer;
-}
-
-
-
-//////////////////////// perl export functions /////////////
-//CBTransactionInput * CBNewTransactionInput(CBScript * script, uint32_t sequence, CBByteArray * prevOutHash, uint32_t prevOutIndex)
-char* CBTransactionInput_create_txinput_obj(char* scriptstring, int sequenceInt, char* prevOutHashString, int prevOutIndexInt){
-	CBTransactionInput* txinput = stringToTransactionInput(scriptstring,sequenceInt,prevOutHashString,prevOutIndexInt);
-	char* answer = CBTransactionInput_obj_to_serializeddata(txinput);
-	//CBFreeTransactionInput(txinput);
-	return answer;
-}
-
-char* CBTransactionInput_get_script_from_obj(char* serializedDataString){
-	CBTransactionInput* txinput = CBTransactionInput_serializeddata_to_obj(serializedDataString);
-	char* scriptstring = scriptToString(txinput->scriptObject);
-	//CBFreeTransactionInput(txinput);
-	return scriptstring;
-}
-char* CBTransactionInput_get_prevOutHash_from_obj(char* serializedDataString){
-	CBTransactionInput* txinput = CBTransactionInput_serializeddata_to_obj(serializedDataString);
-	CBByteArray* dataInReverse = txinput->prevOut.hash;
-	CBByteArray* data = CBByteArrayCopy(dataInReverse);
-	CBByteArrayReverseBytes(data);
-	char * answer = bytearray_to_hexstring(data,data->length);
-	return answer;
-}
-int CBTransactionInput_get_prevOutIndex_from_obj(char* serializedDataString){
-	CBTransactionInput* txinput = CBTransactionInput_serializeddata_to_obj(serializedDataString);
-	uint32_t index = txinput->prevOut.index;
-	CBFreeTransactionInput(txinput);
-	return (int)index;
-}
-int CBTransactionInput_get_sequence_from_obj(char* serializedDataString){
-	CBTransactionInput* txinput = CBTransactionInput_serializeddata_to_obj(serializedDataString);
-	uint32_t sequence = txinput->sequence;
-	CBFreeTransactionInput(txinput);
-	return (int)sequence;
-}
+/*
+ *  scriptPubKey is the script in the previous transaction output.
+ *  scriptSig is the script that gets ripemd hash160's into a p2sh (need this to make signature)
+ *  outpoint = 32 byte tx hash followed by 4 byte uint32_t tx index
+ */
+/*
+HV* xyy(SV* outpoint, SV* scriptPubKey){
+	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
+	
+	struct buffer * incomingdata;
+	STRLEN len; //calculated via SvPV
+	incomingdata->p = (const uint8_t*) SvPV(outpoint,len);
+	incomingdata->len = len;
+	
+	struct bp_outpt * prev_output;
+	bp_outpt_init(prev_output);
+	if(!deser_bp_outpt(prev_output,incomingdata)){
+		return picocoin_returnblankhdkey();
+	}
+	
+}*/
 
 
+MODULE = CBitcoin::TransactionInput	PACKAGE = CBitcoin::TransactionInput
 
 
-MODULE = CBitcoin::TransactionInput	PACKAGE = CBitcoin::TransactionInput	PREFIX = CBTransactionInput_	
-
-PROTOTYPES: DISABLE
-
-
-char *
-CBTransactionInput_create_txinput_obj (scriptstring, sequenceInt, prevOutHashString, prevOutIndexInt)
-	char *	scriptstring
-	int	sequenceInt
-	char *	prevOutHashString
-	int	prevOutIndexInt
-
-char *
-CBTransactionInput_get_script_from_obj (serializedDataString)
-	char *	serializedDataString
-
-char *
-CBTransactionInput_get_prevOutHash_from_obj (serializedDataString)
-	char *	serializedDataString
+PROTOTYPES: DISABLED
 
 int
-CBTransactionInput_get_prevOutIndex_from_obj (serializedDataString)
-	char *	serializedDataString
-
-int
-CBTransactionInput_get_sequence_from_obj (serializedDataString)
-	char *	serializedDataString
-
+dummy3(x)
+	int x
