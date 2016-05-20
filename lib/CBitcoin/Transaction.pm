@@ -385,20 +385,31 @@ sub assemble_multisig_p2sh {
 =cut
 
 sub assemble_p2pkh {
-	my ($this,$i,$key) = @_;
+	my ($this,$i,$key,$txraw) = @_;
 	# do some testing
 	die "bad index" unless defined $i && 0 <= $i && $i < $this->numOfInputs();
 	
 	die "no key" unless defined $key;
+	my $txdata;
+	if(defined $txraw){
+		$txdata = $txraw;
+	}
+	else{
+		$txdata = $this->serialize();
+	}
 
-	my $scriptSig = picocoin_tx_sign_p2pkh(
-		$xpriv,
-		$script,
-		$data,
+	$txraw = picocoin_tx_sign_p2pkh(
+		$key->serialized_private(),
+		CBitcoin::Script::serialize_script($this->input($i)->script()),
+		$txdata,
 		$i,
 		SIGHASH_ALL
 	);
-
+	die "bad signature" unless defined $txraw && 0 < length($txraw);
+	return $txraw;
+	
+	#warn "Script Sig:".unpack('H*',$scriptSig)."\n";
+	#$this->input($i)->add_scriptSig($scriptSig);
 =pod	
 	my $sig_with_pushbytes = $this->calculate_signature($i,$key);
 	die "bad signature" unless defined $sig_with_pushbytes && 0 < length($sig_with_pushbytes);

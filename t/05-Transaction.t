@@ -75,40 +75,6 @@ my @outputs;
 
 
 {
-	my $tx = CBitcoin::Transaction->new({
-		'inputs' => \@ins, 'outputs' => \@outs
-	});
-	my $nIn = 0;
-	my $data = $tx->serialize();
-	#warn "TX:".unpack('H*',$data)."\n";
-	
-	ok(!$tx->validate_syntax('make me garbage'.$data),'should not be valid tx');
-	ok($tx->validate_syntax($data),'should be valid tx');
-	
-	
-	for(my $j=0;$j<scalar(@inputs);$j++){
-		$tx->assemble_p2pkh($j,$root->deriveChild(1,$j + 1));
-	}
-	
-	my $full = $tx->serialize();
-	#warn "Full:".unpack('H*',$full)."\n";
-	
-	my $signature = $tx->calculate_signature($nIn,$root->deriveChild(1,$nIn + 1));
-	ok(65 < length($signature), 'tx signature is not long enough');
-	
-	
-	
-	ok($tx->validate_sigs() ,' is the signed transaction valid?');
-	
-	#for(my $i=0;$i< $tx->numOfInputs();$i++){
-	#	$tx->input($i)->add_cbhdkey($root->deriveChild(1,$i + 1));
-		#$tx->input($i)->add_scriptSig($inputs[$i]->{'script'});
-	#}
-	
-}
-
-
-{
 	# got these from a block explorer, but we have to reverse the bytes
 	my @hashes = (
 		'6105e342232a9e67e4fa4ee0651eb8efd146dc0d7d346c788f45d8ad591c4577',
@@ -149,11 +115,11 @@ my @outputs;
 		'inputs' => \@ins, 'outputs' => \@outs
 	});
 	
-	for(my $j=0;$j<scalar(@ins);$j++){
-		$tx->assemble_p2pkh($j,$root->deriveChild(1,$j + 1));
-	}
+	my $txdata = $tx->assemble_p2pkh(0,$root->deriveChild(1,1));
+	warn "Txdata:".unpack('H*',$txdata)."\n";
+	$txdata = $tx->assemble_p2pkh(1,$root->deriveChild(1,2),$txdata);
 	
-	warn "TX:".unpack('H*',$tx->serialize() )."\n";
+	warn "TX:".unpack('H*',$txdata )."\n";
 }
 
 
