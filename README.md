@@ -13,8 +13,7 @@ To see how an spv client works, check out the t/spv.t.no script.  It contains an
 
 ## DEBIAN INSTALLATION
 
-To compile a debian package, first install libccoin0, which is https://github.com/favioflamingo/picocoin.  
-Once you compile and install the cbitcoin source package, go into the main directory and tyoe:
+To compile a debian package, first install libccoin0, which is https://github.com/favioflamingo/picocoin.  Once you compile and install the cbitcoin source package, go into the main directory and type:
 ```bash
     dh_make -p libcbitcoin-perl_0.01 --createorig -l
     debuild -uc
@@ -22,7 +21,7 @@ Once you compile and install the cbitcoin source package, go into the main direc
 
 ## INSTALLATION
 
-To install this module, run the following commands:
+To install this module manually, run the following commands:
 ```bash
 	perl Makefile.PL
 	make
