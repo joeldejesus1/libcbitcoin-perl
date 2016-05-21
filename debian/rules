@@ -12,6 +12,8 @@
 %:
 	dh $@  --with autotools-dev
 
+override_dh_auto_configure:
+	perl Makefile.PL PREFIX=/usr
 override_dh_auto_install:
 	make DESTDIR=debian/libcbitcoin-perl pure_install
 

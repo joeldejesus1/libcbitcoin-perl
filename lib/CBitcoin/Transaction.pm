@@ -26,6 +26,7 @@ Version 0.01
 =cut
 
 use bigint;
+use CBitcoin;
 use CBitcoin::Script;
 use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
@@ -37,7 +38,7 @@ require DynaLoader;
 
 $CBitcoin::Transaction::VERSION = '0.1';
 
-DynaLoader::bootstrap CBitcoin::Transaction $CBitcoin::Transaction::VERSION;
+DynaLoader::bootstrap CBitcoin::Transaction $CBitcoin::VERSION;
 
 @CBitcoin::Transaction::EXPORT = ();
 @CBitcoin::Transaction::EXPORT_OK = ();

@@ -3,7 +3,7 @@ package CBitcoin::Script;
 use strict;
 use warnings;
 
-use CBitcoin ':network_bytes';
+use CBitcoin;
 
 =head1 NAME
 
@@ -23,7 +23,7 @@ require DynaLoader;
 
 $CBitcoin::Script::VERSION = '0.1';
 
-DynaLoader::bootstrap CBitcoin::Script $CBitcoin::Script::VERSION;
+DynaLoader::bootstrap CBitcoin::Script $CBitcoin::VERSION;
 
 @CBitcoin::Script::EXPORT = ();
 @CBitcoin::Script::EXPORT_OK = ();
@@ -118,10 +118,10 @@ sub prefix {
 	
 	my $mapper;
 
-	if($CBitcoin::network_bytes eq MAINNET){
+	if($CBitcoin::network_bytes eq CBitcoin::MAINNET){
 		$mapper = $mapper_mainnet;
 	}
-	elsif($CBitcoin::network_bytes eq TESTNET){
+	elsif($CBitcoin::network_bytes eq CBitcoin::TESTNET){
 		$mapper = $mapper_testnet;
 	}
 	else{

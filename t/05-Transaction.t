@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use CBitcoin ':network_bytes';
+use CBitcoin ;
 use CBitcoin::CBHD;
 use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;

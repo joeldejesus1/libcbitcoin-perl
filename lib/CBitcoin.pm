@@ -29,9 +29,9 @@ $CBitcoin::VERSION = '0.1';
 
 DynaLoader::bootstrap CBitcoin $CBitcoin::VERSION;
 
-@CBitcoin::EXPORT = ();
-@CBitcoin::EXPORT_OK = ( 'MAINNET', 'TESTNET', 'TESTNET3');
-%CBitcoin::EXPORT_TAGS = ( network_bytes => [ 'MAINNET', 'TESTNET', 'TESTNET3' ] );
+@CBitcoin::EXPORT = ('MAINNET', 'TESTNET', 'TESTNET3');
+@CBitcoin::EXPORT_OK = ( );
+%CBitcoin::EXPORT_TAGS = (  );
 
 =item dl_load_flags
 

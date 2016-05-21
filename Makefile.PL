@@ -57,8 +57,6 @@ all ::
 
 __END__
 
-
-    ZFSonAWS is a program that automates backing up zfs snapshots onto AWS's S3.
     Copyright (C) 2015  Joel De Jesus
 
     This program is free software; you can redistribute it and/or modify

@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 
-use CBitcoin ':network_bytes';
+use CBitcoin;
 use Test::More tests => 15;
 
 

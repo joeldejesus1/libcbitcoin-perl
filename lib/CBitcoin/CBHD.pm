@@ -5,7 +5,7 @@ use bigint;
 use strict;
 use warnings;
 
-use CBitcoin ':network_bytes';
+use CBitcoin;
 use CBitcoin::Script;
 
 =head1 NAME
@@ -27,7 +27,7 @@ require DynaLoader;
 $CBitcoin::CBHD::VERSION = '0.1';
 
 #XSLoader::load('CBitcoin::CBHD',$CBitcoin::CBHD::VERSION );
-DynaLoader::bootstrap CBitcoin::CBHD $CBitcoin::CBHD::VERSION;
+DynaLoader::bootstrap CBitcoin::CBHD $CBitcoin::VERSION;
 
 @CBitcoin::CBHD::EXPORT = ();
 @CBitcoin::CBHD::EXPORT_OK = ();

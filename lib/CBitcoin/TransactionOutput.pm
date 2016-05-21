@@ -13,7 +13,7 @@ CBitcoin::TransactionOutput - The great new CBitcoin::TransactionOutput!
 Version 0.01
 
 =cut
-
+use CBitcoin;
 use CBitcoin::Script;
 use CBitcoin::Utilities;
 
@@ -23,7 +23,7 @@ require DynaLoader;
 
 $CBitcoin::TransactionOutput::VERSION = '0.1';
 
-DynaLoader::bootstrap CBitcoin::TransactionOutput $CBitcoin::TransactionOutput::VERSION;
+DynaLoader::bootstrap CBitcoin::TransactionOutput $CBitcoin::VERSION;
 
 @CBitcoin::TransactionOutput::EXPORT = ();
 @CBitcoin::TransactionOutput::EXPORT_OK = ();

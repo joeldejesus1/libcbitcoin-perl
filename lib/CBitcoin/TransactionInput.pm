@@ -2,6 +2,8 @@ package CBitcoin::TransactionInput;
 
 use strict;
 use warnings;
+
+use CBitcoin;
 use CBitcoin::Script;
 
 =head1 NAME
@@ -20,7 +22,7 @@ require DynaLoader;
 
 $CBitcoin::TransactionInput::VERSION = '0.1';
 
-DynaLoader::bootstrap CBitcoin::TransactionInput $CBitcoin::TransactionInput::VERSION;
+DynaLoader::bootstrap CBitcoin::TransactionInput $CBitcoin::VERSION;
 
 @CBitcoin::TransactionInput::EXPORT = ();
 @CBitcoin::TransactionInput::EXPORT_OK = ();
