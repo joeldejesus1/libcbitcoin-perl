@@ -54,7 +54,7 @@ our $minimum_seed_length = 30;
 
 =pod
 
----++ new($xpriv_txt)
+---++ new($xprv_txt)
 
 Create a cbhd object from a serialized, base58 encoded scalar.
 
@@ -73,14 +73,14 @@ sub new {
 	# Check the network bytes
 	my $prefix = substr($txt,0,4);
 	if(
-		( $prefix eq 'xpriv' || $prefix eq 'xpub' )
-		&& $CBitcoin::network_bytes eq MAINNET
+		( $prefix eq 'xprv' || $prefix eq 'xpub' )
+		&& $CBitcoin::network_bytes eq CBitcoin::MAINNET
 	){
 		
 	}
 	elsif(
 		( $prefix eq 'tprv' || $prefix eq 'tpub' )
-		&& $CBitcoin::network_bytes eq TESTNET
+		&& $CBitcoin::network_bytes eq CBitcoin::TESTNET
 	){
 		
 	}
@@ -90,7 +90,7 @@ sub new {
 	
 	my $this = picocoin_newhdkey($txt);
 	
-	die "bad xpriv/xpub" unless defined $this && $this->{'success'};
+	die "bad xprv/xpub" unless defined $this && $this->{'success'};
 	
 	bless($this, $package);
 	
@@ -122,18 +122,18 @@ sub generate {
 		}
 		close($fh);
 		$this = picocoin_generatehdkeymaster($seed);
-		if($CBitcoin::network_bytes eq TESTNET){
+		if($CBitcoin::network_bytes eq CBitcoin::TESTNET){
 			# need to go the long-about route to redo the key with the correct network bytes
 			# since this is perl, do it the old fashion way, regex
 			bless($this,$package);
 
 			if(defined $this->{'serialized private'}){
-				my $x = $this->export_xpriv();
-				if($x =~ m/^xpriv(.*)$/){
-					$this = picocoin_newhdkey('tpriv'.$1);
+				my $x = $this->export_xprv();
+				if($x =~ m/^xprv(.*)$/){
+					$this = picocoin_newhdkey('tprv'.$1);
 				}
 				else{
-					die "bad format for xpriv";
+					die "bad format for xprv";
 				}
 			}
 			else{
@@ -142,7 +142,7 @@ sub generate {
 					$this = picocoin_newhdkey('tpub'.$1);
 				}
 				else{
-					die "bad format for xpriv";
+					die "bad format for xprv";
 				}				
 			}
 		}
@@ -270,23 +270,23 @@ sub export_xpub {
 
 =pod
 
----++ export_xpriv
+---++ export_xprv
 
 =cut
 
-sub export_xpriv {
+sub export_xprv {
 	my $this = shift;
 	
-	return $this->{'xpriv'} if defined $this->{'xpriv'};
+	return $this->{'xprv'} if defined $this->{'xprv'};
 	
-	$this->{'xpriv'} = CBitcoin::picocoin_base58_encode(
+	$this->{'xprv'} = CBitcoin::picocoin_base58_encode(
 		$this->{'serialized private'}.
 		substr(Digest::SHA::sha256(Digest::SHA::sha256(
 			$this->{'serialized private'}))
 		,0,4)
 	);
 	
-	return $this->{'xpriv'};
+	return $this->{'xprv'};
 }
 
 sub serialized_private {
@@ -372,6 +372,43 @@ Provide the public key in raw binary form.
 
 sub publickey {
 	return shift->{'public key'};
+}
+
+=pod
+
+---++ index
+
+=cut
+
+sub index {
+	my ($this) = @_;
+	
+	
+	return $this->{'real index'} if defined $this->{'real index'};
+	
+	if( 0 <= $this->{'index'} && $this->{'index'} < ( 2 << 30)  ){
+		$this->{'real index'} = $this->{'index'};
+	}
+	else{
+		$this->{'real index'} = $this->{'index'} - (2 << 30);
+	}
+	
+	return $this->{'real index'};
+}
+
+=pod
+
+---++ childid->($hardbool,$index)
+
+=cut
+
+sub childid {
+	my ($this) = @_;
+	my $hardbool = 1;
+	if($this->is_soft_child()){
+		$hardbool = 0;
+	}
+	return ($hardbool,$this->index());
 }
 
 

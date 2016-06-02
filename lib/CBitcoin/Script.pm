@@ -266,7 +266,7 @@ sub whatTypeOfScript {
 		return 'p2pkh';	
 	}
 	elsif($s[-1] eq 'OP_CHECKMULTISIG'){
-		return 'multsig';
+		return 'multisig';
 	}
 	else{
 		die "bad script type";
@@ -400,3 +400,5 @@ __END__
 		return '1'.$value;	
 	}
 }
+
+1;
