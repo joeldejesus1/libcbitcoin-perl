@@ -1,8 +1,9 @@
 package CBitcoin::TransactionInput;
 
-use 5.014002;
 use strict;
 use warnings;
+
+use CBitcoin;
 use CBitcoin::Script;
 
 =head1 NAME
@@ -19,9 +20,9 @@ require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::TransactionInput::VERSION = '0.2';
+$CBitcoin::TransactionInput::VERSION = '0.1';
 
-DynaLoader::bootstrap CBitcoin::TransactionInput $CBitcoin::TransactionInput::VERSION;
+DynaLoader::bootstrap CBitcoin::TransactionInput $CBitcoin::VERSION;
 
 @CBitcoin::TransactionInput::EXPORT = ();
 @CBitcoin::TransactionInput::EXPORT_OK = ();
@@ -38,73 +39,74 @@ sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 =item new
 
----++ new()
+---++ new($info)
+
+$info = {
+	'prevOutHash' => 0x84320230,
+	'prevOutIndex' => 32,
+	'script' => 'OP_HASH160 ...'
+};
 
 =cut
 
 
 sub new {
-	use bigint;
 	my $package = shift;
 	my $this = bless({}, $package);
 
 	my $x = shift;
-	unless(ref($x) eq 'HASH'){
-		return $this;
-	}
-	if(defined $x->{'data'} && $x->{'data'} =~ m/^([0-9a-zA-Z]+)$/){
-		# we have a tx input which is serialized
-		$this->{'data'} = $x->{'data'};
-	
-	}
-	elsif(
-		defined $x->{'prevOutHash'} && $x->{'prevOutHash'} =~ m/^([0-9a-fA-F]+)$/
-		&& defined $x->{'prevOutIndex'} && $x->{'prevOutIndex'} =~ m/[0-9]+/
-		&& defined $x->{'script'}
+	unless(
+		defined $x && ref($x) eq 'HASH' 
+		&& defined $x->{'script'} && defined $x->{'prevOutHash'} 
+		&& defined $x->{'prevOutIndex'} && $x->{'prevOutIndex'} =~ m/^\d+$/
 	){
-		my $sequence = hex('0xFFFFFFFF') unless defined $x->{'sequence'};
-		# call this function to validate the data, and get serialized data back
-		#char* create_txinput_obj(char* scriptstring, int sequenceInt, char* prevOutHashString, int prevOutIndexInt){
-		$this->{'data'} = create_txinput_obj(
-			$x->{'script'}
-			,$sequence
-			,$x->{'prevOutHash'}
-			,$x->{'prevOutIndex'}
-		);
-		$this->script;
-		$this->prevOutHash;
-		$this->prevOutIndex;
+		return undef;
 	}
-	else{
-		die "no arguments to create Transaction::Input";
+	foreach my $col ('script','prevOutHash','prevOutIndex'){
+		$this->{$col} = $x->{$col};
 	}
-
+	
+	
+	if($this->type_of_script() eq 'multisig'){
+		$this->{'this is a p2sh'} = 1;
+		
+		# change the script to p2sh
+		my $x = $this->{'script'};
+		$x = CBitcoin::Script::script_to_address($x);
+		die "no valid script" unless defined $x;
+		$this->{'script'} = CBitcoin::Script::address_to_script($x);
+		die "no valid script" unless defined $x;
+	}
+	elsif($this->type_of_script() eq 'p2sh'){
+		$this->{'this is a p2sh'} = 1;
+		
+	}
+	
 	return $this;
 }
 
-=item serialized_data
-
----++ serialized_data()
-
-=cut
-
-
-sub serialized_data {
-	my $this = shift;
-	return $this->{'data'};
-}
-
-=item script
+=pod
 
 ---++ script
+
+AKA scriptPubKey
 
 =cut
 
 sub script {
-	my $this = shift;
-	# this is a C function
-	return get_script_from_obj($this->{'data'});
+	return shift->{'script'};
 }
+
+=pod
+
+---++ scriptSig
+
+=cut
+
+sub scriptSig {
+	return shift->{'scriptSig'};
+}
+
 
 =item type_of_script
 
@@ -121,25 +123,25 @@ sub type_of_script {
 
 ---++ prevOutHash()
 
+This is packed.
+
 =cut
 
 sub prevOutHash {
-	#use bigint;
-	my $this = shift;
-	# this is a C function
-	return get_prevOutHash_from_obj($this->{'data'});
+	return shift->{'prevOutHash'};
+
 }
 
 =item prevOutIndex
 
 ---++ prevOutIndex()
 
+Not packed.
+
 =cut
 
 sub prevOutIndex {
-	use bigint;
-	my $this = shift;
-	return get_prevOutIndex_from_obj($this->{'data'});
+	return shift->{'prevOutIndex'};
 }
 
 =item sequence
@@ -149,10 +151,74 @@ sub prevOutIndex {
 =cut
 
 sub sequence {
-	use bigint;
-	my $this = shift;
-	return get_sequence_from_obj($this->{'data'});
+	return shift->{'sequence'} || 0;
 }
+
+=pod
+
+---++ add_scriptSig($scriptSig)
+
+For checking the signature or making a signature, we need the script that gets transformed into scriptPubKey.
+
+=cut
+
+sub add_scriptSig {
+	my ($this,$script) = @_;
+	die "bad script" unless defined $script && 0 < length($script);
+	
+	$this->{'scriptSig'} = $script;
+	
+	return $this->{'scriptSig'};
+}
+
+=pod
+
+---++ add_cbhdkey($cbhd_key)
+
+For making the signature, we need to add the $cbhd_key.
+
+=cut
+
+sub add_cbhdkey {
+	my ($this,$cbhdkey) = @_;
+	die "bad cbhd key" unless defined $cbhdkey && $cbhdkey->{'success'};
+	$this->{'cbhd key'} = $cbhdkey;
+	return $cbhdkey;
+}
+
+
+=pod
+
+---+ i/o
+
+=cut
+
+=pod
+
+---++ serialize
+
+=cut
+
+sub serialize {
+	my ($this,$raw_bool) = @_;
+
+	# scriptSig
+	my $script = $this->scriptSig || '';
+	
+	if($raw_bool){
+		return $this->prevOutHash().pack('L',$this->prevOutIndex()).
+			CBitcoin::Utilities::serialize_varint(0).
+			pack('L',$this->sequence());	
+	}
+	else{
+		return $this->prevOutHash().pack('L',$this->prevOutIndex()).
+			CBitcoin::Utilities::serialize_varint(length($script)).$script.
+			pack('L',$this->sequence());
+	}
+	
+
+}
+
 
 =head1 AUTHOR
 

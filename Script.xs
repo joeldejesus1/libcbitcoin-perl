@@ -4,236 +4,286 @@
 
 #include <stdio.h>
 #include <ctype.h>
-#include <openssl/ssl.h>
-#include <openssl/ripemd.h>
-#include <openssl/rand.h>
-#include <CBHDKeys.h>
-#include <CBChecksumBytes.h>
-#include <CBAddress.h>
-#include <CBWIF.h>
-#include <CBByteArray.h>
-#include <CBBase58.h>
-#include <CBScript.h>
-#include <CBBigInt.h>
+#include <errno.h>
 
-//bool CBInitScriptFromString(CBScript * self, char * string)
-char* scriptToString(CBScript* script){
-	char* answer = (char *)malloc(CBScriptStringMaxSize(script)*sizeof(char));
-	CBScriptToString(script, answer);
-	return answer;
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
-}
+#include <assert.h>
+#include <ccoin/util.h>
+#include <ccoin/buffer.h>
+#include <ccoin/script.h>
+#include <ccoin/core.h>
+#include <ccoin/mbr.h>
+#include <ccoin/message.h>
+//#include <ccoin/compat.h>
 
-CBScript* stringToScript(char* scriptstring){
-	CBScript* self;
-	if(CBInitScriptFromString(self,scriptstring)){
-		return self;
-	}
-	else{
-		return NULL;
-	}
-}
+////// extra
 
-char* CBScript_obj_to_serializeddata(CBScript* script){
-	char* answer = (char *)malloc(CBScriptStringMaxSize(script)*sizeof(char));
-	CBScriptToString(script, answer);
-	return answer;
-
-}
-CBScript* CBScript_serializeddata_to_obj(char* scriptstring){
-	CBScript* self;
-	if(CBInitScriptFromString(self,scriptstring)){
-		return self;
-	}
-	else{
-		return NULL;
-	}
-}
-
-//////////////////////// perl export functions /////////////
-
-
-// 20 byte hex string (Hash160) to address
-char* newAddressFromRIPEMD160Hash(char* hexstring, int prefix){
-	CBByteArray* array = hexstring_to_bytearray(hexstring);
-	fprintf(stderr,"Array Length=%d\n",array->length);
-	CBAddress * address = CBNewAddressFromRIPEMD160Hash(CBByteArrayGetData(array), prefix, true);
-	CBByteArray * addressstring = CBChecksumBytesGetString(CBGetChecksumBytes(address));
-	CBReleaseObject(address);
-	return (char *)CBByteArrayGetData(addressstring);
+SV* picocoin_returnblankSV(void){
+	//SV* ans_sv = newSVpv("",1);
+	//return ans_sv;
+	return &PL_sv_undef;
 }
 
 
-
-
-/* Return 1 if this script is multisig, 0 for else*/
-// this function does not work
-char* whatTypeOfScript(char* scriptstring){
-	CBScript * script = CBNewScriptFromString(scriptstring);
-	if(script == NULL){
-		return "NULL";
-	}
-	if(CBScriptIsMultisig(script)){
-		return "multisig";
-	}
-	else if(CBScriptIsP2SH(script)){
-		return "p2sh";
-	}
-	else if(CBScriptIsPubkey(script)){
-		return "pubkey";
-	}
-	else if(CBScriptIsKeyHash(script)){
-		return "p2pkh";
-	}
-	else{
-		return "FAILED";
-	}
-
+int dummy2(int x) {
+	return x;
 }
 
-char* script_to_p2sh(char* scriptstring){
-	CBScript * script = CBNewScriptP2SHOutput(CBNewScriptFromString(scriptstring));
-    char* answer = (char *)malloc(CBScriptStringMaxSize(script)*sizeof(char));
-    CBScriptToString(script, answer);
-    CBFreeScript(script);
-    return answer;
+static bool is_digitstr(const char *s)
+{
+	if (*s == '-')
+		s++;
+
+	while (*s) {
+		if (!isdigit(*s))
+			return false;
+		s++;
+	}
+
+	return true;
 }
 
-/*char* serializeP2SH(char* scriptstring){
-	CBScript * script = CBNewScriptP2SHOutput(CBNewScriptFromString(scriptstring));
-	return CBScript_obj_to_serializeddata(script);
-}*/
+static char **strsplit_set(const char *s, const char *delim)
+{
+	// init delimiter lookup table
+	const char *stmp;
+	bool is_delim[256];
+	memset(&is_delim, 0, sizeof(is_delim));
+
+	stmp = delim;
+	while (*stmp) {
+		is_delim[(unsigned char)*stmp] = true;
+		stmp++;
+	}
+
+	bool in_str = true;
+	parr *pa = parr_new(0, free);
+	cstring *cs = cstr_new(NULL);
+	if (!pa || !cs)
+		goto err_out;
+
+	while (*s) {
+		unsigned char ch = (unsigned char) *s;
+		if (is_delim[ch]) {
+			if (in_str) {
+				in_str = false;
+				parr_add(pa, cs->str);
+
+				cstr_free(cs, false);
+				cs = cstr_new(NULL);
+				if (!cs)
+					goto err_out;
+			}
+		} else {
+			in_str = true;
+			if (!cstr_append_c(cs, ch))
+				goto err_out;
+		}
+		s++;
+	}
+
+	parr_add(pa, cs->str);
+	cstr_free(cs, false);
+
+	parr_add(pa, NULL);
+
+	char **ret = (char **) pa->data;
+	parr_free(pa, false);
 
 
+	return ret;
 
-char* addressToHex(char* addressString){
-    CBByteArray * addrStr = CBNewByteArrayFromString(addressString, true);
+err_out:
+	parr_free(pa, true);
+	cstr_free(cs, true);
+	return NULL;
+}
 
-    CBAddress * addr = CBNewAddressFromString(addrStr, false);
-    if(addr == NULL)
-    	return "";
-    
-    uint8_t * pubKeyHash = CBByteArrayGetData(CBGetByteArray(addr)) + 1;
-    
-    int prefix = (int) CBChecksumBytesGetPrefix(addr);
-    
-    
-    CBScript *script;
-    char *answer;
-    
-    if(prefix == 0x00){
-    	return bytearray_to_hexstring(CBGetByteArray(addr),CBGetByteArray(addr)->length);
-    	//return "p2pkh";
-    }
-    else if(prefix == 0x05){
-    	// see CBInitChecksumBytesFromString for details
-    	return bytearray_to_hexstring(CBGetByteArray(addr),CBGetByteArray(addr)->length);
+static void freev(void *vec_)
+{
+	void **vec = vec_;
+	if (!vec)
+		return;
+
+	unsigned int idx = 0;
+	while (vec[idx]) {
+		free(vec[idx]);
+		vec[idx] = NULL;
+		idx++;
+	}
+
+	free(vec);
+}
+
+// from libtest.c
+cstring *parse_script_str(const char *enc)
+{
+	char **tokens = strsplit_set(enc, " \t\n");
+	assert (tokens != NULL);
+
+	cstring *script = cstr_new_sz(64);
+
+	unsigned int idx;
+	for (idx = 0; tokens[idx] != NULL; idx++) {
+		char *token = tokens[idx];
+
+		if (is_digitstr(token)) {
+			int64_t v = strtoll(token, NULL, 10);
+			bsp_push_int64(script, v);
+		}
+
+		else if (is_hexstr(token, true)) {
+			cstring *raw = hex2str(token);
+			cstr_append_buf(script, raw->str, raw->len);
+			cstr_free(raw, true);
+		}
+
+		else if ((strlen(token) >= 2) &&
+			 (token[0] == '\'') &&
+			 (token[strlen(token) - 1] == '\''))
+			bsp_push_data(script, &token[1], strlen(token) - 2);
+
+		else if (GetOpType(token) != ccoin_OP_INVALIDOPCODE)
+			bsp_push_op(script, GetOpType(token));
+
+		else{
+			//assert(!"parse error");
+			freev(tokens);
+			cstr_free(script, true);
+			return NULL;
+		}
+			
+	}
+
+	freev(tokens);
+
+	return script;
+}
+
+///////// picocoin
+
+// change binary to string
+SV* picocoin_script_decode(SV* x){
+	STRLEN len; //calculated via SvPV
+	char * scriptSigEnc = (char*) SvPV(x,len);
+	cstring *scriptSig = parse_script_str(scriptSigEnc);
+	if(scriptSig == NULL){
+		return picocoin_returnblankSV();
+	}
 	
-    	uint8_t hash[32];
-		uint32_t keylength = 20;
-		//CBSha256(pubKeyHash, keylength, hash);
-
-		
-		script = (CBScript *) CBNewByteArrayOfSize(
-			1 + 1 + keylength + 1
-		);
-		CBByteArraySetByte(script, 0, CB_SCRIPT_OP_HASH160);
-		// indicates 20 bytes follow, see https://github.com/bitcoin/bips/blob/master/bip-0016.mediawiki
-		CBByteArraySetByte(script, 1, 0x14);
-		CBByteArraySetBytes(script, 2, pubKeyHash, keylength);
-		CBByteArraySetByte(script,
-			2 + keylength , 
-			CB_SCRIPT_OP_EQUAL
-		);
-    	
-    }
-    else{
-    	return "unknown";
-    }
-    //return bytearray_to_hexstring(CBGetByteArray(addr), 20);
-    //CBFreeAddress(addr);
-    return CBScript_obj_to_serializeddata(script);
-	//return "crap";
-}
-
-// CBScript * CBNewScriptPubKeyOutput(uint8_t * pubKey);
-char* pubkeyToScript (char* pubKeystring){
-	// convert to uint8_t *
-	CBByteArray * masterString = CBNewByteArrayFromString(pubKeystring, true);
-	CBScript * script = CBNewScriptPubKeyOutput(CBByteArrayGetData(masterString));
-	CBReleaseObject(masterString);
-
-	return scriptToString(script);
-}
-
-//http://stackoverflow.com/questions/1503763/how-can-i-pass-an-array-to-a-c-function-in-perl-xs#1505355
-//CBNewScriptMultisigOutput(uint8_t ** pubKeys, uint8_t m, uint8_t n);
-//char* multisigToScript (char** multisigConcatenated,)
-char* multisigToScript(SV* pubKeyArray,int mKeysInt, int nKeysInt) {
-	uint8_t mKeys, nKeys;
-	mKeys = (uint8_t)mKeysInt;
-	nKeys = (uint8_t)nKeysInt;
-
-	int n;
-	I32 length = 0;
-    if ((! SvROK(pubKeyArray))
-    || (SvTYPE(SvRV(pubKeyArray)) != SVt_PVAV)
-    || ((length = av_len((AV *)SvRV(pubKeyArray))) < 0))
-    {
-        return 0;
-    }
-    /* Create the array which holds the return values. */
-	uint8_t** multisig = (uint8_t**)malloc(nKeysInt * sizeof(uint8_t*));
-
-	for (n=0; n<=length; n++) {
-		STRLEN l;
-
-		char * fn = SvPV (*av_fetch ((AV *) SvRV (pubKeyArray), n, 0), l);
-
-		CBByteArray * masterString = hexstring_to_bytearray(fn);
-
-		// this line should just assign a uint8_t * pointer
-		multisig[n] = CBByteArrayGetData(masterString);
-
-		//CBReleaseObject(masterString);
-
+	int length = (scriptSig->len)*sizeof(uint8_t);
+	uint8_t * answer = malloc(length);
+	//sprintf("%s",ans->str);
+	memcpy(answer,scriptSig->str,length);
+	SV* ans_sv = newSVpv(answer,length);
+	cstr_free(scriptSig, true);
+	return ans_sv;
+	//return answer;
+	/*int i;
+	char * fullans = malloc((1 + ans->len) * sizeof(char));
+	for(i=0;i<ans->len+1;i++){
+		fullans[i] = ans->str[i];
 	}
-	CBScript* finalscript =  CBNewScriptMultisigOutput(multisig,mKeys,nKeys);
-
-	return scriptToString(finalscript);
+	cstr_free(ans, true);
+	return fullans;
+	*/
 }
 
 
 
-MODULE = CBitcoin::Script	PACKAGE = CBitcoin::Script	
+// const char *opn = GetOpName(OP_PUBKEY);
 
-PROTOTYPES: DISABLE
+AV* picocoin_parse_script(SV* serialized_script){
+	AV *r = newAV();
+	
+	STRLEN len; //calculated via SvPV
+	uint8_t * spointer = (uint8_t*) SvPV(serialized_script,len);
+	struct const_buffer buf = { spointer, len };
+	struct bscript_parser bp;
+	struct bscript_op op;
+	//parr *arr = parr_new(16, free);
+
+	
+	bsp_start(&bp, &buf);
+	// const char *GetOpName(enum opcodetype opcode_)
+	while (bsp_getop(&op, &bp)){
+		//parr_add(arr, memdup(&op, sizeof(op)));
+		struct bscript_op *op_p;
+		op_p = memdup(&op, sizeof(op));
+		// av_push( r, newSVnv());
+		if (is_bsp_pushdata(op_p->op)) {
+			//uint8_t * d1 = malloc(op_p->data.len * sizeof(uint8_t));
+			//memcpy(d1,op_p->data.p,op_p->data.len);
+			
+			char * data_withnull = malloc(2*op_p->data.len*sizeof(char) + 1 + 2);
+			char * data_withoutnull = malloc(2*op_p->data.len*sizeof(char) + 1 + 2 - 1);
+			
+			uint8_t lendata[1];
+			lendata[0] = (uint8_t) op_p->data.len;
+			
+			char * datalen = malloc(2 * 1 + 1);
+			datalen[0] = '0';
+			datalen[1] = 'x';
+			encode_hex(datalen + 2, lendata, 1);
+			av_push( r, newSVpv(datalen,  4 ));
+			
+			//memcpy(data, hexprefix, hexprefix_length);
+			data_withnull[0] = '0';
+			data_withnull[1] = 'x';
+			encode_hex(data_withnull + 2, op_p->data.p, op_p->data.len);
+			
+			// strip the null out
+			int i;
+			for(i=0;i<2*op_p->data.len*sizeof(char) + 1 + 2 - 1;i++){
+				data_withoutnull[i] = data_withnull[i];
+			}
+			free(data_withnull);
+			av_push( r, newSVpv(data_withoutnull,  2*op_p->data.len*sizeof(char) + 1 + 2 - 1 ));
+		} else {
+			const char* ox1 = GetOpName(op_p->op);
+			size_t length = strlen(ox1);
+			char * opname = malloc(length * sizeof(char));
+			// max size is 100
+			strncpy(opname,ox1,length);
+			av_push( r, newSVpv(opname,length));
+		}
+		free(op_p);
+	}
+	
+	
+	if (bp.error){
+		av_push( r,  newSViv(0)   );
+	}
+	else{
+		av_push( r,  newSViv(1)   );
+	}
+
+	return r;
+
+err_out:
+	//parr_free(arr, true);
+	return r;
+}
 
 
-char*
-script_to_p2sh(scriptstring)
-	char* scriptstring
 
-char *
-newAddressFromRIPEMD160Hash (hexstring,prefix)
-	char *	hexstring
-	int		prefix
+MODULE = CBitcoin::Script	PACKAGE = CBitcoin::Script
 
-char *
-whatTypeOfScript (scriptstring)
-	char *	scriptstring
 
-char *
-addressToHex (addressString)
-	char *	addressString
+PROTOTYPES: DISABLED
 
-char *
-pubkeyToScript (pubKeystring)
-	char *	pubKeystring
+int
+dummy2(x)
+	int x
+	
+SV*
+picocoin_script_decode(x)
+	SV* x
 
-char *
-multisigToScript (pubKeyArray, mKeysInt, nKeysInt)
-	SV *	pubKeyArray
-	int	mKeysInt
-	int	nKeysInt
-
+AV*
+picocoin_parse_script(x)
+	SV* x

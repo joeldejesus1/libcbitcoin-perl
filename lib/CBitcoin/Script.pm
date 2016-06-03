@@ -1,8 +1,9 @@
 package CBitcoin::Script;
 
-use 5.014002;
 use strict;
 use warnings;
+
+use CBitcoin;
 
 =head1 NAME
 
@@ -20,9 +21,9 @@ require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::Script::VERSION = '0.2';
+$CBitcoin::Script::VERSION = '0.1';
 
-DynaLoader::bootstrap CBitcoin::Script $CBitcoin::Script::VERSION;
+DynaLoader::bootstrap CBitcoin::Script $CBitcoin::VERSION;
 
 @CBitcoin::Script::EXPORT = ();
 @CBitcoin::Script::EXPORT_OK = ();
@@ -38,15 +39,59 @@ Don't worry about this.
 sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 
+
 =pod
 
----+ constructor
+---++ convert_OP_to_CCOIN($string,$push_bytes_bool)
 
----++ new
-
-{ 'address' => ..} or {'text' => ..}
+OP_HASH160 -> ccoin_OP_HASH160;
 
 =cut
+
+sub convert_OP_to_CCOIN {
+	my ($string,$push_bytes_bool) = @_;
+	die "no script" unless defined $string;
+	my @newarray;
+	foreach my $element (split(' ',$string)){
+		if($element =~ m/^OP_/){
+			push(@newarray,'ccoin_'.$element);
+		}
+		elsif($element =~ m/^0x([0-9a-fA-F]+)$/ && $push_bytes_bool){
+			my $x = $1;
+			my $y = pack('C',length($x)/2);
+			push(@newarray,'0x'.unpack('H*',$y),'0x'.$x);
+		}
+		else{
+			push(@newarray,$element);
+		}
+	}
+	return join(' ',@newarray);
+}
+
+=pod
+
+---++ convert_CCOIN_to_OP(@x)
+
+ccoin_OP_HASH160 -> OP_HASH160;
+
+=cut
+
+sub convert_CCOIN_to_OP {
+	my @newarray;
+	foreach my $element (@_){
+		chomp($element);
+		if($element =~ m/^ccoin_(OP_.*)/){
+			push(@newarray,$1);
+		}
+		elsif($element =~ m/^0x(\d{2})$/){
+			# skip, because it is a length
+		}
+		else{
+			push(@newarray,$element);
+		}
+	}
+	return join(' ',@newarray);
+}
 
 =pod
 
@@ -57,14 +102,32 @@ Map prefixes to integer.
 See https://en.bitcoin.it/wiki/List_of_address_prefixes.
 
 =cut
+our $mapper_mainnet = {
+	'p2pkh' => 0x00, 'p2sh' => 0x05,
+	0x00 => 'p2pkh', 0x05 => 'p2sh'
+};
+
+our $mapper_testnet = {
+	'p2pkh' => 0x6F, 'p2sh' => 0xC4,
+	0x6F => 'p2pkh', 0xC4 => 'p2sh'
+};
+
 
 sub prefix {
 	my $type = shift;
 	
-	my $mapper = {
-		'p2pkh' => 0x00, 'p2sh' => 0x05,
-		0x00 => 'p2pkh', 0x05 => 'p2sh'
-	};
+	my $mapper;
+
+	if($CBitcoin::network_bytes eq CBitcoin::MAINNET){
+		$mapper = $mapper_mainnet;
+	}
+	elsif($CBitcoin::network_bytes eq CBitcoin::TESTNET){
+		$mapper = $mapper_testnet;
+	}
+	else{
+		die "bad network bytes";
+	}
+
 
 	if(defined $type && defined $mapper->{$type}){
 		return $mapper->{$type};
@@ -75,9 +138,34 @@ sub prefix {
 	
 }
 
+=pod
 
+---++ what_network_is_address()
 
-=item address_to_script
+Are we on MAINNET ('production') or TESTNET ('test')?
+
+=cut
+
+sub what_network_is_address {
+	my $x = shift;
+	die "bad address" unless defined $x && 0 < length($x);
+	$x = CBitcoin::picocoin_base58_decode($x);
+	die "bad address" unless defined $x && 0 < length($x);
+	my $prefix = unpack('C',substr($x,0,1) );
+	
+	
+	if(defined $mapper_mainnet->{$prefix}){
+		return 'production';
+	}
+	elsif(defined $mapper_testnet->{$prefix}){
+		return 'test';
+	}
+	else{
+		return 'unknown';
+	}
+}
+
+=pod
 
 ---++ address_to_script
 
@@ -87,42 +175,36 @@ sub prefix {
 sub address_to_script {
 	#use bigint;
 	my $x = shift;
-	die "bad address" unless defined $x && 0 < length($x);
-	$x = addressToHex($x);
-	return '' unless defined $x && 0 < length($x);
 	
-	my $prefix = prefix(hex(substr($x,0,2)));
-	my $hash = substr($x,2,40);
+	die "bad address" unless defined $x && 0 < length($x);
+	$x = CBitcoin::picocoin_base58_decode($x);
+	die "bad address" unless defined $x && 0 < length($x);
+
+	
+	my $prefix = prefix(unpack('C',substr($x,0,1)));
+	my $hash = substr($x,1,20);
+	unless(
+		substr($x,21,4) eq
+			substr(Digest::SHA::sha256(Digest::SHA::sha256(substr($x,0,21))),0,4) 
+	){
+		return undef;
+	}
 	
 	# change to hex	
 	if($prefix eq 'p2pkh'){
-		return 'OP_DUP OP_HASH160 0x'.$hash.' OP_EQUALVERIFY OP_CHECKSIG';
+		return 'OP_DUP OP_HASH160 0x'.unpack('H*',$hash).' OP_EQUALVERIFY OP_CHECKSIG';
 	}
 	elsif($prefix eq 'p2sh'){
-		return 'OP_HASH160 0x'.$hash.' OP_EQUAL';
+		return 'OP_HASH160 0x'.unpack('H*',$hash).' OP_EQUAL';
 	}
 	else{
 		die "should not be here.";
 	}
 }
 
+
+
 =pod
-
----++ address_type
-
-p2pkh or p2sh or unknown...
-
-=cut
-
-sub address_type {
-	my $x = shift;
-	$x = addressToHex($x);
-	return prefix(hex(substr($x,0,2)));
-}
-
-
-
-=item script_to_address
 
 ---++ script_to_address
 
@@ -134,69 +216,91 @@ sub script_to_address {
 	die "no script given" unless defined $x && 0 < length($x);
 	
 	my $type = whatTypeOfScript($x);
+	my $serialized_script = serialize_script($x);
+	my ($hash,$prefix);
 	
 	# this part only works for OP_HASH160
 	if($type eq 'multisig'){
 		# need to get p2sh 
-		$x = script_to_p2sh($x);
-		warn "P2SH Script=$x\n";
-		# then, get: OP_HASH160 0x3dbcec384e5b32bb426cc011382c4985990a1895 OP_EQUAL
-		my @y = split(' ',$x);
-		warn "Hash=".length(substr($y[1],2))."\n";
-		return newAddressFromRIPEMD160Hash(substr($y[1],2),prefix('p2sh'));
+		$prefix = pack('C',prefix('p2sh'));
+		$hash = CBitcoin::picocoin_ripemd_hash160($serialized_script);
 	}
 	elsif($type eq 'p2sh'){
-		# we have: OP_HASH160 0x3dbcec384e5b32bb426cc011382c4985990a1895 OP_EQUAL
-		my @y = split(' ',$x);
-		warn "Hash=".substr($y[1],2)."\n";
-		return newAddressFromRIPEMD160Hash(substr($y[1],2),prefix('p2sh'));
+		# we have: OP_HASH160 0x14 0x3dbcec384e5b32bb426cc011382c4985990a1895 OP_EQUAL
+		die "bad script length" unless length($serialized_script) == 23;
+		$prefix = pack('C',prefix('p2sh'));
+		$hash = substr($serialized_script,2,20);
 	}
 	elsif($type eq 'pubkey'){
 		die "cannot handle pubkey";
 	}
 	elsif($type eq 'p2pkh'){
-		# we have: OP_DUP OP_HASH160 0x3dbcec384e5b32bb426cc011382c4985990a1895 OP_EQUALVERIFY OP_CHECKSIG
-		my @y = split(' ',$x);
-		warn "Hash=".substr($y[2],2)."\n";
-		return newAddressFromRIPEMD160Hash(substr($y[2],2),prefix('p2pkh'));
+		# we have: OP_DUP OP_HASH160 0x14 0x3dbcec384e5b32bb426cc011382c4985990a1895 OP_EQUALVERIFY OP_CHECKSIG
+		$prefix = pack('C',prefix('p2pkh'));
+		die "bad script length" unless length($serialized_script) == 25;
+		$hash = substr($serialized_script,3,20);
 	}
 	else{
 		die "bad type";
 	}
+
+	my $address = $prefix.$hash.substr(
+		Digest::SHA::sha256(Digest::SHA::sha256($prefix.$hash)),
+		0,4
+	);
+	return CBitcoin::picocoin_base58_encode($address);
 	
 }
 
-=item pubkeys_to_multisig_script
+sub whatTypeOfScript {
+	my $x = shift;
+	die "undefined type" unless defined $x && 0 < length($x);
+	my @s = split(' ',$x);
+	
+	if(scalar(@s) == 3 && $s[0] eq 'OP_HASH160' && $s[2] eq 'OP_EQUAL'){
+		return 'p2sh';
+	}
+	elsif(
+		scalar(@s) == 5 && $s[0] eq 'OP_DUP' && $s[1] eq 'OP_HASH160'
+		&& $s[3] eq 'OP_EQUALVERIFY' && $s[4] eq 'OP_CHECKSIG'
+	){
+		return 'p2pkh';	
+	}
+	elsif($s[-1] eq 'OP_CHECKMULTISIG'){
+		return 'multisig';
+	}
+	else{
+		die "bad script type";
+	}
+	
+	
+}
 
----++ pubkeys_to_multisig_script(\@cbhdkeys,$m) 
+=pod
 
-Rule 1:<verbatim>$m < $n = scalar(@cbhdkeys)</verbatim>
+---++ serialize_script
+
 =cut
 
-sub pubkeys_to_multisig_script {
-	my $KeyArrayRef = shift;
-	my ($m,$n) = (shift,-1);
-
-	unless(
-		( defined $KeyArrayRef && defined $m )
-		&& ( ref($KeyArrayRef) eq 'ARRAY' && $m =~ m/^\d+$/ )
-		&& scalar(@{$KeyArrayRef}) >= $m && $m > 0
-	){
-		die "insufficient arguments to create script";
-	}
-	$n = scalar(@{$KeyArrayRef});
-	
-
-	#char* multisigToScript(SV* pubKeyArray,int mKeysInt, int nKeysInt)
-	my @pubkeyarray;
-	foreach my $key (@{$KeyArrayRef}){
-		warn "Address:".$key->address()."  Public Key:".$key->publickey()."\n";
-		push(@pubkeyarray,$key->publickey());
-	}
-	return multisigToScript(\@pubkeyarray,$m, $n);
+sub serialize_script {
+	my $x = shift;
+	return undef unless defined $x;
+	return picocoin_script_decode(convert_OP_to_CCOIN($x,1));
 }
 
 
+=pod
+
+---++ deserialize_script
+
+=cut
+
+sub deserialize_script {
+	my $x = shift;
+	return undef unless defined $x && 0 < length($x);
+	$x = picocoin_parse_script($x);
+	return convert_CCOIN_to_OP(@{$x});
+}
 
 
 =head1 AUTHOR
@@ -297,3 +401,5 @@ __END__
 		return '1'.$value;	
 	}
 }
+
+1;

@@ -1,9 +1,12 @@
 package CBitcoin::CBHD;
 
-use 5.014002;
+#use 5.014002;
+use bigint;
 use strict;
 use warnings;
 
+use CBitcoin;
+use CBitcoin::Script;
 
 =head1 NAME
 
@@ -21,10 +24,10 @@ require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::CBHD::VERSION = '0.2';
+$CBitcoin::CBHD::VERSION = '0.1';
 
 #XSLoader::load('CBitcoin::CBHD',$CBitcoin::CBHD::VERSION );
-DynaLoader::bootstrap CBitcoin::CBHD $CBitcoin::CBHD::VERSION;
+DynaLoader::bootstrap CBitcoin::CBHD $CBitcoin::VERSION;
 
 @CBitcoin::CBHD::EXPORT = ();
 @CBitcoin::CBHD::EXPORT_OK = ();
@@ -38,33 +41,65 @@ Don't worry about this.
 
 sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
+our $minimum_seed_length = 30;
 
 # Preloaded methods go here.
 
-=item new
+=pod
 
----+ new()
-
-Create a cbhd object.
+---+ constructors
 
 =cut
 
+
+=pod
+
+---++ new($xprv_txt)
+
+Create a cbhd object from a serialized, base58 encoded scalar.
+
+TODO: check for the appropriate network bytes.
+
+=cut
+
+
+
 sub new {
 	my $package = shift;
-	my $seed = shift;
-	my $this = {};
-	bless($this, $package);
-	if(defined $seed){
-		$this->serialized_data($seed);
+	my $txt = shift;
+	die "no serialized, base58 encoded provided" 
+		unless defined $txt && 4 < length($txt);
+	
+	# Check the network bytes
+	my $prefix = substr($txt,0,4);
+	if(
+		( $prefix eq 'xprv' || $prefix eq 'xpub' )
+		&& $CBitcoin::network_bytes eq CBitcoin::MAINNET
+	){
+		
 	}
+	elsif(
+		( $prefix eq 'tprv' || $prefix eq 'tpub' )
+		&& $CBitcoin::network_bytes eq CBitcoin::TESTNET
+	){
+		
+	}
+	else{
+		die "bad network bytes";
+	}
+	
+	my $this = picocoin_newhdkey($txt);
+	
+	die "bad xprv/xpub" unless defined $this && $this->{'success'};
+	
+	bless($this, $package);
+	
 	return $this;
 }
 
-=item generate
+=pod
 
----+ generate
-
-newMasterKey deriveChildPrivate exportWIFFromCBHDKey exportAddressFromCBHDKey publickeyFromWIF
+---++ generate($seed)
 
 generate a key (parent)
 
@@ -72,55 +107,57 @@ generate a key (parent)
 
 
 sub generate {
-	my $this = shift;
-	eval{
-		my $key = CBitcoin::CBHD::newMasterKey(1);
-		$this->serialized_data($key) || die "Cannot load the key.";		
-	};
-	if($@){
-		return 0;
+	my ($package,$seed) = @_;
+	my $this = {};
+	if(defined $seed && $minimum_seed_length < length($seed) ){
+		$this = picocoin_generatehdkeymaster($seed);
 	}
-	return 1;
-}
+	elsif(!defined $seed){
+		# get 32 bytes from /dev/random (we might block here)
+		open(my $fh,'<','/dev/random') || die "cannot read any safe random bytes";
+		binmode($fh);
+		my ($n,$m) = (32,0);
+		while(0 < $n - $m){
+			$m += sysread($fh,$seed,32,$m);
+		}
+		close($fh);
+		$this = picocoin_generatehdkeymaster($seed);
+		if($CBitcoin::network_bytes eq CBitcoin::TESTNET){
+			# need to go the long-about route to redo the key with the correct network bytes
+			# since this is perl, do it the old fashion way, regex
+			bless($this,$package);
 
-=item serialized_data
-
----+ serialized_data
-
-
-=cut
-
-
-sub serialized_data {
-	my $this = shift;
-	my $x = shift;
-	if(defined $x && $x =~ m/^([0-9a-zA-Z]+)$/){
-		$this->{'data'} = $x;
-		return $this->{'data'};
-	}
-	elsif(!(defined $x)){
-		return $this->{'data'};
+			if(defined $this->{'serialized private'}){
+				my $x = $this->export_xprv();
+				if($x =~ m/^xprv(.*)$/){
+					$this = picocoin_newhdkey('tprv'.$1);
+				}
+				else{
+					die "bad format for xprv";
+				}
+			}
+			else{
+				my $x = $this->export_xpub();
+				if($x =~ m/^xpub(.*)$/){
+					$this = picocoin_newhdkey('tpub'.$1);
+				}
+				else{
+					die "bad format for xprv";
+				}				
+			}
+		}
 	}
 	else{
-		die "no arguments to create CBitcoin::CBHD data";
+		die "seed is too short";
 	}
+	bless($this,$package);
+	
+	$this->{'is soft child'} = 0;
+	
+	return $this;
 }
 
-=item is_soft_child
-
----+ is_soft_child
-
-Returns true if yes, false if soft.
-=cut
-
-
-sub is_soft_child {
-	my $this = shift;
-	exportPrivChildIDFromCBHDKey();
-	return shift->{'is soft child'};
-}
-
-=item deriveChild
+=pod
 
 ---++ deriveChild($hardbool,$childid)
 
@@ -130,34 +167,30 @@ go from private parent keypair to private child keypair, then set $hardbool to t
 =cut
 
 sub deriveChild {
-	my $this = shift;
-	my $hardbool = shift;
-	my $childid = shift;
-	my $childkey = new CBitcoin::CBHD;
-	eval{
-		if($hardbool){
-			$hardbool = 1;
-		}
-		else{
-			$hardbool = 0;
-			$childkey->{'is soft child'} = 1;
-		}
-		unless($childid > 0 && $childid < 2**31){
-			die "The child id is not in the correct range.\n";
-		}
-		die "no private key" unless $this->serialized_data;
-		$childkey->serialized_data(CBitcoin::CBHD::deriveChildPrivate($this->serialized_data(),$hardbool,$childid));
-		
-	};
-	if($@){
+	my ($this,$hardbool,$childid) = @_;
+	
+	my $childkey;
+	if($hardbool && defined $this->{'serialized private'}){
+		$childkey = picocoin_generatehdkeychild(
+			$this->{'serialized private'},
+			(2 << 30) + $childid
+		);
+	}
+	elsif(defined $this->{'serialized private'}){
+		$childkey = picocoin_generatehdkeychild($this->{'serialized private'},$childid);
+	}
+	else{
+		die "no private data";
+	}
+
+	if(!defined $childkey || !($childkey->{'success'})){
 		return undef;
 	}
+	bless($childkey,ref($this));
 	return $childkey;
-	
 }
 
-
-=item deriveChildPubExt
+=pod
 
 ---++ deriveChildPubExt($childid)
 
@@ -168,51 +201,118 @@ From Hard to Soft.
 =cut
 
 sub deriveChildPubExt {
-	my $this = shift;
-	my $childid = shift;
-	my $childkey = new CBitcoin::CBHD;
-	eval{
+	my ($this,$childid) = @_;
+	
+	# soft key so $childid < 2^31
+	my $childkey = picocoin_generatehdkeychild($this->{'serialized public'},$childid);
 
-		unless($childid > 0 && $childid < 2**31){
-			die "The child id is not in the correct range.\n";
-		}
-		die "no private key" unless $this->serialized_data;
-		$childkey->serialized_data(CBitcoin::CBHD::deriveChildPublicExtended($this->serialized_data(),$childid));
-		$childkey->{'is soft child'} = 1;
-	};
-	if($@){
-		warn "Error:$@";
+	if(!defined $childkey || !($childkey->{'success'})){
 		return undef;
 	}
-	return $childkey;
 	
+	bless($childkey,ref($this));
+	
+	return $childkey;
 }
 
-=item exportPublicExtendedCBHD
 
----++ exportPublicExtendedCBHD
+=pod
+
+---+ utilities
+
+=cut
+
+=pod
+
+---++ is_soft_child
+
+Returns true if yes, false if soft.
 
 =cut
 
 
-sub exportPublicExtendedCBHD {
+sub is_soft_child {
 	my $this = shift;
-	# better make sure we have the private bits
-	return ref($this)->new(exportPublicExtendedKey($this->serialized_data()));
+	
+	return $this->{'is soft child'} if defined $this->{'is soft child'};
+	
+	if( $this->{'index'} < ( 2 << 30) && $this->{'index'} != 0){
+		$this->{'is soft child'} = 1;
+	}
+	else{
+		$this->{'is soft child'} = 0;
+	}
+	
+	return $this->{'is soft child'};
 }
 
-=item network_bytes
 
----++ network_bytes
+
+=pod
+
+---++ export_xpub
+
+=cut
+
+sub export_xpub {
+	my $this = shift;
+	
+	return $this->{'xpub'} if defined $this->{'xpub'};
+	
+	$this->{'xpub'} = CBitcoin::picocoin_base58_encode(
+		$this->{'serialized public'}.
+		substr(Digest::SHA::sha256(Digest::SHA::sha256(
+			$this->{'serialized public'}))
+		,0,4)
+	);	
+	return $this->{'xpub'};
+}
+
+=pod
+
+---++ export_xprv
+
+=cut
+
+sub export_xprv {
+	my $this = shift;
+	
+	return $this->{'xprv'} if defined $this->{'xprv'};
+	
+	$this->{'xprv'} = CBitcoin::picocoin_base58_encode(
+		$this->{'serialized private'}.
+		substr(Digest::SHA::sha256(Digest::SHA::sha256(
+			$this->{'serialized private'}))
+		,0,4)
+	);
+	
+	return $this->{'xprv'};
+}
+
+sub serialized_private {
+	return shift->{'serialized private'};
+}
+
+sub serialized_public {
+	return shift->{'serialized public'};
+}
+
+=pod
+
+---++ network_bytes()
+
+Return either 'production' or 'test' depending on whether we are on testnet or mainnet
 
 =cut
 
 sub network_bytes {
-	my $ans = exportNetworkBytes(shift->serialized_data());
-	if($ans == 1){
+	my $this = shift;
+	my $xpub = $this->export_xpub();
+	
+	if($xpub =~ m/^xpub/){
 		return 'production';
 	}
-	elsif($ans == 2){
+	elsif($xpub =~ m/^tpub/){
 		return 'test';
 	}
 	else{
@@ -221,82 +321,113 @@ sub network_bytes {
 }
 
 
-=item cbhd_type
+=pod
 
 ---++ cbhd_type
+
+Return 'private' if we posses the serialized private key, else return public.
 
 =cut
 
 sub cbhd_type {
-	my $ans = exportCBHDType(shift->serialized_data());
-	if($ans == 1){
+	my $this = shift;
+
+	if(defined $this->{'serialized private'}){
 		return 'private';
 	}
-	elsif($ans == 2){
+	else{
 		return 'public';
 	}
-	else{
-		return 'unknown';
-	}
+	
 }
 
 
-=item WIF
-
----++ $cbhd->WIF()
-
-=cut
-
-
-sub WIF {
-	my $this = shift;
-	my $wif = '';
-	eval{
-		die "no private key" unless $this->serialized_data();
-		$wif = CBitcoin::CBHD::exportWIFFromCBHDKey($this->serialized_data());
-	};
-	if($@){
-		return undef;
-	}
-	return $wif;
-}
-
-=item address
+=pod
 
 ---++ address()
+
+The network bytes are determined by the global variable $CBitcoin::network_bytes.
 
 =cut
 
 sub address {
 	my $this = shift;
-	my $address = '';
-	eval{
-		die "no private key" unless $this->serialized_data();
-		$address = CBitcoin::CBHD::exportAddressFromCBHDKey($this->serialized_data());
-	};
-	if($@){
-		return undef;
-	}
-	return $address;
+	
+	return $this->{'address'} if defined $this->{'address'};
+	
+	my $script = 'OP_DUP OP_HASH160 0x'.unpack('H*',$this->{'ripemdHASH160'})
+		.' OP_EQUALVERIFY OP_CHECKSIG';
+	
+	$this->{'address'} = CBitcoin::Script::script_to_address($script);
+	return $this->{'address'};
 }
 
-=item publickey
+=pod
 
----++ $cbhd->publickey()
+---++ publickey()
+
+Provide the public key in raw binary form.
 
 =cut
 
 sub publickey {
-	my $this = shift;
-	my $x = '';
-	eval{
-		die "no private key" unless $this->serialized_data();
-		$x = CBitcoin::CBHD::exportPublicKeyFromCBHDKey($this->serialized_data());
-	};
-	if($@){
-		return undef;
+	return shift->{'public key'};
+}
+
+=pod
+
+---++ index
+
+=cut
+
+sub index {
+	my ($this) = @_;
+	
+	
+	return $this->{'real index'} if defined $this->{'real index'};
+	
+	if( 0 <= $this->{'index'} && $this->{'index'} < ( 2 << 30)  ){
+		$this->{'real index'} = $this->{'index'};
 	}
-	return $x;
+	else{
+		$this->{'real index'} = $this->{'index'} - (2 << 30);
+	}
+	
+	return $this->{'real index'};
+}
+
+=pod
+
+---++ childid->($hardbool,$index)
+
+=cut
+
+sub childid {
+	my ($this) = @_;
+	my $hardbool = 1;
+	if($this->is_soft_child()){
+		$hardbool = 0;
+	}
+	return ($hardbool,$this->index());
+}
+
+
+=pod
+
+---++ print_to_stderr
+
+=cut
+
+sub print_to_stderr {
+	my $this = shift;
+	warn "version=".$this->{'version'}."\n";
+	warn "Depth=".$this->{'depth'}."\n";
+	warn "index=".$this->{'index'}."\n";
+	warn "success=".$this->{'success'}."\n";
+	warn "serialized private=".unpack('H*',$this->{'serialized private'})."\n";
+	warn "serialized public=".unpack('H*',$this->{'serialized public'})."\n";
+	warn "Depth=".$this->{'depth'}."\n";
+
 }
 
 

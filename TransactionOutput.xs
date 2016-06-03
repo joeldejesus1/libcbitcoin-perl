@@ -4,97 +4,43 @@
 
 #include <stdio.h>
 #include <ctype.h>
-#include <openssl/ssl.h>
-#include <openssl/ripemd.h>
-#include <openssl/rand.h>
-#include <CBHDKeys.h>
-#include <CBChecksumBytes.h>
-#include <CBAddress.h>
-#include <CBWIF.h>
-#include <CBByteArray.h>
-#include <CBBase58.h>
-#include <CBScript.h>
-#include <CBTransactionOutput.h>
+#include <errno.h>
+
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <assert.h>
+#include <ccoin/util.h>
+#include <ccoin/buffer.h>
+#include <ccoin/script.h>
+#include <ccoin/core.h>
+#include <ccoin/mbr.h>
+#include <ccoin/message.h>
+//#include <ccoin/compat.h>
+
+////// extra
 
 
-
-
-CBTransactionOutput* stringToTransactionOutput(char* scriptstring, int valueInt){
-
-	CBScript* script = CBNewScriptFromString(scriptstring);
-
-	CBTransactionOutput* answer = CBNewTransactionOutput((uint64_t) valueInt,script);
-	//CBFreeScript(script);
-	//CBDestroyByteArray(prevOutHash);
-	return answer;
+int dummy4(int x) {
+	return x;
 }
 
-CBTransactionOutput* CBTransactionOutput_serializeddata_to_obj(char* datastring){
-
-	CBByteArray* data = hexstring_to_bytearray(datastring);
-
-	CBTransactionOutput* txoutput = CBNewTransactionOutputFromData(data);
-	int dlen = (int)CBTransactionOutputDeserialise(txoutput);
-
-	//CBTransactionInputDeserialise(txinput);
-	//CBDestroyByteArray(data);
-	return txoutput;
-}
-
-char* CBTransactionOutput_obj_to_serializeddata(CBTransactionOutput * txoutput){
-	CBTransactionOutputPrepareBytes(txoutput);
-	int dlen = CBTransactionOutputSerialise(txoutput);
-	CBByteArray* serializeddata = CBGetMessage(txoutput)->bytes;
-
-	char* answer = bytearray_to_hexstring(serializeddata,dlen);
-
-	return answer;
-}
-
-
-
-//////////////////////// perl export functions /////////////
-//CBTransactionInput * CBNewTransactionInput(CBScript * script, uint32_t sequence, CBByteArray * prevOutHash, uint32_t prevOutIndex)
-char* CBTransactionOutput_create_txoutput_obj(char* scriptstring, int valueInt){
-	CBTransactionOutput* txoutput = stringToTransactionOutput(scriptstring,valueInt);
-	char* answer = CBTransactionOutput_obj_to_serializeddata(txoutput);
-	//CBFreeTransactionOutput(txoutput);
-	return answer;
-}
-
-char* CBTransactionOutput_get_script_from_obj(char* serializedDataString){
-	CBTransactionOutput* txoutput = CBTransactionOutput_serializeddata_to_obj(serializedDataString);
-	char* scriptstring = scriptToString(txoutput->scriptObject);
-	//CBFreeTransactionOutput(txoutput);
-	return scriptstring;
-}
-
-int CBTransactionOutput_get_value_from_obj(char* serializedDataString){
-	CBTransactionOutput* txoutput = CBTransactionOutput_serializeddata_to_obj(serializedDataString);
-	uint64_t value = txoutput->value;
-	CBFreeTransactionOutput(txoutput);
-	return (int)value;
-}
+/*
+ *  scriptPubKey is the script in the previous transaction output.
+ *  scriptSig is the script that gets ripemd hash160's into a p2sh (need this to make signature)
+ *  outpoint = 32 byte tx hash followed by 4 byte uint32_t tx index
+ */
 
 
 
 
-
-MODULE = CBitcoin::TransactionOutput	PACKAGE = CBitcoin::TransactionOutput	PREFIX = CBTransactionOutput_	
-
-PROTOTYPES: DISABLE
+MODULE = CBitcoin::TransactionOutput	PACKAGE = CBitcoin::TransactionOutput
 
 
-char *
-CBTransactionOutput_create_txoutput_obj (scriptstring, valueInt)
-	char *	scriptstring
-	int	valueInt
-
-char *
-CBTransactionOutput_get_script_from_obj (serializedDataString)
-	char *	serializedDataString
+PROTOTYPES: DISABLED
 
 int
-CBTransactionOutput_get_value_from_obj (serializedDataString)
-	char *	serializedDataString
-
+dummy4(x)
+	int x

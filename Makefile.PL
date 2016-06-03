@@ -1,4 +1,4 @@
-use 5.014002;
+#use 5.014002;
 use strict;
 use warnings;
 use ExtUtils::MakeMaker;
@@ -7,8 +7,8 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
 	    'TYPEMAPS' => []
 	    ,'NAME' => 'CBitcoin'
-	     ,'LIBS' => [ ' -lcrypto -lcbitcoin ' ]
-		,'VERSION' => '0.2'
+	     ,'LIBS' => [ ' -lcrypto -lccoin -lgmp ' ]
+		,'VERSION' => '0.1'
 
 		,'AUTHOR'              => q{Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>}
 		,'VERSION_FROM'        => 'lib/CBitcoin.pm'
@@ -48,8 +48,8 @@ all ::
 	(cd blib/arch/auto/CBitcoin/ && ( [ -d TransactionInput ] || mkdir TransactionInput ) && ( [ -e TransactionInput/TransactionInput.so ] || ln -s ../CBitcoin.so TransactionInput/TransactionInput.so ) )
 	(cd blib/arch/auto/CBitcoin/ && ( [ -d TransactionOutput ] || mkdir TransactionOutput ) && ( [ -e TransactionOutput/TransactionOutput.so ] || ln -s ../CBitcoin.so TransactionOutput/TransactionOutput.so ) )
 	(cd blib/arch/auto/CBitcoin/ && ( [ -d Transaction ] || mkdir Transaction ) && ( [ -e Transaction/Transaction.so ] || ln -s ../CBitcoin.so Transaction/Transaction.so ) )
-	(cd blib/arch/auto/CBitcoin/ && ( [ -d Message ] || mkdir Message ) && ( [ -e Message/Message.so ] || ln -s ../CBitcoin.so Message/Message.so ) )
-	(cd blib/arch/auto/CBitcoin/ && ( [ -d Block ] || mkdir Block ) && ( [ -e Block/Block.so ] || ln -s ../CBitcoin.so Block/Block.so ) )
+##	(cd blib/arch/auto/CBitcoin/ && ( [ -d Message ] || mkdir Message ) && ( [ -e Message/Message.so ] || ln -s ../CBitcoin.so Message/Message.so ) )
+#	(cd blib/arch/auto/CBitcoin/ && ( [ -d Block ] || mkdir Block ) && ( [ -e Block/Block.so ] || ln -s ../CBitcoin.so Block/Block.so ) )
 
 };
 
@@ -57,8 +57,6 @@ all ::
 
 __END__
 
-
-    ZFSonAWS is a program that automates backing up zfs snapshots onto AWS's S3.
     Copyright (C) 2015  Joel De Jesus
 
     This program is free software; you can redistribute it and/or modify

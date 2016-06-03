@@ -1,10 +1,9 @@
 #!perl -T
-use 5.014002;
 use Test::More tests => 6;
 
 BEGIN {
+	use_ok( 'CBitcoin::CBHD' ) || print "Bail out!\n";
     use_ok( 'CBitcoin' ) || print "Bail out!\n";
-    use_ok( 'CBitcoin::CBHD' ) || print "Bail out!\n";
     use_ok( 'CBitcoin::Script' ) || print "Bail out!\n";
     use_ok( 'CBitcoin::TransactionInput' ) || print "Bail out!\n";
     use_ok( 'CBitcoin::TransactionOutput' ) || print "Bail out!\n";
