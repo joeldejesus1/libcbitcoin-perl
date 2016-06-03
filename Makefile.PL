@@ -49,7 +49,7 @@ all ::
 	(cd blib/arch/auto/CBitcoin/ && ( [ -d TransactionOutput ] || mkdir TransactionOutput ) && ( [ -e TransactionOutput/TransactionOutput.so ] || ln -s ../CBitcoin.so TransactionOutput/TransactionOutput.so ) )
 	(cd blib/arch/auto/CBitcoin/ && ( [ -d Transaction ] || mkdir Transaction ) && ( [ -e Transaction/Transaction.so ] || ln -s ../CBitcoin.so Transaction/Transaction.so ) )
 ##	(cd blib/arch/auto/CBitcoin/ && ( [ -d Message ] || mkdir Message ) && ( [ -e Message/Message.so ] || ln -s ../CBitcoin.so Message/Message.so ) )
-#	(cd blib/arch/auto/CBitcoin/ && ( [ -d Block ] || mkdir Block ) && ( [ -e Block/Block.so ] || ln -s ../CBitcoin.so Block/Block.so ) )
+	(cd blib/arch/auto/CBitcoin/ && ( [ -d Block ] || mkdir Block ) && ( [ -e Block/Block.so ] || ln -s ../CBitcoin.so Block/Block.so ) )
 
 };
 

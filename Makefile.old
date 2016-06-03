@@ -165,19 +165,22 @@ LINKTYPE = dynamic
 BOOTDEP = 
 
 # Handy lists of source code files:
-XS_FILES = CBHD.xs \
+XS_FILES = Block.xs \
+	CBHD.xs \
 	CBitcoin.xs \
 	Script.xs \
 	Transaction.xs \
 	TransactionInput.xs \
 	TransactionOutput.xs
-C_FILES  = CBHD.c \
+C_FILES  = Block.c \
+	CBHD.c \
 	CBitcoin.c \
 	Script.c \
 	Transaction.c \
 	TransactionInput.c \
 	TransactionOutput.c
-O_FILES  = CBHD.o \
+O_FILES  = Block.o \
+	CBHD.o \
 	CBitcoin.o \
 	Script.o \
 	Transaction.o \
@@ -645,20 +648,20 @@ clean :: clean_subdirs
 	  $(BOOTSTRAP) $(INST_ARCHAUTODIR)/extralibs.all \
 	  $(INST_ARCHAUTODIR)/extralibs.ld $(MAKE_APERL_FILE) \
 	  *$(LIB_EXT) *$(OBJ_EXT) \
-	  *perl.core CBHD.c \
-	  CBitcoin.c MYMETA.json \
-	  MYMETA.yml Script.c \
-	  Transaction.c TransactionInput.c \
-	  TransactionOutput.c blibdirs.ts \
-	  core core.*perl.*.? \
-	  core.[0-9] core.[0-9][0-9] \
-	  core.[0-9][0-9][0-9] core.[0-9][0-9][0-9][0-9] \
-	  core.[0-9][0-9][0-9][0-9][0-9] lib$(BASEEXT).def \
-	  mon.out perl \
-	  perl$(EXE_EXT) perl.exe \
-	  perlmain.c pm_to_blib \
-	  pm_to_blib.ts so_locations \
-	  tmon.out 
+	  *perl.core Block.c \
+	  CBHD.c CBitcoin.c \
+	  MYMETA.json MYMETA.yml \
+	  Script.c Transaction.c \
+	  TransactionInput.c TransactionOutput.c \
+	  blibdirs.ts core \
+	  core.*perl.*.? core.[0-9] \
+	  core.[0-9][0-9] core.[0-9][0-9][0-9] \
+	  core.[0-9][0-9][0-9][0-9] core.[0-9][0-9][0-9][0-9][0-9] \
+	  lib$(BASEEXT).def mon.out \
+	  perl perl$(EXE_EXT) \
+	  perl.exe perlmain.c \
+	  pm_to_blib pm_to_blib.ts \
+	  so_locations tmon.out 
 	- $(RM_RF) \
 	  blib libcbitcoin-perl* 
 	  $(NOECHO) $(RM_F) $(MAKEFILE_OLD)
@@ -1056,7 +1059,7 @@ PERL_HDRS = \
 
 $(OBJECT) : $(PERL_HDRS)
 
-CBHD.c CBitcoin.c Script.c Transaction.c TransactionInput.c TransactionOutput.c : $(XSUBPPDEPS)
+Block.c CBHD.c CBitcoin.c Script.c Transaction.c TransactionInput.c TransactionOutput.c : $(XSUBPPDEPS)
 
 
 # --- MakeMaker makefile section:
@@ -1068,7 +1071,7 @@ all ::
 	(cd blib/arch/auto/CBitcoin/ && ( [ -d TransactionOutput ] || mkdir TransactionOutput ) && ( [ -e TransactionOutput/TransactionOutput.so ] || ln -s ../CBitcoin.so TransactionOutput/TransactionOutput.so ) )
 	(cd blib/arch/auto/CBitcoin/ && ( [ -d Transaction ] || mkdir Transaction ) && ( [ -e Transaction/Transaction.so ] || ln -s ../CBitcoin.so Transaction/Transaction.so ) )
 ##	(cd blib/arch/auto/CBitcoin/ && ( [ -d Message ] || mkdir Message ) && ( [ -e Message/Message.so ] || ln -s ../CBitcoin.so Message/Message.so ) )
-#	(cd blib/arch/auto/CBitcoin/ && ( [ -d Block ] || mkdir Block ) && ( [ -e Block/Block.so ] || ln -s ../CBitcoin.so Block/Block.so ) )
+	(cd blib/arch/auto/CBitcoin/ && ( [ -d Block ] || mkdir Block ) && ( [ -e Block/Block.so ] || ln -s ../CBitcoin.so Block/Block.so ) )
 
 
 

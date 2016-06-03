@@ -1,19 +1,38 @@
-use 5.014002;
 use strict;
 use warnings;
 
 
-use CBitcoin::Block;
-
+#use CBitcoin::Block;
+require Data::Dumper;
 use Test::More tests => 1;
 
-my $gen_block = CBitcoin::Block->genesis_block();
-warn "Hash=".$gen_block->hash_hex."\n";
-warn "prevBlockHash=".$gen_block->prevBlockHash_hex."\n";
-warn "Data=".unpack('H*',$gen_block->data)."\n";
-ok(1) || print "Bail out!";
+use CBitcoin::Block;
+
+#my $gen_block = CBitcoin::Block->genesis_block();
+#warn "Hash=".$gen_block->hash_hex."\n";
+#warn "prevBlockHash=".$gen_block->prevBlockHash_hex."\n";
+#warn "Data=".unpack('H*',$gen_block->data)."\n";
+
+open(my $fh,'<','t/blk120383.ser') || print "Bail out!";
+binmode($fh);
+my $blockdata;
+my $total = 0;
+while(my $n = sysread($fh,$blockdata,8192,$total)){
+	$total += $n;
+}
+
+my $block = CBitcoin::Block::picocoin_block_des($blockdata);
+
+warn "XO=".Data::Dumper::Dumper($block)."\n";
+
+ok( 0 < length($blockdata) ) || print "Bail out!";
+
+
 
 #my $newblock = block_BlockFromData(,0);
+
+
+
 
 
 __END__

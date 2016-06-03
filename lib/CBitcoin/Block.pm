@@ -1,6 +1,6 @@
 package CBitcoin::Block;
 
-use 5.014002;
+#use 5.014002;
 use strict;
 use warnings;
 
@@ -14,8 +14,7 @@ Version 0.01
 
 =cut
 
-
-use bigint;
+use CBitcoin;
 use CBitcoin::Script;
 use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
@@ -23,13 +22,13 @@ use CBitcoin::Transaction;
 use CBitcoin::Utilities;
 use Digest::SHA;
 
-use constant MAINNET    => 0xd9b4bef9, TESTNET => pack('L',0xdab5bffa), TESTNET3 => pack('L',0x0709110b), NAMECOIN => pack('L',0xfeb4bef9) ;
+#use constant MAINNET    => 0xd9b4bef9, TESTNET => pack('L',0xdab5bffa), TESTNET3 => pack('L',0x0709110b), NAMECOIN => pack('L',0xfeb4bef9) ;
 
 require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::Block::VERSION = '0.2';
+$CBitcoin::Block::VERSION = $CBitcoin::VERSION;
 
 DynaLoader::bootstrap CBitcoin::Block $CBitcoin::Block::VERSION;
 
