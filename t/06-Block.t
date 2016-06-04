@@ -6,6 +6,7 @@ use warnings;
 require Data::Dumper;
 use Test::More tests => 1;
 
+use CBitcoin::Message;
 use CBitcoin::Block;
 
 #my $gen_block = CBitcoin::Block->genesis_block();
@@ -13,19 +14,17 @@ use CBitcoin::Block;
 #warn "prevBlockHash=".$gen_block->prevBlockHash_hex."\n";
 #warn "Data=".unpack('H*',$gen_block->data)."\n";
 
-open(my $fh,'<','t/blk120383.ser') || print "Bail out!";
+open(my $fh,'<','t/blk0.ser') || print "Bail out!";
 binmode($fh);
-my $blockdata;
-my $total = 0;
-while(my $n = sysread($fh,$blockdata,8192,$total)){
-	$total += $n;
-}
+my $msgdata;
+my $msg = CBitcoin::Message->deserialize($fh);
+close($fh);
 
-my $block = CBitcoin::Block::picocoin_block_des($blockdata);
+my $block = CBitcoin::Block::picocoin_block_des($msg->payload() );
 
 warn "XO=".Data::Dumper::Dumper($block)."\n";
 
-ok( 0 < length($blockdata) ) || print "Bail out!";
+ok( 0 < length($msg->payload()) ) || print "Bail out!";
 
 
 

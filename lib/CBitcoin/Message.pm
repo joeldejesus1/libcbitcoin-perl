@@ -1,6 +1,5 @@
 package CBitcoin::Message;
 
-use 5.014002;
 use strict;
 use warnings;
 
@@ -27,11 +26,11 @@ use constant MAINNET    => 0xd9b4bef9, TESTNET => pack('L',0xdab5bffa), TESTNET3
 
 require Exporter;
 *import = \&Exporter::import;
-require DynaLoader;
+#require DynaLoader;
 
-$CBitcoin::Message::VERSION = '0.2';
+#$CBitcoin::Message::VERSION = '0.2';
 
-DynaLoader::bootstrap CBitcoin::Message $CBitcoin::Message::VERSION;
+#DynaLoader::bootstrap CBitcoin::Message $CBitcoin::Message::VERSION;
 
 @CBitcoin::Message::EXPORT = ();
 @CBitcoin::Message::EXPORT_OK = ();
@@ -194,10 +193,44 @@ sub deserialize_command {
 }
 
 
-sub read_message {
+
+sub deserialize {
+	my $package = shift;
 	my $fh = shift;
+	my ($n,$buf,$total);
+	($n,$total) = (0,0);
 	
-	# ignore blocks
+	$n = read($fh,$buf,4);
+	die "cannot read network bytes" unless $n == 4;
+	my $magic = unpack('L',$buf);
+	
+	$n = read($fh,$buf,12);
+	die "cannot read command" unless $n == 12;
+	my $command = deserialize_command($buf);
+
+	$n = read($fh,$buf,4);
+	die "cannot read payload length" unless $n == 4;
+	my $size = unpack('L',$buf);
+
+	$n = read($fh,$buf,4);
+	die "cannot read payload checksum" unless $n == 4;
+	my $checksum = $buf;
+	
+	$n = read($fh,$buf,$size,$total);
+	die "cannot read full payload" unless $size == $n;
+	
+	die "bad payload" unless checksum_payload($buf) eq $checksum;
+	
+	my $this = {
+		'command' => $command,
+		'magic' => $magic,
+		'payload' => $buf
+	};
+	
+	
+	bless($this,$package);
+	
+	return $this;
 	
 		
 }

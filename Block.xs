@@ -61,27 +61,26 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block block){
 
 HV* picocoin_block_des(SV* blockdata){
 	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
-	fprintf(stderr,"hi - 1\n");
+	
 	STRLEN len_blkdata;
 	uint8_t * blkdata_pointer = (uint8_t*) SvPV(blockdata,len_blkdata);
 	struct const_buffer blkbuf = { blkdata_pointer, len_blkdata };
-	fprintf(stderr,"hi - 2\n");
-	struct bp_block *block;
-	fprintf(stderr,"hi - 3\n");
-	bp_block_init(block);
-	fprintf(stderr,"hi - 3.1\n");
-	if(!deser_bp_block(block, &blkbuf)){
-		bp_block_free(block);
-		fprintf(stderr,"hi - 5\n");
+	
+	struct bp_block block;
+	
+	bp_block_init(&block);
+	
+	if(!deser_bp_block(&block, &blkbuf)){
+		bp_block_free(&block);	
 		return picocoin_returnblankblock(rh);
 	}
-	fprintf(stderr,"hi - 4\n");
-	
-	if(!bp_block_valid(block)){
+
+	if(!bp_block_valid(&block)){
+		bp_block_free(&block);
 		return picocoin_returnblankblock(rh);
 	}
 	
-	
+	bp_block_free(&block);
 	return picocoin_returnblankblock(rh);
 }
 
