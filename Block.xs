@@ -36,26 +36,53 @@ HV* picocoin_returnblankblock(HV * rh){
 }
 
 // given a full hdkey, fill in a perl hash with relevant data
-HV* picocoin_returnblock(HV * rh, const struct bp_block block){
-	hv_store(rh, "version", 7, newSViv( block.nVersion), 0);
-	hv_store(rh, "time", 4, newSViv( block.nTime), 0);
-	hv_store(rh, "bits", 4, newSViv( block.nBits), 0);
-	hv_store(rh, "nonce", 5, newSViv( block.nNonce), 0);
-	char *x;
-	bu256_hex(x,&block.hashPrevBlock);
+HV* picocoin_returnblock(HV * rh, const struct bp_block *block){
+	//fprintf(stderr,"hi - 4\n");
+	hv_store(rh, "version", 7, newSViv( block->nVersion), 0);
+	hv_store(rh, "time", 4, newSViv( block->nTime), 0);
+	hv_store(rh, "bits", 4, newSViv( block->nBits), 0);
+	hv_store(rh, "nonce", 5, newSViv( block->nNonce), 0); 
+	
+	char x[BU256_STRSZ];
+	//fprintf(stderr,"hi - 5\n");
+	bu256_hex(x,&block->hashPrevBlock);
+	//fprintf(stderr,"hi - 6\n");
 	hv_store(rh, "prevBlockHash", 17, newSVpv(x,sizeof(x)), 0);
-	bu256_hex(x,&block.hashMerkleRoot);
+	//fprintf(stderr,"hi - 7\n");
+	bu256_hex(x,&block->hashMerkleRoot);
+	
 	hv_store(rh, "merkleRoot", 10, newSVpv(x,sizeof(x)), 0);
 	
 	
 	// sha256_valid
-	if(block.sha256_valid){
+	if(block->sha256_valid){
 		// sha256
-		bu256_hex(x, &block.sha256);
+		bu256_hex(x, &block->sha256);
 		hv_store(rh, "sha256", 6, newSVpv(x,sizeof(x)), 0);
 	}
 	
 	//hd_extended_key_free(&hdkey);
+	// parr *vtx; 
+	//parr *vtx = block->vtx;
+	//fprintf(stderr,"hi %s\n",block->vtx->len);
+	if (!block->vtx || !block->vtx->len){
+		return rh;
+	}
+	
+	fprintf(stderr,"hi %d\n",block->vtx->len);
+	int i;
+	for(i=0;i<block->vtx->len;i++){
+		struct bp_tx *tx;
+		tx = parr_idx(block->vtx, i);
+		//tx->vin tx->vout
+		if(tx->vin && tx->vin->len){
+			
+		}
+		if(tx->vout && tx->vout->len){
+			
+		}
+	}
+	
 	return rh;
 }
 
@@ -69,19 +96,21 @@ HV* picocoin_block_des(SV* blockdata){
 	struct bp_block block;
 	
 	bp_block_init(&block);
-	
+	//fprintf(stderr,"hi - 1\n");
 	if(!deser_bp_block(&block, &blkbuf)){
 		bp_block_free(&block);	
 		return picocoin_returnblankblock(rh);
 	}
-
+	//fprintf(stderr,"hi - 2\n");
 	if(!bp_block_valid(&block)){
 		bp_block_free(&block);
 		return picocoin_returnblankblock(rh);
 	}
+	//fprintf(stderr,"hi - 3\n");
 	
+	picocoin_returnblock(rh,&block);
 	bp_block_free(&block);
-	return picocoin_returnblankblock(rh);
+	return rh;
 }
 
 ////// extra

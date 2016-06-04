@@ -15,7 +15,6 @@ Version 0.01
 
 use Net::IP;
 
-use bigint;
 use CBitcoin::Script;
 use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
@@ -204,13 +203,16 @@ sub deserialize {
 	die "cannot read network bytes" unless $n == 4;
 	my $magic = unpack('L',$buf);
 	
+	
 	$n = read($fh,$buf,12);
 	die "cannot read command" unless $n == 12;
 	my $command = deserialize_command($buf);
+	
 
 	$n = read($fh,$buf,4);
 	die "cannot read payload length" unless $n == 4;
 	my $size = unpack('L',$buf);
+	
 
 	$n = read($fh,$buf,4);
 	die "cannot read payload checksum" unless $n == 4;
@@ -219,7 +221,8 @@ sub deserialize {
 	$n = read($fh,$buf,$size,$total);
 	die "cannot read full payload" unless $size == $n;
 	
-	die "bad payload" unless checksum_payload($buf) eq $checksum;
+	die "bad payload" unless 
+		substr(checksum_payload($buf),0,4) eq $checksum;
 	
 	my $this = {
 		'command' => $command,

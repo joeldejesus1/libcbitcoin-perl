@@ -16,12 +16,20 @@ use CBitcoin::Block;
 
 open(my $fh,'<','t/blk0.ser') || print "Bail out!";
 binmode($fh);
-my $msgdata;
+
 my $msg = CBitcoin::Message->deserialize($fh);
 close($fh);
 
 my $block = CBitcoin::Block::picocoin_block_des($msg->payload() );
 
+warn "XO=".Data::Dumper::Dumper($block)."\n";
+
+open($fh,'<','t/blk120383.ser') || print "Bail out!";
+binmode($fh);
+$msg = CBitcoin::Message->deserialize($fh);
+close($fh);
+
+$block = CBitcoin::Block::picocoin_block_des($msg->payload() );
 warn "XO=".Data::Dumper::Dumper($block)."\n";
 
 ok( 0 < length($msg->payload()) ) || print "Bail out!";
