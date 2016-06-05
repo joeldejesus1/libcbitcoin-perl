@@ -30,7 +30,7 @@ $msg = CBitcoin::Message->deserialize($fh);
 close($fh);
 
 $block = CBitcoin::Block::picocoin_block_des($msg->payload() );
-warn "XO=".Data::Dumper::Dumper($block)."\n";
+#warn "XO=".Data::Dumper::Dumper($block)."\n";
 
 ok( 0 < length($msg->payload()) ) || print "Bail out!";
 

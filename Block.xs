@@ -42,23 +42,22 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block){
 	hv_store(rh, "time", 4, newSViv( block->nTime), 0);
 	hv_store(rh, "bits", 4, newSViv( block->nBits), 0);
 	hv_store(rh, "nonce", 5, newSViv( block->nNonce), 0); 
+	hv_store(rh, "success", 7, newSViv((int) 1), 0);
 	
-	char x[BU256_STRSZ];
-	//fprintf(stderr,"hi - 5\n");
-	bu256_hex(x,&block->hashPrevBlock);
-	//fprintf(stderr,"hi - 6\n");
-	hv_store(rh, "prevBlockHash", 17, newSVpv(x,sizeof(x)), 0);
-	//fprintf(stderr,"hi - 7\n");
-	bu256_hex(x,&block->hashMerkleRoot);
-	
-	hv_store(rh, "merkleRoot", 10, newSVpv(x,sizeof(x)), 0);
+	char x1[BU256_STRSZ];
+	bu256_hex(x1,&block->hashPrevBlock);
+	hv_store(rh, "prevBlockHash", 14, newSVpv(x1,sizeof(x1)), 0);
+	char x2[BU256_STRSZ];
+	bu256_hex(x2,&block->hashMerkleRoot);
+	hv_store(rh, "merkleRoot", 10, newSVpv(x2,sizeof(x2)), 0);
 	
 	
 	// sha256_valid
 	if(block->sha256_valid){
 		// sha256
-		bu256_hex(x, &block->sha256);
-		hv_store(rh, "sha256", 6, newSVpv(x,sizeof(x)), 0);
+		char x3[BU256_STRSZ];
+		bu256_hex(x3, &block->sha256);
+		hv_store(rh, "sha256", 6, newSVpv(x3,sizeof(x3)), 0);
 	}
 	
 	//hd_extended_key_free(&hdkey);
@@ -69,19 +68,85 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block){
 		return rh;
 	}
 	
-	fprintf(stderr,"hi %d\n",block->vtx->len);
+	fprintf(stderr,"txs %d\n",block->vtx->len);
+	
 	int i;
+	AV* avTX = (AV *) sv_2mortal ((SV *) newAV ());
 	for(i=0;i<block->vtx->len;i++){
 		struct bp_tx *tx;
 		tx = parr_idx(block->vtx, i);
+		
+		HV * rhSingleTX= (HV *) sv_2mortal ((SV *) newHV ());
+		
 		//tx->vin tx->vout
 		if(tx->vin && tx->vin->len){
+			int j;
+			struct bp_txin *txin;
+			AV* avtxin = (AV *) sv_2mortal ((SV *) newAV ());
 			
+			for( j=0; j<tx->vin->len; j++){
+				//fprintf(stderr,"txin=%d\n",j);
+				txin = parr_idx(tx->vin, j);
+				
+				HV * rhtxin = (HV *) sv_2mortal ((SV *) newHV ());
+				
+				struct bp_outpt prevout;
+
+				//cstring s = { (char *)(out->data), 0, sizeof(out->data) + 1 };
+				char prevHash[BU256_STRSZ];
+				bu256_hex(prevHash, &txin->prevout.hash);
+				
+				hv_store( rhtxin, "prevHash", 8, newSVpv( prevHash,  BU256_STRSZ), 0);
+				hv_store( rhtxin, "prevIndex", 9, newSViv(txin->prevout.n), 0);
+				
+				if(txin->scriptSig && txin->scriptSig->len){
+					// scriptSig
+					uint8_t * scriptSig = malloc(txin->scriptSig->len * sizeof(uint8_t) );
+					memcpy(scriptSig,txin->scriptSig->str,txin->scriptSig->len);
+					//SV* ans_sv = newSVpv(answer,length);
+					hv_store( rhtxin, "scriptSig", 9, newSVpv( scriptSig,  txin->scriptSig->len), 0);
+				}
+				
+				
+				av_push(avtxin, newRV((SV *) rhtxin));
+				//av_push(avtxin, newSViv(j));
+			}
+			
+			hv_store( rhSingleTX, "vin", 4, newRV((SV *)avtxin), 0);
 		}
+		
 		if(tx->vout && tx->vout->len){
+			int j;
+			struct bp_txout *txout;
+			AV* avtxout = (AV *) sv_2mortal ((SV *) newAV ());
 			
+			for( j=0; j<tx->vout->len; j++){
+				//fprintf(stderr,"txin=%d\n",j);
+				txout = parr_idx(tx->vout, j);
+				
+				HV * rhtxout = (HV *) sv_2mortal ((SV *) newHV ());
+				
+
+				hv_store( rhtxout, "value", 5, newSViv( txout->nValue ), 0);
+				
+				uint8_t *spk = malloc(txout->scriptPubKey->len * sizeof(uint8_t));
+				memcpy(spk,txout->scriptPubKey->str,txout->scriptPubKey->len);				
+				hv_store( rhtxout, "script", 6, newSVpv(spk,txout->scriptPubKey->len), 0);
+				
+				
+				av_push(avtxout, newRV((SV *) rhtxout));
+				//av_push(avtxin, newSViv(j));
+			}
+			//av_push(avTX, newRV((SV *)avtxout) );
+			
+			hv_store( rhSingleTX, "vout", 4, newRV((SV *)avtxout), 0);
 		}
+		
+		
+		av_push(avTX, newRV((SV *)rhSingleTX) );
 	}
+	hv_store(rh, "tx", 2,  newRV((SV *)avTX)  , 0);
+	
 	
 	return rh;
 }

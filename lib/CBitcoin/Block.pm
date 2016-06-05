@@ -86,61 +86,52 @@ sub serialize_header2 {
 
 =pod
 
----++ deserialize($fh)->object
+---++ deserialize($payload)->object
 
-4 	version 	int32_t 	Block version information (note, this is signed)
-32 	prev_block 	char[32] 	The hash value of the previous block this particular block references
-32 	merkle_root 	char[32] 	The reference to a Merkle tree collection which is a hash of all transactions related to this block
-4 	timestamp 	uint32_t 	A timestamp recording when this block was created (Will overflow in 2106[2])
-4 	bits 	uint32_t 	The calculated difficulty target being used for this block
-4 	nonce 	uint32_t 	The nonce used to generate this block… to allow variations of the header and compute different hashes
-1 	txn_count 	var_int 	Number of transaction entries, this value is always 0 
+ {
+          'tx' => [
+                    {
+                      'vout' => [
+                                  {
+                                    'value' => 5000000000,
+                                    'script' => '.........'
+                                  }
+                                ],
+                      'vin' => [
+                                  {
+                                    'prevIndex' => 4294967295,
+                                    'scriptSig' => ',,,,The Times 03/Jan/2009 Chancellor on brink of second bailout for banks',
+                                    'prevHash' => '0000000000000000000000000000000000000000000000000000000000000000'
+                                  }
+                                ]
+                    }
+                  ],
+          'prevBlockHash' => '0000000000000000000000000000000000000000000000000000000000000000',
+          'merkleRoot' => '4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b',
+          'sha256' => '000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f',
+          'nonce' => 2083236893,
+          'time' => 1231006505,
+          'bits' => 486604799,
+          'version' => 1
+        };
+
 
 =cut
 
 sub deserialize{
 	my $package = shift;
-	my $fh = shift;
-	my $this;
-	my ($n,$buf);
-	my $shaobj = Digest::SHA->new(256);
-	$n = read($fh,$buf,4);
-	die "not enough bytes to read version" unless $n == 4;
-	$this->{'version'} = $buf;
-	$shaobj->add($buf);
-
-	$n = read($fh,$buf,32);
-	die "not enough bytes to read prevBlockHash" unless $n == 32;
-	$this->{'prevBlockHash'} = $buf;	
-	$shaobj->add($buf);
-	
-	$n = read($fh,$buf,32);
-	die "not enough bytes to read merkleRoot" unless $n == 32;
-	$this->{'merkleRoot'} = $buf;
-	$shaobj->add($buf);
-
-	$n = read($fh,$buf,4);
-	die "not enough bytes to read timestamp" unless $n == 4;
-	$this->{'timestamp'} = $buf;
-	$shaobj->add($buf);
-	
-	$n = read($fh,$buf,4);
-	die "not enough bytes to read bits" unless $n == 4;
-	$this->{'bits'} = $buf;
-	$shaobj->add($buf);
-	
-	$n = read($fh,$buf,4);
-	die "not enough bytes to read nonce" unless $n == 4;
-	$this->{'nonce'} = $buf;
-	$shaobj->add($buf);
-	
-	my $count = CBitcoin::Utilities::deserialize_varint($fh);
-	warn "got tx count=$count\n";
-	$this->{'transactionNum'} = $count;
-	
+	my $payload = shift;
+	my $this = picocoin_returnblock($payload);
+	die "failed to parse" unless $this->{'success'};
 	bless($this,$package);
 	
-	$this->{'hash'} = Digest::SHA::sha256($shaobj->digest());
+	$this->{'merkleRoot'} = pack('H*',$this->{'merkleRoot'});
+	$this->{'prevBlockHash'} = pack('H*',$this->{'prevBlockHash'});
+	if($this->{'sha256'}){
+		$this->{'sha256'} = pack('H*',$this->{'sha256'});
+	}
+	
+	$this->{'data'} = $payload;
 	
 	return $this;
 }
@@ -171,11 +162,11 @@ sub serialize_header {
 =cut
 
 sub timestamp {
-	return unpack('L',shift->{'timestamp'});
+	return shift->{'time'};
 }
 
 sub target {
-	return unpack('L',shift->{'target'});
+	return shift->{'bits'};
 }
 
 sub nonce {
@@ -187,11 +178,12 @@ sub version {
 }
 
 sub transactionNum {
-	return shift->{'transactionNum'};
+	my $this = shift;
+	return scalar(@{$this->{'tx'}});
 }
 
 sub bits {
-	return unpack('L',shift->{'bits'});
+	return shift->{'bits'};
 }
 
 
@@ -214,11 +206,11 @@ sub prevBlockHash_hex {
 
 
 sub hash {
-	return shift->{'hash'};
+	return shift->{'sha256'};
 }
 
 sub hash_hex {
-	return unpack('H*',shift->{'hash'});
+	return unpack('H*',shift->{'sha256'});
 }
 
 sub data {
