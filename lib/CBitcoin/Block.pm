@@ -121,13 +121,13 @@ sub serialize_header2 {
 sub deserialize{
 	my $package = shift;
 	my $payload = shift;
-	my $this = picocoin_returnblock($payload);
+	my $this = picocoin_block_des($payload);
 	die "failed to parse" unless $this->{'success'};
 	bless($this,$package);
 	
 	$this->{'merkleRoot'} = pack('H*',$this->{'merkleRoot'});
-	$this->{'prevBlockHash'} = pack('H*',$this->{'prevBlockHash'});
-	if($this->{'sha256'}){
+	$this->{'prevBlockHash'} = pack('H*',$this->{'prevBlockHash'}) if defined $this->{'prevBlockHash'};
+	if(defined $this->{'sha256'}){
 		$this->{'sha256'} = pack('H*',$this->{'sha256'});
 	}
 	

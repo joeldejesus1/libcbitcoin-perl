@@ -20,17 +20,17 @@ binmode($fh);
 my $msg = CBitcoin::Message->deserialize($fh);
 close($fh);
 
-my $block = CBitcoin::Block::picocoin_block_des($msg->payload() );
+my $block = CBitcoin::Block->deserialize($msg->payload() );
 
-warn "XO=".Data::Dumper::Dumper($block)."\n";
+warn "XO=".$block->hash_hex."\n";
 
 open($fh,'<','t/blk120383.ser') || print "Bail out!";
 binmode($fh);
 $msg = CBitcoin::Message->deserialize($fh);
 close($fh);
 
-$block = CBitcoin::Block::picocoin_block_des($msg->payload() );
-#warn "XO=".Data::Dumper::Dumper($block)."\n";
+$block = CBitcoin::Block->deserialize($msg->payload() );
+warn "XO=".$block->hash_hex."\n";
 
 ok( 0 < length($msg->payload()) ) || print "Bail out!";
 
