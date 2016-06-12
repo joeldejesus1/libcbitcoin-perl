@@ -48,16 +48,27 @@ sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 ---++ genesis_block
 
-Return a block header that has been deserialized.
+Return the genesis block that corresponds to the current $CBitcoin::network_bytes value.
 
 =cut
 
 sub genesis_block{
 	my $package = shift;
-	
-	my $ref = block_GenesisBlock();
-	
-	return $package->new($ref);
+	my $x;
+	if($CBitcoin::network_bytes eq CBitcoin::MAINNET){
+		open(my $fh,'<','t/blk0.ser') || die "genesis block message";
+		binmode($fh);
+
+		my $msg = CBitcoin::Message->deserialize($fh);
+		close($fh);
+
+		$x = CBitcoin::Block->deserialize($msg->payload() );
+	}
+	else{
+		die "no genesis block";
+	}
+	#my $ref = block_GenesisBlock();
+	return $x;
 }
 
 
@@ -197,20 +208,33 @@ sub merkleRoot_hex {
 
 
 sub prevBlockHash {
-	return shift->{'prevBlockHash'};
+	my $this = shift;
+	return $this->{'prevBlockHash reverse'} if $this->{'prevBlockHash reverse'};
+	# need to reverse bytes
+	my $hash = $this->{'prevBlockHash'};
+	$hash = join '', reverse split /(..)/, unpack('H*',$hash);
+	$hash = pack('H*',$hash);
+	$this->{'prevBlockHash reverse'} = $hash;
+	return $hash;
 }
 
 sub prevBlockHash_hex {
-	return unpack('H*',shift->{'prevBlockHash'});
+	return unpack('H*',shift->prevBlockHash());
 }
 
 
 sub hash {
-	return shift->{'sha256'};
+	my $this = shift;
+	return $this->{'sha256 reverse'} if $this->{'sha256 reverse'};
+	my $hash = $this->{'sha256'};
+	$hash = join '', reverse split /(..)/, unpack('H*',$hash);
+	$hash = pack('H*',$hash);
+	$this->{'sha256 reverse'} = $hash;
+	return $hash;
 }
 
 sub hash_hex {
-	return unpack('H*',shift->{'sha256'});
+	return unpack('H*',shift->hash());
 }
 
 sub data {

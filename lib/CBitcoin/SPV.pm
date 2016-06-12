@@ -31,7 +31,7 @@ sub new {
 	my $package = shift;
 	my $options = shift;
 	$options = {} unless defined $options;
-
+	
 	my $this = {};
 	bless($this,$package);
 	$this = $this->init($options);
@@ -47,13 +47,13 @@ sub new {
 	$this->{'transactions'} = {};
 	$this->initialize_chain();
 	$this->sort_chain();
-	
+	warn "hello 4";
 	# brain
 	$this->{'inv'} = [{},{},{},{}];
 	$this->{'inv search'} = [{},{},{},{}];	
 	$this->initialize_peers();
 	
-	
+	warn "spv new done";
 
 	return $this;
 	
@@ -120,6 +120,7 @@ sub make_directories{
 	if($base =~ m/^(.*)$/){
 		$base = $1;
 	}
+	
 	
 	mkdir($base) unless -d $base;
 	
@@ -188,42 +189,12 @@ Save the genesis block into block headers.  Also, create the first block locator
 sub initialize_chain{
 	my $this = shift;
 	my $base = $this->db_path();
-	#warn "initialize chain 1\n";
-	opendir(my $fh, $base.'/headers') || die "cannot open directory to headers at ". $base.'/headers';
-	#warn "initialize chain 1.2\n";
-	my @files = grep { $_ ne '.' && $_ ne '..' } readdir $fh;
-	#warn "initialize chain 1.3\n";
-	closedir($fh);
-	unless(0 == scalar(@files)){
-		#die "no files?=".scalar(@files)."\n";
-		return $this->initialize_chain_scan_files(\@files);	
-	}
-	#warn "initialize chain 2\n";
+
+	warn "initialize chain 2\n";
 	# must get genesis block
 	my $gen_block = CBitcoin::Block->genesis_block();
-	#warn "Genesis hash=".$gen_block->hash_hex."\n";
-	#warn "Genesis prevBlockHash=".$gen_block->prevBlockHash_hex."\n";
 
-	my @path = CBitcoin::Utilities::HashToFilepath($gen_block->hash_hex);
-	
-	#warn "initialize chain 3\n";
-	CBitcoin::Utilities::recursive_mkdir("$base/headers/".join('/',@path)) 
-		unless -d "$base/headers/".join('/',@path);
-	my $n;
-	open($fh,'>',"$base/headers/".join('/',@path).'/prevBlockHash') 
-		|| die "cannot save prevblock hash";
-	$n = syswrite($fh,$gen_block->prevBlockHash);
-	die "could not save hash" unless $n == length($gen_block->prevBlockHash) && $n > 1;
-	close($fh);
-	
-	#warn "initialize chain 4\n";
-	open($fh,'>',"$base/headers/".join('/',@path).'/data') || die "cannot save block data";
-	my $data = $gen_block->serialize_header();
-	$n = syswrite($fh,$data);
-	die "could not save data" unless $n == length($data) && $n > 1;
-	close($fh);
-	
-	#warn "initialize chain 5 hash=".unpack('H*',$gen_block->hash)."\n";
+	warn "initialize chain 5 hash=".unpack('H*',$gen_block->hash)."\n";
 	#$this->{'headers'}->[0] = $gen_block->hash;
 	$this->add_header_to_chain($gen_block);
 	#push(@{$this->{'headers'}},$gen_block->hash);
@@ -286,29 +257,7 @@ sub add_header_to_chain {
 	my $this = shift;
 	my $header = shift;
 	die "header is null" unless defined $header;
-	
-	my $base = $this->db_path();
-	my ($fh,$n);
-	
-	# the size is 3, with 2 directories and the final element being the file name
-	my @path = CBitcoin::Utilities::HashToFilepath($header->hash_hex);
-	die "path is not the right size" unless scalar(@path) == 3;
 
-	unless(-d "$base/headers/".join('/',@path)){
-		# the dir is the hex of the hash
-		CBitcoin::Utilities::recursive_mkdir("$base/headers/".join('/',@path[0..1]));
-		
-		# write the header into ./data
-		open($fh,'>',"$base/headers/".join('/',@path)) || die "cannot save block data";
-		my $data = $header->serialize_header();
-		$n = 0;
-		while(0 < length($data) - $n){
-			$n += syswrite($fh,$data, 8192, $n);
-		}
-		close($fh);
-		
-		$this->add_header_to_db($header);
-	}
 	$this->add_header_to_inmemory_chain($header);
 	#return $this->block_height(1);
 }
@@ -880,10 +829,18 @@ This is called when a handshake is finished.
 sub peer_hook_handshake_finished{
 	my $this = shift;
 	my $peer = shift;
-	#warn "Running send getblocks since hand shake is finished\n";
+	warn "Running send getblocks since hand shake is finished\n";
 	
 	#$peer->send_getheaders();
-	$peer->send_getaddr();
+	#$peer->send_getaddr();
+	if($this->block_height() < $peer->block_height()){
+		warn "alpha; block height diff=".( $peer->block_height() - $this->block_height() );
+		$peer->send_getblocks();
+	}
+	else{
+		warn "beta; block height diff=".( $peer->block_height() - $this->block_height() );
+		#$peer->send_getaddr();
+	}
 	
 	#$peer->send_getblocks();
 }
@@ -912,10 +869,11 @@ When done, set result=1???
 
 sub hook_inv {
 	my ($this,$type,$hash) = @_;
-	#warn "Got inv of type=$type with hash=".unpack('H*',$hash)."\n";
+	warn "Got inv of type=$type with hash=".unpack('H*',$hash)."\n";
+	
 	
 	return undef unless defined $type && (0 <= $type && $type <= 3 ) &&
-		 defined $hash && length($hash) > 0;
+		 defined $hash && 0 < length($hash);
 	# length($hash) should be equal to 32 (256bits), but in the future that might change.
 	
 	
@@ -951,6 +909,20 @@ sub hook_peer_onreadidle {
 	#	$this->is_marked_getblocks(0);
 	#	$this->{'getblocks timeout'} = time();
 	#}
+	if( $this->hook_getdata_blocks_preview() == 0){
+		if($this->block_height() < $peer->block_height()){
+			warn "alpha; block height diff=".( $peer->block_height() - $this->block_height() );
+			$peer->send_getblocks();
+		}
+		else{
+			warn "beta; block height diff=".( $peer->block_height() - $this->block_height() );
+			#$peer->send_getaddr();
+		}		
+	}
+	else{
+		warn "Preview=".$this->hook_getdata_blocks_preview();
+	}
+
 }
 
 =pod
@@ -970,7 +942,7 @@ sub hook_getdata {
 	my $gd_timeout = 600;
 	
 	my ($i,$max_count_per_peer) = (0,$max_count);
-	#warn "hook_getdata part 1 \n";
+	warn "hook_getdata part 1 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[0]}){
 		# error
 		if(
@@ -985,7 +957,7 @@ sub hook_getdata {
 			last;
 		}
 	}
-	#warn "hook_getdata part 2 \n";
+	warn "hook_getdata part 2 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[1]}){
 		# tx
 		if(
@@ -1000,7 +972,7 @@ sub hook_getdata {
 			last;
 		}
 	}
-	#warn "hook_getdata part 3 \n";
+	warn "hook_getdata part 3 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[2]}){
 		# block
 		if(
@@ -1015,7 +987,7 @@ sub hook_getdata {
 			last;
 		}
 	}
-	#warn "hook_getdata part 4 \n";
+	warn "hook_getdata part 4 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[3]}){
 		# filtered block
 		if(
@@ -1030,7 +1002,7 @@ sub hook_getdata {
 			last;
 		}
 	}
-	#warn "hook_getdata size is ".scalar(@response)."\n";
+	warn "hook_getdata size is ".scalar(@response)."\n";
 	
 	
 	if(0 < scalar(@response)){
@@ -1073,6 +1045,8 @@ sub hook_getdata_blocks_size {
 
 Does not include stuff that is waiting on time out.
 
+Use this to figure out if we have retrieved all inventory vectors.
+
 =cut
 
 sub hook_getdata_blocks_preview {
@@ -1113,6 +1087,8 @@ sub loop {
 	my ($this,$loopsub,$connectsub) = (shift,shift,shift);
 	die "no loop sub" unless defined $loopsub && ref($loopsub) eq 'CODE';
 	die "no connect sub" unless defined $connectsub && ref($connectsub) eq 'CODE';
+	
+	warn "Starting loop";
 	$loopsub->($this,$connectsub);
 }
 
@@ -1224,6 +1200,7 @@ sub callback_run {
 		&& ref($cm->{'command'}->{$command}->{'subroutine'}) eq 'CODE'
 	){
 		# run the default callback
+		warn "Running callback with command=$command";
 		$cm->{'command'}->{$command}->{'subroutine'}->($this,$msg,$peer);
 	}
 
@@ -1443,7 +1420,7 @@ BEGIN{
 
 sub callback_gotinv {
 	my ($this,$msg,$peer) = @_;
-	#warn "Got inv\n";
+	warn "Got inv\n";
 	unless($peer->handshake_finished()){
 		#warn "got inv before handshake finsihed\n";
 		$peer->mark_finished();
@@ -1452,14 +1429,14 @@ sub callback_gotinv {
 	open(my $fh,'<',\($msg->payload()));
 	binmode($fh);
 	my $count = CBitcoin::Utilities::deserialize_varint($fh);
-	#warn "gotinv: count=$count\n";
+	warn "gotinv: count=$count\n";
 	for(my $i=0;$i < $count;$i++){
 		$this->hook_inv(@{CBitcoin::Utilities::deserialize_inv($fh)});
 	}
 	close($fh);
 		
 	# go fetch the data
-	#$peer->send_getdata($this->hook_getdata());
+	$peer->send_getdata($this->hook_getdata());
 	
 }
 
@@ -1492,62 +1469,39 @@ BEGIN{
 sub callback_gotblock {
 	my ($this,$msg,$peer) = @_;
 	
-	
 	# write this to disk
-	my $fp = '/tmp/spv/tmp.'.$$.'.block';
-	open(my $fh,'<',\($msg->payload()));
-	if( 100_000_000 < length($msg->payload()) ){
-		open(my $fhout,'>',$fp) || die "cannot write to disk";
-		binmode($fh);
-		binmode($fhout);
+
 		
-		my ($n,$buf);
-		while($n = read($fh,$buf,8192)){
-			my $m = 0;
-			while(0 < $n - $m){
-				$m += syswrite($fhout,$buf,$n - $m,$m);
-			}
-		}
-		close($fhout);
-		close($fh);
-		open($fh,'<',$fp) || die "cannot read from disk";		
-	}
-	
-	eval{
-		
-		my $block = CBitcoin::Block->deserialize($fh);
-		
-		#warn "Got block with hash=".$block->hash_hex().
-		#	" and transactionNum=".$block->transactionNum.
-		#	" and prevBlockHash=".$block->prevBlockHash_hex()."\n";
-		my $count = $block->transactionNum;
+	my $block = CBitcoin::Block->deserialize($msg->payload());
+	return undef unless $block->{'success'};
+	warn "Got block with hash=".$block->hash_hex().
+		" and transactionNum=".$block->transactionNum.
+		" and prevBlockHash=".$block->prevBlockHash_hex()."\n";
+	my $count = $block->transactionNum;
 		#die "let us finish early\n";
-		$this->add_header_to_chain($block);
 		
-		if(0 < $count){
-			for(my $i=0;$i<$count;$i++){
-				#warn "looping\n";		
-				$this->add_tx_to_db(
-					$block->hash(),
-					CBitcoin::Transaction->deserialize($fh)
-				);
-			}
-		}
-		else{
-			die "weird block\n";
-		}
+	$this->add_header_to_chain($block);
+		
+		#if(0 < $count){
+		#	for(my $i=0;$i<$count;$i++){
+		#		#warn "looping\n";		
+		#		$this->add_tx_to_db(
+		#			$block->hash(),
+		#			CBitcoin::Transaction->deserialize($fh)
+		#		);
+		#	}
+		#}
+		#else{
+		#	die "weird block\n";
+		#}
 		
 		# delete it in inv search.
-		delete $this->{'inv search'}->[2]->{$block->hash()};
-		
-	} || do {
-		my $error = $@;
-		warn "Error:$error\n";
-	};
+	delete $this->{'inv search'}->[2]->{$block->hash()};
+	$this->hook_peer_onreadidle($peer);
 	
 	
 	#$this->spv->{'inv'}->[2]->{$block->hash()} = $block;
-	unlink($fp) if -f $fp;
+#	unlink($fp) if -f $fp;
 }
 
 

@@ -4,7 +4,7 @@ use warnings;
 
 #use CBitcoin::Block;
 require Data::Dumper;
-use Test::More tests => 1;
+use Test::More tests => 3;
 
 use CBitcoin::Message;
 use CBitcoin::Block;
@@ -22,7 +22,10 @@ close($fh);
 
 my $block = CBitcoin::Block->deserialize($msg->payload() );
 
-warn "XO=".$block->hash_hex."\n";
+#warn "XO=".$block->hash_hex."\n";
+ok( $block->{'success'}, 'Genesis Block' );
+my $gen_hash = $block->hash() if $block->{'success'};
+#warn "XO=[".unpack('H*',$msg->payload())."]\n";
 
 open($fh,'<','t/blk120383.ser') || print "Bail out!";
 binmode($fh);
@@ -30,11 +33,13 @@ $msg = CBitcoin::Message->deserialize($fh);
 close($fh);
 
 $block = CBitcoin::Block->deserialize($msg->payload() );
-warn "XO=".$block->hash_hex."\n";
+#warn "XO=".$block->hash_hex."\n";
 
-ok( 0 < length($msg->payload()) ) || print "Bail out!";
+ok( $block->{'success'}, 'Big Block' );
 
 
+$block = CBitcoin::Block->genesis_block();
+ok( $block->{'success'} && $block->hash() eq $gen_hash, 'Genesis Block sub' );
 
 #my $newblock = block_BlockFromData(,0);
 

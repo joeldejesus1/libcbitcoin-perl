@@ -46,7 +46,7 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block){
 	
 	char x1[BU256_STRSZ];
 	bu256_hex(x1,&block->hashPrevBlock);
-	hv_store(rh, "prevBlockHash", 14, newSVpv(x1,sizeof(x1)), 0);
+	hv_store(rh, "prevBlockHash", 13, newSVpv(x1,sizeof(x1)), 0);
 	char x2[BU256_STRSZ];
 	bu256_hex(x2,&block->hashMerkleRoot);
 	hv_store(rh, "merkleRoot", 10, newSVpv(x2,sizeof(x2)), 0);
@@ -68,7 +68,7 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block){
 		return rh;
 	}
 	
-	fprintf(stderr,"txs %d\n",block->vtx->len);
+	//fprintf(stderr,"txs %d\n",block->vtx->len);
 	
 	int i;
 	AV* avTX = (AV *) sv_2mortal ((SV *) newAV ());

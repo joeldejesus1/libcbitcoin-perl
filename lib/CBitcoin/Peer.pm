@@ -455,13 +455,13 @@ sub read_data {
 	
 	$this->{'bytes'} = '' unless defined $this->{'bytes'};
 	my $socket = $this->socket();
-	#warn "Socket=$socket\n";
+	warn "Socket=$socket\n";
 	my $n = sysread(
 		$this->socket(),$this->{'bytes'},
 		$this->{'read buffer size'},
 		length($this->{'bytes'})
 	);
-
+	warn "Read N=$n bytes";
 	
 	if(defined $n && $n == 0){
 		#warn "Closing peer, socket was closed from the other end.\n";
@@ -827,6 +827,11 @@ Calculate the block locator based on the block headers we have, then send a mess
 sub send_getblocks{
 	my ($this) = @_;
 
+	return undef if defined $this->{'command timeout'}->{'send_getblocks'}
+		&& time() - $this->{'command timeout'}->{'send_getblocks'} < 60*1;
+
+	$this->{'command timeout'}->{'send_getblocks'} = time();
+
 	return $this->write(CBitcoin::Message::serialize(
 		$this->spv->calculate_block_locator(),
 		'getblocks',
@@ -1068,7 +1073,7 @@ BEGIN{
 sub callback_gotinv {
 	my $this = shift;
 	my $msg = shift;
-	#warn "Got inv\n";
+	warn "Got inv\n";
 	unless($this->handshake_finished()){
 		#warn "got inv before handshake finsihed\n";
 		$this->mark_finished();
@@ -1077,7 +1082,7 @@ sub callback_gotinv {
 	open(my $fh,'<',\($msg->payload()));
 	binmode($fh);
 	my $count = CBitcoin::Utilities::deserialize_varint($fh);
-	#warn "gotinv: count=$count\n";
+	warn "gotinv: count=$count\n";
 	for(my $i=0;$i < $count;$i++){
 		$this->spv->hook_inv(@{CBitcoin::Utilities::deserialize_inv($fh)});
 	}

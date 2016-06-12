@@ -12,10 +12,11 @@ $| = 1;
 use Test::More tests => 1;
 
 my $gen_block = CBitcoin::Block->genesis_block();
-warn "Hash=".$gen_block->hash_hex."\n";
-warn "prevBlockHash=".$gen_block->prevBlockHash_hex."\n";
-warn "Data=".unpack('H*',$gen_block->data)."\n";
-ok(1) || print "Bail out!";
+#warn "Hash=".$gen_block->hash_hex."\n";
+#warn "prevBlockHash=".$gen_block->prevBlockHash_hex."\n";
+#warn "Data=".unpack('H*',$gen_block->data)."\n";
+
+ok($gen_block->{'success'}) || print "Bail out!";
 
 # set umask so that files/directories will be 0700 or 0600
 
@@ -248,6 +249,7 @@ $spv->loop($loopsub,$connectsub);
 
 warn "no more connections, add peers and try again\n";
 
+print "Bail out!";
 
 __END__
 
