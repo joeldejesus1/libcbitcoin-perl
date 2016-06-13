@@ -19,11 +19,22 @@ binmode($fh);
 
 my $msg = CBitcoin::Message->deserialize($fh);
 close($fh);
+# $msg->payload()
+my $block = CBitcoin::Block->deserialize(pack('H*','0100000000000000000000000000000000000000000000000000000000000000000000003BA3EDFD7A7B12B27AC72C3E67768F617FC81BC3888A51323A9FB8AA4B1E5E4A29AB5F49FFFF001D1DAC2B7C0101000000010000000000000000000000000000000000000000000000000000000000000000FFFFFFFF4D04FFFF001D0104455468652054696D65732030332F4A616E2F32303039204368616E63656C6C6F72206F6E206272696E6B206F66207365636F6E64206261696C6F757420666F722062616E6B73FFFFFFFF0100F2052A01000000434104678AFDB0FE5548271967F1A67130B7105CD6A828E03909A67962E0EA1F61DEB649F6BC3F4CEF38C4F35504E51EC112DE5C384DF7BA0B8D578A4C702B6BF11D5FAC00000000'));
 
-my $block = CBitcoin::Block->deserialize($msg->payload() );
+my $est_gen_hash = '000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f';
+$est_gen_hash = join '', reverse split /(..)/, $est_gen_hash;
 
+#warn "hash=".$block->hash_hex."\n";
+#warn "hash act=".$est_gen_hash."\n";
+#warn "prevHash=".$block->prevBlockHash_hex."\n";
+#warn "nonce=".$block->nonce."\n";
+#warn "timestamp=".$block->timestamp."\n";
 #warn "XO=".$block->hash_hex."\n";
-ok( $block->{'success'}, 'Genesis Block' );
+
+
+ok( $block->{'success'} && $block->hash_hex eq $est_gen_hash, 'Genesis Block' );
+
 my $gen_hash = $block->hash() if $block->{'success'};
 #warn "XO=[".unpack('H*',$msg->payload())."]\n";
 

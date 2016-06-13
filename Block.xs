@@ -39,9 +39,13 @@ HV* picocoin_returnblankblock(HV * rh){
 HV* picocoin_returnblock(HV * rh, const struct bp_block *block){
 	//fprintf(stderr,"hi - 4\n");
 	hv_store(rh, "version", 7, newSViv( block->nVersion), 0);
+	//fprintf(stderr,"nVersion=%d\n",block->nVersion);
 	hv_store(rh, "time", 4, newSViv( block->nTime), 0);
+	//fprintf(stderr,"nTime=%d\n",block->nTime);
 	hv_store(rh, "bits", 4, newSViv( block->nBits), 0);
-	hv_store(rh, "nonce", 5, newSViv( block->nNonce), 0); 
+	//fprintf(stderr,"bits=%d\n",block->nBits);
+	hv_store(rh, "nonce", 5, newSViv( block->nNonce), 0);
+	//fprintf(stderr,"nonce=%d\n",block->nNonce);
 	hv_store(rh, "success", 7, newSViv((int) 1), 0);
 	
 	char x1[BU256_STRSZ];

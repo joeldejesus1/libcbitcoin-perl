@@ -508,6 +508,9 @@ sub block{
 
 sub block_height {
 	my $this = shift;
+	
+	return 0 unless defined $this->{'headers'};
+	
 	return scalar(@{$this->{'headers'}}) - 1;
 }
 
@@ -869,14 +872,19 @@ When done, set result=1???
 
 sub hook_inv {
 	my ($this,$type,$hash) = @_;
-	warn "Got inv of type=$type with hash=".unpack('H*',$hash)."\n";
+	#
 	
 	
 	return undef unless defined $type && (0 <= $type && $type <= 3 ) &&
 		 defined $hash && 0 < length($hash);
 	# length($hash) should be equal to 32 (256bits), but in the future that might change.
 	
+	if($type == 2){
+		delete $this->{'command timeout'}->{'send_getblocks'};
+	}
 	
+	
+	warn "Got inv [$type;".unpack('H*',$hash)."]";
 	unless(defined $this->{'inv search'}->[$type]->{$hash}){
 		$this->{'inv search'}->[$type]->{$hash} = [0];
 	}
@@ -899,7 +907,7 @@ sub hook_peer_onreadidle {
 	my ($this,$peer) = @_;
 	
 	# check to see if we need to fetch more inv
-	#warn "check to see if we need to fetch more inv\n";
+	warn "check to see if we need to fetch more inv with p=".$this->hook_getdata_blocks_preview()."\n";
 	#$peer->send_getdata($this->hook_getdata());
 	
 	# we might have to wait for a ping before this request goes out to the peer
@@ -909,18 +917,20 @@ sub hook_peer_onreadidle {
 	#	$this->is_marked_getblocks(0);
 	#	$this->{'getblocks timeout'} = time();
 	#}
-	if( $this->hook_getdata_blocks_preview() == 0){
+	if(0 < $this->hook_getdata_blocks_preview()){
+		warn "Need to fetch more inv";
+		$peer->send_getdata($this->hook_getdata());
+	}
+	else{
+		warn "Need to fetch more blocks";
 		if($this->block_height() < $peer->block_height()){
 			warn "alpha; block height diff=".( $peer->block_height() - $this->block_height() );
 			$peer->send_getblocks();
 		}
 		else{
-			warn "beta; block height diff=".( $peer->block_height() - $this->block_height() );
+			warn "we are caught up with peer=$peer";
 			#$peer->send_getaddr();
 		}		
-	}
-	else{
-		warn "Preview=".$this->hook_getdata_blocks_preview();
 	}
 
 }
@@ -938,6 +948,7 @@ sub hook_getdata {
 	my @response;
 	
 	$max_count = 100 unless defined $max_count;
+	$max_count = 4;
 	
 	my $gd_timeout = 600;
 	
@@ -1431,10 +1442,11 @@ sub callback_gotinv {
 	my $count = CBitcoin::Utilities::deserialize_varint($fh);
 	warn "gotinv: count=$count\n";
 	for(my $i=0;$i < $count;$i++){
+		# in hook_inv, mark send_blocks clean
 		$this->hook_inv(@{CBitcoin::Utilities::deserialize_inv($fh)});
 	}
 	close($fh);
-		
+	
 	# go fetch the data
 	$peer->send_getdata($this->hook_getdata());
 	
@@ -1474,7 +1486,7 @@ sub callback_gotblock {
 		
 	my $block = CBitcoin::Block->deserialize($msg->payload());
 	return undef unless $block->{'success'};
-	warn "Got block with hash=".$block->hash_hex().
+	warn "Got block with hash=".length($block->hash()).
 		" and transactionNum=".$block->transactionNum.
 		" and prevBlockHash=".$block->prevBlockHash_hex()."\n";
 	my $count = $block->transactionNum;
@@ -1496,7 +1508,16 @@ sub callback_gotblock {
 		#}
 		
 		# delete it in inv search.
-	delete $this->{'inv search'}->[2]->{$block->hash()};
+	#delete $this->{'inv search'}->[2]->{$block->hash()};
+	if(defined  $this->{'inv search'}->[2]->{$block->hash()}){
+		warn "deleting inv with hash=".$block->hash_hex();
+		delete $this->{'inv search'}->[2]->{$block->hash()};# = undef;
+	}
+	else{
+		warn "missing inv with hash=".$block->hash_hex();
+	}
+	
+	
 	$this->hook_peer_onreadidle($peer);
 	
 	

@@ -56,13 +56,8 @@ sub genesis_block{
 	my $package = shift;
 	my $x;
 	if($CBitcoin::network_bytes eq CBitcoin::MAINNET){
-		open(my $fh,'<','t/blk0.ser') || die "genesis block message";
-		binmode($fh);
-
-		my $msg = CBitcoin::Message->deserialize($fh);
-		close($fh);
-
-		$x = CBitcoin::Block->deserialize($msg->payload() );
+		$x = pack('H*','0100000000000000000000000000000000000000000000000000000000000000000000003BA3EDFD7A7B12B27AC72C3E67768F617FC81BC3888A51323A9FB8AA4B1E5E4A29AB5F49FFFF001D1DAC2B7C0101000000010000000000000000000000000000000000000000000000000000000000000000FFFFFFFF4D04FFFF001D0104455468652054696D65732030332F4A616E2F32303039204368616E63656C6C6F72206F6E206272696E6B206F66207365636F6E64206261696C6F757420666F722062616E6B73FFFFFFFF0100F2052A01000000434104678AFDB0FE5548271967F1A67130B7105CD6A828E03909A67962E0EA1F61DEB649F6BC3F4CEF38C4F35504E51EC112DE5C384DF7BA0B8D578A4C702B6BF11D5FAC00000000');
+		$x = CBitcoin::Block->deserialize($x);
 	}
 	else{
 		die "no genesis block";
@@ -136,13 +131,25 @@ sub deserialize{
 	die "failed to parse" unless $this->{'success'};
 	bless($this,$package);
 	
-	$this->{'merkleRoot'} = pack('H*',$this->{'merkleRoot'});
-	$this->{'prevBlockHash'} = pack('H*',$this->{'prevBlockHash'}) if defined $this->{'prevBlockHash'};
-	if(defined $this->{'sha256'}){
-		$this->{'sha256'} = pack('H*',$this->{'sha256'});
-	}
+
 	
+#	$this->{'merkleRoot'} = pack('H*',$this->{'merkleRoot'});
+
+	foreach my $x ('sha256','prevBlockHash','merkleRoot'){
+		if(defined $this->{$x}){
+			$this->{$x} = pack('H*',
+				substr($this->{$x},0,length($this->{$x}) - 2)
+			);
+		}		
+	}
+
 	$this->{'data'} = $payload;
+	
+	$this->{'header'} = substr($payload,0,80);
+	
+	$this->{'sha256'} = Digest::SHA::sha256($this->{'header'});
+	$this->{'sha256'} = Digest::SHA::sha256($this->{'sha256'});	
+
 	
 	return $this;
 }
@@ -209,6 +216,8 @@ sub merkleRoot_hex {
 
 sub prevBlockHash {
 	my $this = shift;
+	#return $this->{'prevBlockHash'};
+	
 	return $this->{'prevBlockHash reverse'} if $this->{'prevBlockHash reverse'};
 	# need to reverse bytes
 	my $hash = $this->{'prevBlockHash'};
@@ -225,6 +234,8 @@ sub prevBlockHash_hex {
 
 sub hash {
 	my $this = shift;
+	return $this->{'sha256'};
+	# don't need this section since we are manually calculating hash in deserialize()
 	return $this->{'sha256 reverse'} if $this->{'sha256 reverse'};
 	my $hash = $this->{'sha256'};
 	$hash = join '', reverse split /(..)/, unpack('H*',$hash);
