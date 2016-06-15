@@ -26,6 +26,13 @@
 } bu256_t;
  */
 
+void copy256bithash(uint8_t *out, const bu256_t *in){
+	
+	int i;
+	for(i=0;i<8;i++){
+		memcpy((uint8_t *) out[4*i],in->dword[i],4);
+	}
+}
 
 /*
  *   Return success=0 hash (typically indicates failure to deserialize)
@@ -48,20 +55,33 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block){
 	//fprintf(stderr,"nonce=%d\n",block->nNonce);
 	hv_store(rh, "success", 7, newSViv((int) 1), 0);
 	
+	
 	char x1[BU256_STRSZ];
 	bu256_hex(x1,&block->hashPrevBlock);
-	hv_store(rh, "prevBlockHash", 13, newSVpv(x1,sizeof(x1)), 0);
+	hv_store(rh, "prevBlockHash", 13, newSVpv(x1,BU256_STRSZ), 0);
+	//uint8_t *hash1 = malloc(32 * sizeof(uint8_t));
+	//copy256bithash(hash1,&block->hashPrevBlock);
+	//hv_store(rh, "prevBlockHash", 13, newSVpv(hash1,32), 0);
+	
+	
 	char x2[BU256_STRSZ];
 	bu256_hex(x2,&block->hashMerkleRoot);
-	hv_store(rh, "merkleRoot", 10, newSVpv(x2,sizeof(x2)), 0);
+	hv_store(rh, "merkleRoot", 10, newSVpv(x2, BU256_STRSZ ), 0);
+	//uint8_t *hash2 = malloc(32 * sizeof(uint8_t));
+	//copy256bithash(hash2,&block->hashMerkleRoot);
+	//hv_store(rh, "merkleRoot", 10, newSVpv(hash2,32 ), 0);
 	
 	
 	// sha256_valid
 	if(block->sha256_valid){
 		// sha256
+		
 		char x3[BU256_STRSZ];
 		bu256_hex(x3, &block->sha256);
-		hv_store(rh, "sha256", 6, newSVpv(x3,sizeof(x3)), 0);
+		hv_store(rh, "sha256", 6, newSVpv(x3,BU256_STRSZ), 0);
+		//uint8_t *hash3 = malloc(32 * sizeof(uint8_t));
+		//copy256bithash(hash3,&block->sha256);
+		//hv_store(rh, "sha256", 6, newSVpv(hash3,32), 0);
 	}
 	
 	//hd_extended_key_free(&hdkey);
@@ -176,6 +196,7 @@ HV* picocoin_block_des(SV* blockdata){
 		return picocoin_returnblankblock(rh);
 	}
 	//fprintf(stderr,"hi - 3\n");
+	bp_block_calc_sha256(&block);
 	
 	picocoin_returnblock(rh,&block);
 	bp_block_free(&block);

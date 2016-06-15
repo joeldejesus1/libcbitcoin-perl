@@ -137,9 +137,10 @@ sub deserialize{
 
 	foreach my $x ('sha256','prevBlockHash','merkleRoot'){
 		if(defined $this->{$x}){
-			$this->{$x} = pack('H*',
-				substr($this->{$x},0,length($this->{$x}) - 2)
-			);
+			# strip off 65th byte
+			$this->{$x} = substr($this->{$x},0,length($this->{$x}) - 1);
+			$this->{$x} = join '', reverse split /(..)/, $this->{$x};
+			$this->{$x} = pack('H*',$this->{$x});
 		}		
 	}
 
@@ -147,8 +148,8 @@ sub deserialize{
 	
 	$this->{'header'} = substr($payload,0,80);
 	
-	$this->{'sha256'} = Digest::SHA::sha256($this->{'header'});
-	$this->{'sha256'} = Digest::SHA::sha256($this->{'sha256'});	
+	#$this->{'sha256'} = Digest::SHA::sha256($this->{'header'});
+	#$this->{'sha256'} = Digest::SHA::sha256($this->{'sha256'});	
 
 	
 	return $this;

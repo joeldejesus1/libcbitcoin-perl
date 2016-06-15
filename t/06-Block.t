@@ -6,13 +6,19 @@ use warnings;
 require Data::Dumper;
 use Test::More tests => 3;
 
+use JSON::XS;
 use CBitcoin::Message;
 use CBitcoin::Block;
 
-#my $gen_block = CBitcoin::Block->genesis_block();
-#warn "Hash=".$gen_block->hash_hex."\n";
-#warn "prevBlockHash=".$gen_block->prevBlockHash_hex."\n";
-#warn "Data=".unpack('H*',$gen_block->data)."\n";
+########## Test a raw genesis block ############
+
+my $blk0json = '{
+  "hash" : "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
+  "height" : 0,
+  "size" : 309
+}';
+$blk0json = JSON::XS::decode_json($blk0json);
+$blk0json->{'hash'} =  join '', reverse split /(..)/, $blk0json->{'hash'} ;
 
 open(my $fh,'<','t/blk0.ser') || print "Bail out!";
 binmode($fh);
@@ -31,12 +37,22 @@ $est_gen_hash = join '', reverse split /(..)/, $est_gen_hash;
 #warn "nonce=".$block->nonce."\n";
 #warn "timestamp=".$block->timestamp."\n";
 #warn "XO=".$block->hash_hex."\n";
-
+#warn "blk0=".$block->hash_hex."\n[".length($block->hash)."]...".$blk0json->{'hash'}."\n";
 
 ok( $block->{'success'} && $block->hash_hex eq $est_gen_hash, 'Genesis Block' );
 
 my $gen_hash = $block->hash() if $block->{'success'};
 #warn "XO=[".unpack('H*',$msg->payload())."]\n";
+
+########## Test a big block ############
+
+my $blk120383json = '{
+  "hash" : "0000000000008fdf23e2a8d58a6e47a9f09913ad0b8f8507e0490385fba59ca3",
+  "height" : 120383,
+  "size" : 99090
+}';
+$blk120383json = JSON::XS::decode_json($blk120383json);
+$blk120383json->{'hash'} =  join '', reverse split /(..)/, $blk120383json->{'hash'} ;
 
 open($fh,'<','t/blk120383.ser') || print "Bail out!";
 binmode($fh);
@@ -44,10 +60,15 @@ $msg = CBitcoin::Message->deserialize($fh);
 close($fh);
 
 $block = CBitcoin::Block->deserialize($msg->payload() );
-#warn "XO=".$block->hash_hex."\n";
+#warn "blk120383=".$block->hash_hex."\n[".length($block->hash)."]...".$blk120383json->{'hash'}."\n";
 
-ok( $block->{'success'}, 'Big Block' );
+ok( 
+	$block->{'success'} 
+	&& $block->hash_hex eq $blk120383json->{'hash'}
+, 'Big Block' );
 
+
+########## Retest Genesis Block ############
 
 $block = CBitcoin::Block->genesis_block();
 ok( $block->{'success'} && $block->hash() eq $gen_hash, 'Genesis Block sub' );

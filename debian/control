@@ -2,9 +2,7 @@ Source: libcbitcoin-perl
 Section: extra
 Priority: extra
 Maintainer: Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>
-
-Build-Depends: debhelper (>= 8.0.0),libconvert-base32-perl, libssl-dev, autotools-dev, picocoin0, picocoin-dev, libnet-ip-perl, libio-epoll-perl, libev-perl
-
+Build-Depends: debhelper (>= 8.0.0), libjson-xs-perl,libconvert-base32-perl, libssl-dev, autotools-dev, picocoin0, picocoin-dev, libnet-ip-perl, libio-epoll-perl, libev-perl
 Standards-Version: 3.9.3
 Homepage: https://e-flamingo.jp
 
