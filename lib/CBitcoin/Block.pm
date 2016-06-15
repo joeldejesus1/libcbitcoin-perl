@@ -213,6 +213,7 @@ sub merkleRoot_hex {
 	return unpack('H*',shift->{'merkleRoot'});
 }
 
+# TODO: fix this in the XS!
 
 sub prevBlockHash {
 	my $this = shift;

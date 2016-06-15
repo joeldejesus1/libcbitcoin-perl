@@ -50,8 +50,11 @@ sub new {
 	warn "hello 4";
 	# brain
 	$this->{'inv'} = [{},{},{},{}];
-	$this->{'inv search'} = [{},{},{},{}];	
+	$this->{'inv search'} = [{},{},{},{}];
+	$this->{'inv next getdata'} = [ [], [], [], []];	
 	$this->initialize_peers();
+	
+	
 	
 	warn "spv new done";
 
@@ -192,11 +195,27 @@ sub initialize_chain{
 
 	warn "initialize chain 2\n";
 	# must get genesis block
-	my $gen_block = CBitcoin::Block->genesis_block();
-
-	warn "initialize chain 5 hash=".unpack('H*',$gen_block->hash)."\n";
+	$this->{'genesis block'} = CBitcoin::Block->genesis_block();
+	
+	$this->{'header hash to hash'}->{$this->{'genesis block'}->hash()} = 
+		[$this->{'genesis block'}->prevBlockHash(),''];
+		
+		
+	# style 2
+	$this->{'chain'}->{'genesis block'} = $this->{'genesis block'}->hash();
+	$this->{'chain'}->{'latest'} = $this->{'chain'}->{'genesis block'};
+	$this->{'chain'}->{'orphans'} = {};
+	$this->{'headers'}->[0] = $this->{'genesis block'}->hash();
+	
+	$this->{'header changed'} = 1;
+	$this->sort_chain();
+	#print "Bail out!";
+	#die "bad news";
 	#$this->{'headers'}->[0] = $gen_block->hash;
-	$this->add_header_to_chain($gen_block);
+	
+	#warn "initialize chain 5 hash=".unpack('H*',$gen_block->hash)."\n";
+	
+	#$this->add_header_to_chain($gen_block);
 	#push(@{$this->{'headers'}},$gen_block->hash);
 	
 	return 1;
@@ -271,6 +290,28 @@ sub add_header_to_chain {
 sub add_header_to_inmemory_chain {
 	my ($this,$header) = @_;
 	
+	
+	# style 2
+	#$this->{'chain'}->{'latest'};
+	if(defined $this->{'header hash to hash'}->{$header->hash}){
+		warn "we already have this block\n";
+		return undef;
+	}
+	elsif($this->{'chain'}->{'latest'} ne $header->prevBlockHash){
+		warn "Got orphan block\n";
+		$this->{'chain'}->{'orphans'}->{$header->hash};
+		print "Bail out!";
+		die "orphan block";
+	}
+	else{
+		warn "Got main chain block\n";
+		$this->{'chain'}->{'latest'} = $header->hash;
+		push(@{$this->{'headers'}},$header->hash);
+		print "Bail out!";
+		die "main chain block";
+	}
+	
+	# this section handles relationships between blocks
 	if(defined $this->{'header hash to hash'}->{$header->hash} ){
 		$this->{'header hash to hash'}->{$header->hash}->[0] = $header->prevBlockHash;
 	}
@@ -279,18 +320,28 @@ sub add_header_to_inmemory_chain {
 	}
 	
 	if(defined $this->{'header hash to hash'}->{$header->prevBlockHash}){
+		warn "should be here!";
 		$this->{'header hash to hash'}->{$header->prevBlockHash}->[1] = $header->hash;
 	}
 	else{
+		warn "should not be here!";
 		$this->{'header hash to hash'}->{$header->prevBlockHash} = ['',$header->hash];
 	}
 	
+	
+
+	
+	
 	$this->{'header changed'} = 1;
+	
+	
 }
 
 =pod
 
 ---++ sort_chain
+
+Iterate through $this->{'header hash to hash'} to calculate $this->{'headers'}.
 
 =cut
 
@@ -299,21 +350,44 @@ sub sort_chain {
 	
 	return undef unless $this->{'header changed'};
 	
-	$this->{'headers'} = [];
+	#$this->{'headers'} = [];
 	
 	my $mainref = $this->{'header hash to hash'};
-	my $gen_block = CBitcoin::Block->genesis_block();
+	my $gen_block = $this->{'genesis block'};
 	my $curr_hash = $gen_block->hash;
-	my $loopcheck = {};
+	my $loopcheck = {}; # to see if the chain is actually a loop, prevent infinite loops
+	my $index = 0;
+	my $orig_height = scalar(@{$this->{'headers'}}) - 1;
 	while(defined $curr_hash && $curr_hash ne '' && !($loopcheck->{$curr_hash})){
-		#warn "New hash=".unpack('H*',$curr_hash)."\n";
-		push(@{$this->{'headers'}},$curr_hash);
+		
+		if($orig_height <= $index){
+			# new blocks
+			$this->{'chain'}->{'latest'} = $curr_hash;
+			$this->{'headers'}->[$index] = $curr_hash;
+			if(defined $this->{'chain'}->{'orphans'}->{$curr_hash}){
+				warn "deleting orphan\n";
+				delete $this->{'chain'}->{'orphans'}->{$curr_hash};
+			}
+		}
+		elsif(
+			$this->{'headers'}->[$index] eq $curr_hash
+		){
+			warn "chain not finished, keep going\n";
+			#last;
+		}
+		else{
+			warn "chain does not match!";
+			
+		}
 		$loopcheck->{$curr_hash} = 1;
 		$curr_hash = $mainref->{$curr_hash}->[1];
-		
+		$index += 1;
 	}
 	#warn "finished sorting, new block_height=".scalar(@{$this->{'headers'}})."\n";
 	$this->{'header changed'} = 0;
+	
+	
+
 }
 
 =pod
@@ -488,9 +562,7 @@ sub block{
 		defined $index && $index =~ m/^(\d+)$/ && 0 <= $index;
 	#$index = $index;
 	
-	if($this->{'header changed'}){
-		$this->sort_chain();
-	}
+	$this->sort_chain();
 	
 	#require Data::Dumper;
 	#my $xo = Data::Dumper::Dumper($this->{'headers'});
@@ -508,9 +580,7 @@ sub block{
 
 sub block_height {
 	my $this = shift;
-	
-	return 0 unless defined $this->{'headers'};
-	
+	$this->sort_chain();	
 	return scalar(@{$this->{'headers'}}) - 1;
 }
 
@@ -832,6 +902,7 @@ This is called when a handshake is finished.
 sub peer_hook_handshake_finished{
 	my $this = shift;
 	my $peer = shift;
+	
 	warn "Running send getblocks since hand shake is finished\n";
 	
 	#$peer->send_getheaders();
@@ -887,6 +958,7 @@ sub hook_inv {
 	warn "Got inv [$type;".unpack('H*',$hash)."]";
 	unless(defined $this->{'inv search'}->[$type]->{$hash}){
 		$this->{'inv search'}->[$type]->{$hash} = [0];
+		push(@{$this->{'inv next getdata'}->[$type]},$hash);
 	}
 	
 	# what do we do?
@@ -905,7 +977,8 @@ A peer can do a read, so, after reading in the bytes, figure out what to do.
 
 sub hook_peer_onreadidle {
 	my ($this,$peer) = @_;
-	
+	return undef unless $peer->handshake_finished();
+	$this->sort_chain();
 	# check to see if we need to fetch more inv
 	warn "check to see if we need to fetch more inv with p=".$this->hook_getdata_blocks_preview()."\n";
 	#$peer->send_getdata($this->hook_getdata());
@@ -917,6 +990,9 @@ sub hook_peer_onreadidle {
 	#	$this->is_marked_getblocks(0);
 	#	$this->{'getblocks timeout'} = time();
 	#}
+	
+	warn "Num of Headers=".scalar(@{$this->{'headers'}});
+	
 	if(0 < $this->hook_getdata_blocks_preview()){
 		warn "Need to fetch more inv";
 		$peer->send_getdata($this->hook_getdata());
@@ -925,7 +1001,9 @@ sub hook_peer_onreadidle {
 		warn "Need to fetch more blocks";
 		if($this->block_height() < $peer->block_height()){
 			warn "alpha; block height diff=".( $peer->block_height() - $this->block_height() );
-			$peer->send_getblocks();
+			#$peer->send_getblocks();
+			#print "Bail out!";
+			#exit 0;
 		}
 		else{
 			warn "we are caught up with peer=$peer";
@@ -947,8 +1025,8 @@ sub hook_getdata {
 	my ($this,$max_count) = @_;
 	my @response;
 	
-	$max_count = 100 unless defined $max_count;
-	$max_count = 4;
+	$max_count = 500 unless defined $max_count;
+	#$max_count = 4;
 	
 	my $gd_timeout = 600;
 	
@@ -984,7 +1062,7 @@ sub hook_getdata {
 		}
 	}
 	warn "hook_getdata part 3 \n";
-	foreach my $hash (keys %{$this->{'inv search'}->[2]}){
+	while(my $hash = shift(@{$this->{'inv next getdata'}->[2]})  ){
 		# block
 		if(
 			$i < $max_count_per_peer 
@@ -995,9 +1073,12 @@ sub hook_getdata {
 			$i += 1;	
 		}
 		elsif($max_count_per_peer < $i){
+			unshift(@{$this->{'inv next getdata'}->[2]},$hash);
 			last;
 		}
 	}
+	#$this->{'inv next getdata'}->[2] = [];
+	
 	warn "hook_getdata part 4 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[3]}){
 		# filtered block
@@ -1431,7 +1512,7 @@ BEGIN{
 
 sub callback_gotinv {
 	my ($this,$msg,$peer) = @_;
-	warn "Got inv\n";
+	#warn "Got inv\n";
 	unless($peer->handshake_finished()){
 		#warn "got inv before handshake finsihed\n";
 		$peer->mark_finished();
@@ -1440,7 +1521,7 @@ sub callback_gotinv {
 	open(my $fh,'<',\($msg->payload()));
 	binmode($fh);
 	my $count = CBitcoin::Utilities::deserialize_varint($fh);
-	warn "gotinv: count=$count\n";
+	#warn "gotinv: count=$count\n";
 	for(my $i=0;$i < $count;$i++){
 		# in hook_inv, mark send_blocks clean
 		$this->hook_inv(@{CBitcoin::Utilities::deserialize_inv($fh)});
@@ -1481,12 +1562,14 @@ BEGIN{
 sub callback_gotblock {
 	my ($this,$msg,$peer) = @_;
 	
-	# write this to disk
 
-		
 	my $block = CBitcoin::Block->deserialize($msg->payload());
+	
 	return undef unless $block->{'success'};
-	warn "Got block with hash=".length($block->hash()).
+	
+	# TODO: Fix the faulty prevBlockHash (returning bogus hash....)
+	
+	warn "Got block with hash=".$block->hash_hex().
 		" and transactionNum=".$block->transactionNum.
 		" and prevBlockHash=".$block->prevBlockHash_hex()."\n";
 	my $count = $block->transactionNum;
@@ -1494,6 +1577,16 @@ sub callback_gotblock {
 		
 	$this->add_header_to_chain($block);
 		
+	#if(defined $this->{'header hash to hash'}->{$block->prevBlockHash}){
+	#	warn "block exists in chain with prev hash=".$block->prevBlockHash_hex."\n";
+	#}
+	#else{
+	#	warn "block does not exist";
+		#print "Bail out!";
+		#die "failed";
+	#}
+	#print "Bail out!";
+	#die "failed";
 		#if(0 < $count){
 		#	for(my $i=0;$i<$count;$i++){
 		#		#warn "looping\n";		
@@ -1510,11 +1603,11 @@ sub callback_gotblock {
 		# delete it in inv search.
 	#delete $this->{'inv search'}->[2]->{$block->hash()};
 	if(defined  $this->{'inv search'}->[2]->{$block->hash()}){
-		warn "deleting inv with hash=".$block->hash_hex();
+		warn "deleting inv with hash=".$block->hash_hex()."\n";
 		delete $this->{'inv search'}->[2]->{$block->hash()};# = undef;
 	}
 	else{
-		warn "missing inv with hash=".$block->hash_hex();
+		warn "missing inv with hash=".$block->hash_hex()."\n";
 	}
 	
 	
