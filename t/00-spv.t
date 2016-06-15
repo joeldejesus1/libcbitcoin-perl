@@ -218,7 +218,8 @@ my $spv = CBitcoin::SPV->new({
 	'port' => 8333,
 	'isLocal' => 1,
 	'connect sub' => $connectsub,
-	'mark write sub' => $markwritesub 
+	'mark write sub' => $markwritesub ,
+	'read buffer size' => 8192 * 8
 });
 
 $spv->add_peer_to_inmemmory(pack('Q',1),'127.0.0.1','8333');		

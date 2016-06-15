@@ -277,6 +277,8 @@ sub add_header_to_chain {
 	my $header = shift;
 	die "header is null" unless defined $header;
 
+	
+
 	$this->add_header_to_inmemory_chain($header);
 	#return $this->block_height(1);
 }
@@ -294,21 +296,21 @@ sub add_header_to_inmemory_chain {
 	# style 2
 	#$this->{'chain'}->{'latest'};
 	if(defined $this->{'header hash to hash'}->{$header->hash}){
-		warn "we already have this block\n";
+		#warn "we already have this block\n";
 		return undef;
 	}
 	elsif($this->{'chain'}->{'latest'} ne $header->prevBlockHash){
-		warn "Got orphan block\n";
+		#warn "Got orphan block\n";
 		$this->{'chain'}->{'orphans'}->{$header->hash};
-		print "Bail out!";
-		die "orphan block";
+		#print "Bail out!";
+		#die "orphan block";
 	}
 	else{
-		warn "Got main chain block\n";
+		#warn "Got main chain block\n";
 		$this->{'chain'}->{'latest'} = $header->hash;
 		push(@{$this->{'headers'}},$header->hash);
-		print "Bail out!";
-		die "main chain block";
+		#print "Bail out!";
+		#die "main chain block";
 	}
 	
 	# this section handles relationships between blocks
@@ -320,17 +322,13 @@ sub add_header_to_inmemory_chain {
 	}
 	
 	if(defined $this->{'header hash to hash'}->{$header->prevBlockHash}){
-		warn "should be here!";
+#		warn "should be here!";
 		$this->{'header hash to hash'}->{$header->prevBlockHash}->[1] = $header->hash;
 	}
 	else{
-		warn "should not be here!";
+#		warn "should not be here!";
 		$this->{'header hash to hash'}->{$header->prevBlockHash} = ['',$header->hash];
 	}
-	
-	
-
-	
 	
 	$this->{'header changed'} = 1;
 	
@@ -365,18 +363,18 @@ sub sort_chain {
 			$this->{'chain'}->{'latest'} = $curr_hash;
 			$this->{'headers'}->[$index] = $curr_hash;
 			if(defined $this->{'chain'}->{'orphans'}->{$curr_hash}){
-				warn "deleting orphan\n";
+				#warn "deleting orphan\n";
 				delete $this->{'chain'}->{'orphans'}->{$curr_hash};
 			}
 		}
 		elsif(
 			$this->{'headers'}->[$index] eq $curr_hash
 		){
-			warn "chain not finished, keep going\n";
+			#warn "chain not finished, keep going\n";
 			#last;
 		}
 		else{
-			warn "chain does not match!";
+			#warn "chain does not match!";
 			
 		}
 		$loopcheck->{$curr_hash} = 1;
@@ -951,7 +949,8 @@ sub hook_inv {
 	# length($hash) should be equal to 32 (256bits), but in the future that might change.
 	
 	if($type == 2){
-		delete $this->{'command timeout'}->{'send_getblocks'};
+		#delete $this->{'command timeout'}->{'send_getblocks'};
+		$this->{'command timeout'}->{'send_getblocks'} = 0;
 	}
 	
 	
@@ -980,7 +979,7 @@ sub hook_peer_onreadidle {
 	return undef unless $peer->handshake_finished();
 	$this->sort_chain();
 	# check to see if we need to fetch more inv
-	warn "check to see if we need to fetch more inv with p=".$this->hook_getdata_blocks_preview()."\n";
+	#warn "check to see if we need to fetch more inv with p=".$this->hook_getdata_blocks_preview()."\n";
 	#$peer->send_getdata($this->hook_getdata());
 	
 	# we might have to wait for a ping before this request goes out to the peer
@@ -1001,7 +1000,7 @@ sub hook_peer_onreadidle {
 		warn "Need to fetch more blocks";
 		if($this->block_height() < $peer->block_height()){
 			warn "alpha; block height diff=".( $peer->block_height() - $this->block_height() );
-			#$peer->send_getblocks();
+			$peer->send_getblocks();
 			#print "Bail out!";
 			#exit 0;
 		}
@@ -1031,7 +1030,7 @@ sub hook_getdata {
 	my $gd_timeout = 600;
 	
 	my ($i,$max_count_per_peer) = (0,$max_count);
-	warn "hook_getdata part 1 \n";
+	#warn "hook_getdata part 1 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[0]}){
 		# error
 		if(
@@ -1046,7 +1045,7 @@ sub hook_getdata {
 			last;
 		}
 	}
-	warn "hook_getdata part 2 \n";
+	#warn "hook_getdata part 2 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[1]}){
 		# tx
 		if(
@@ -1061,7 +1060,7 @@ sub hook_getdata {
 			last;
 		}
 	}
-	warn "hook_getdata part 3 \n";
+	#warn "hook_getdata part 3 \n";
 	while(my $hash = shift(@{$this->{'inv next getdata'}->[2]})  ){
 		# block
 		if(
@@ -1079,7 +1078,7 @@ sub hook_getdata {
 	}
 	#$this->{'inv next getdata'}->[2] = [];
 	
-	warn "hook_getdata part 4 \n";
+	#warn "hook_getdata part 4 \n";
 	foreach my $hash (keys %{$this->{'inv search'}->[3]}){
 		# filtered block
 		if(
@@ -1094,7 +1093,7 @@ sub hook_getdata {
 			last;
 		}
 	}
-	warn "hook_getdata size is ".scalar(@response)."\n";
+	#warn "hook_getdata size is ".scalar(@response)."\n";
 	
 	
 	if(0 < scalar(@response)){

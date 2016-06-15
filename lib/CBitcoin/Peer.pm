@@ -450,12 +450,12 @@ Take an opportunity after processing to see if there is a need to close this con
 
 sub read_data {
 	use POSIX qw(:errno_h);
-	warn "can read from peer";
+#	warn "can read from peer";
 	my $this = shift;
 	
 	$this->{'bytes'} = '' unless defined $this->{'bytes'};
 	my $socket = $this->socket();
-	warn "Socket=$socket\n";
+#	warn "Socket=$socket\n";
 	my $n = sysread(
 		$this->socket(),$this->{'bytes'},
 		$this->{'read buffer size'},
@@ -826,10 +826,10 @@ Calculate the block locator based on the block headers we have, then send a mess
 
 sub send_getblocks{
 	my ($this) = @_;
-
+	#warn "Checking get_blocks timeout\n";
 	return undef if defined $this->{'command timeout'}->{'send_getblocks'}
-		&& time() - $this->{'command timeout'}->{'send_getblocks'} < 60*1;
-
+		&& time() - $this->{'command timeout'}->{'send_getblocks'} < 5;
+	warn "Sending get_blocks\n";
 	$this->{'command timeout'}->{'send_getblocks'} = time();
 
 	return $this->write(CBitcoin::Message::serialize(

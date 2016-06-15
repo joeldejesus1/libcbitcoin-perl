@@ -218,7 +218,7 @@ sub merkleRoot_hex {
 
 sub prevBlockHash {
 	my $this = shift;
-	#return $this->{'prevBlockHash'};
+	return $this->{'prevBlockHash'};
 	
 	return $this->{'prevBlockHash reverse'} if $this->{'prevBlockHash reverse'};
 	# need to reverse bytes
