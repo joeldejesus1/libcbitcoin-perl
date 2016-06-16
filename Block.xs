@@ -19,12 +19,63 @@
 #include <ccoin/core.h>
 #include <ccoin/mbr.h>
 #include <ccoin/message.h>
+#include <ccoin/bloom.h>
 //#include <ccoin/compat.h>
 /*
  * typedef struct bu256 {
 	uint32_t dword[BU256_WORDS];
 } bu256_t;
  */
+
+
+
+////// bloom filter ///////////
+
+void bloomfilter_insert(struct bloom* bf, SV* arrayref){
+	
+	if(!SvROK(arrayref)){
+		return;
+	}
+	SV* tmpSV = (SV*)SvRV(arrayref);
+	
+	if (SvTYPE(tmpSV) != SVt_PVAV) {
+		return;
+	}
+	AV* array = (AV*)tmpSV;
+	fprintf(stderr, "insert - 1");
+	int i;
+	for (i=0; i<=av_len(array); i++) {
+		SV** elem = av_fetch(array, i, 0);
+		if (elem != NULL){
+			STRLEN len;
+			uint8_t * elem_pointer = (uint8_t*) SvPV(*elem,len);
+			bloom_insert(bf,elem_pointer,(size_t) len);
+		}
+	}
+}
+
+
+struct bloom* bloomfilter_create(int nElements, double nFPRate){
+	//fprintf(stderr,"create - 1\n");
+	if(nElements <= 0 || nFPRate <= 0 || 1 < nFPRate){
+		fprintf(stderr,"create - 1\n");
+		return NULL;
+	}
+	//fprintf(stderr,"create - 2\n");
+	struct bloom * bf = {
+			cstr_new_sz(1024),0
+	};
+	//fprintf(stderr,"create - 3(%d,%f)\n",nElements,nFPRate);
+	if(!bloom_init(bf,(uint32_t) nElements,nFPRate)){
+		fprintf(stderr,"create - 4\n");
+		bloom_free(bf);
+		return NULL;
+	}
+	//fprintf(stderr,"create - 5\n");
+	return bf;	
+}
+
+////////// extra ///////////////
 
 void copy256bithash(uint8_t *out, const bu256_t *in){
 	
@@ -46,7 +97,7 @@ HV* picocoin_returnblankblock(HV * rh){
 HV* picocoin_returnblock(HV * rh, const struct bp_block *block){
 	//fprintf(stderr,"hi - 4\n");
 	hv_store(rh, "version", 7, newSViv( block->nVersion), 0);
-	//fprintf(stderr,"nVersion=%d\n",block->nVersion);
+	//fprintf(stderr,"nVersion=%d\n"double,block->nVersion);
 	hv_store(rh, "time", 4, newSViv( block->nTime), 0);
 	//fprintf(stderr,"nTime=%d\n",block->nTime);
 	hv_store(rh, "bits", 4, newSViv( block->nBits), 0);
@@ -203,12 +254,41 @@ HV* picocoin_block_des(SV* blockdata){
 	return rh;
 }
 
-////// extra
-
-
-int dummy6(int x) {
-	return x;
+/*
+ * Send an array ($script1, $script2, ...), nElements, and nFPRate
+ */
+HV* picocoin_bloomfilter_new(SV* arrayref, int nElements, double nFPRate){
+	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
+	//newSViv( txout->nValue )
+	//hv_store( rhtxin, "prevHash", 8, newSVpv( prevHash,  BU256_STRSZ), 0);
+	fprintf(stderr,"new - 1\n");
+	struct bloom* bf = bloomfilter_create(nElements,nFPRate);
+	fprintf(stderr,"new - 1.2\n");
+	if(bf == NULL){
+		fprintf(stderr,"new - 2\n");
+		return picocoin_returnblankblock(rh);
+	}
+	bloomfilter_insert(bf, arrayref);
+	// 
+	hv_store( rh, "nElements", 9, newSViv( nElements ), 0);
+	hv_store( rh, "nFPRate", 7, newSViv( nFPRate ), 0);
+	hv_store( rh, "success", 7, newSViv( 1 ), 0);
+	
+	// serialize
+	cstring *ser = cstr_new_sz(1024);
+	ser_bloom(ser, bf);
+	bloom_free(bf);
+	size_t length = ser->len;
+	uint8_t *final = malloc(ser->len * sizeof(uint8_t));
+	memcpy(final,ser->str,ser->len);
+	cstr_free(ser,true);
+	// TODO: check for memory leak
+	hv_store( rh, "data", 4, newSVpv( final,  length), 0);
+	
+	return rh;
 }
+
+
 
 /*
  *  scriptPubKey is the script in the previous transaction output.
@@ -238,9 +318,12 @@ MODULE = CBitcoin::Block	PACKAGE = CBitcoin::Block
 
 PROTOTYPES: DISABLED
 
-int
-dummy6(x)
-	int x
+
+HV*
+picocoin_bloomfilter_new(arrayref,nElements,nFPRate)
+	SV* arrayref
+	int nElements
+	double nFPRate
 	
 HV*
 picocoin_block_des(blockdata)

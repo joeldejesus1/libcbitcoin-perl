@@ -4,7 +4,7 @@ use warnings;
 
 #use CBitcoin::Block;
 require Data::Dumper;
-use Test::More tests => 3;
+use Test::More tests => 4;
 
 use JSON::XS;
 use CBitcoin::Message;
@@ -77,6 +77,16 @@ ok( $block->{'success'} && $block->hash() eq $gen_hash, 'Genesis Block sub' );
 
 
 
+############## Test Bloom Filter ############
+my @values = ('monkeybrain');
+my $hash = CBitcoin::Block::picocoin_bloomfilter_new(\@values,1000,0.001);
+ok(
+	defined $hash && ref($hash) eq 'HASH' && $hash->{'success'}
+	, 'successful serialization of bloom filter'
+);
+
+#$hash->{'data'} = '' unless defined $hash->{'data'};
+#warn "Got BF=".unpack('H*',$hash->{'data'})."\n";
 
 
 __END__
