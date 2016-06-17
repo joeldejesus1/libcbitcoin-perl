@@ -7,9 +7,10 @@ require Data::Dumper;
 use Test::More tests => 4;
 
 use JSON::XS;
+use CBitcoin;
 use CBitcoin::Message;
 use CBitcoin::Block;
-
+use CBitcoin::Script;
 ########## Test a raw genesis block ############
 
 my $blk0json = '{
@@ -78,13 +79,32 @@ ok( $block->{'success'} && $block->hash() eq $gen_hash, 'Genesis Block sub' );
 
 
 ############## Test Bloom Filter ############
-my @values = ('monkeybrain');
-my $hash = CBitcoin::Block::picocoin_bloomfilter_new(\@values,1000,0.001);
+my @scripts;
+foreach my $addr (
+	'1HLoD9E4SDFFPDiYfNYnkBLQ85Y51J3Zb1','1CpJni8cZ63BV3pA6cSBp5nWd71hx5MgX2'
+){
+	my $script = CBitcoin::Script::address_to_script($addr);
+	print "Bail out!" unless defined $script && 0 < length($script);
+	$script = CBitcoin::Script::serialize_script($script);
+	print "Bail out!" unless defined $script && 0 < length($script);
+	push(@scripts,$script);
+}
+
+
+
+my $hash = CBitcoin::Block::picocoin_bloomfilter_new(\@scripts,1000,0.001);
 ok(
 	defined $hash && ref($hash) eq 'HASH' && $hash->{'success'}
 	, 'successful serialization of bloom filter'
 );
+#warn "BF=".unpack('H*',$hash->{'data'});
+#warn "BF=".length($hash->{'data'})."\n";
+my $bhash = CBitcoin::Block::picocoin_block_des_with_bloomfilter(
+	$msg->payload(), $hash->{'data'}
+);
+warn "Success=".$bhash->{'success'}."\n";
 
+# test these addresses 
 #$hash->{'data'} = '' unless defined $hash->{'data'};
 #warn "Got BF=".unpack('H*',$hash->{'data'})."\n";
 

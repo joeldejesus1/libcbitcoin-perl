@@ -20,6 +20,7 @@
 #include <ccoin/mbr.h>
 #include <ccoin/message.h>
 #include <ccoin/bloom.h>
+#include <ccoin/serialize.h>
 //#include <ccoin/compat.h>
 /*
  * typedef struct bu256 {
@@ -31,6 +32,32 @@
 
 ////// bloom filter ///////////
 
+struct bloom* bloomfilter_des(SV* bfdata){
+	STRLEN len; //calculated via SvPV
+	uint8_t * bfdata_pointer = (uint8_t*) SvPV(bfdata,len);
+
+	if(len == 0){
+		return NULL;
+	}
+	struct bloom * bf = malloc(sizeof(*bf));
+	__bloom_init(bf);
+	
+	struct const_buffer bfbuff= {bfdata_pointer,len};
+	
+	if(!deser_bloom(bf, &bfbuff)){
+		bloom_free(bf);
+		return NULL;
+	}	
+	
+	return bf;
+}
+
+
+/*
+ * extern bool bloom_contains(struct bloom *bf, const void *data, size_t data_len);
+
+extern bool bloom_size_ok(const struct bloom *bf);
+ */
 void bloomfilter_insert(struct bloom* bf, SV* arrayref){
 	
 	if(!SvROK(arrayref)){
@@ -42,7 +69,7 @@ void bloomfilter_insert(struct bloom* bf, SV* arrayref){
 		return;
 	}
 	AV* array = (AV*)tmpSV;
-	fprintf(stderr, "insert - 1");
+	//fprintf(stderr, "insert - 1");
 	int i;
 	for (i=0; i<=av_len(array); i++) {
 		SV** elem = av_fetch(array, i, 0);
@@ -58,16 +85,18 @@ void bloomfilter_insert(struct bloom* bf, SV* arrayref){
 struct bloom* bloomfilter_create(int nElements, double nFPRate){
 	//fprintf(stderr,"create - 1\n");
 	if(nElements <= 0 || nFPRate <= 0 || 1 < nFPRate){
-		fprintf(stderr,"create - 1\n");
+		//fprintf(stderr,"create - 1\n");
 		return NULL;
 	}
 	//fprintf(stderr,"create - 2\n");
-	struct bloom * bf = {
-			cstr_new_sz(1024),0
-	};
+	//struct bloom * bf = {
+	//		cstr_new_sz(1024),0
+	//};
+	struct bloom * bf = malloc(sizeof(*bf));
+	
 	//fprintf(stderr,"create - 3(%d,%f)\n",nElements,nFPRate);
 	if(!bloom_init(bf,(uint32_t) nElements,nFPRate)){
-		fprintf(stderr,"create - 4\n");
+		//fprintf(stderr,"create - 4\n");
 		bloom_free(bf);
 		return NULL;
 	}
@@ -94,7 +123,7 @@ HV* picocoin_returnblankblock(HV * rh){
 }
 
 // given a full hdkey, fill in a perl hash with relevant data
-HV* picocoin_returnblock(HV * rh, const struct bp_block *block){
+HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf){
 	//fprintf(stderr,"hi - 4\n");
 	hv_store(rh, "version", 7, newSViv( block->nVersion), 0);
 	//fprintf(stderr,"nVersion=%d\n"double,block->nVersion);
@@ -249,7 +278,42 @@ HV* picocoin_block_des(SV* blockdata){
 	//fprintf(stderr,"hi - 3\n");
 	bp_block_calc_sha256(&block);
 	
-	picocoin_returnblock(rh,&block);
+	picocoin_returnblock(rh,&block,NULL);
+	bp_block_free(&block);
+	return rh;
+}
+
+
+HV* picocoin_block_des_with_bloomfilter(SV* blockdata,SV* bfdata){
+	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
+	
+	
+	struct bloom* bf = bloomfilter_des(bfdata);
+	if(bf == NULL){
+		return picocoin_returnblankblock(rh);
+	}
+	
+	STRLEN len_blkdata;
+	uint8_t * blkdata_pointer = (uint8_t*) SvPV(blockdata,len_blkdata);
+	struct const_buffer blkbuf = { blkdata_pointer, len_blkdata };
+	
+	struct bp_block block;
+	
+	bp_block_init(&block);
+	//fprintf(stderr,"hi - 1\n");
+	if(!deser_bp_block(&block, &blkbuf)){
+		bp_block_free(&block);	
+		return picocoin_returnblankblock(rh);
+	}
+	//fprintf(stderr,"hi - 2\n");
+	if(!bp_block_valid(&block)){
+		bp_block_free(&block);
+		return picocoin_returnblankblock(rh);
+	}
+	//fprintf(stderr,"hi - 3\n");
+	bp_block_calc_sha256(&block);
+	
+	picocoin_returnblock(rh,&block,bf);
 	bp_block_free(&block);
 	return rh;
 }
@@ -261,11 +325,11 @@ HV* picocoin_bloomfilter_new(SV* arrayref, int nElements, double nFPRate){
 	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
 	//newSViv( txout->nValue )
 	//hv_store( rhtxin, "prevHash", 8, newSVpv( prevHash,  BU256_STRSZ), 0);
-	fprintf(stderr,"new - 1\n");
+	//fprintf(stderr,"new - 1\n");
 	struct bloom* bf = bloomfilter_create(nElements,nFPRate);
-	fprintf(stderr,"new - 1.2\n");
+	//fprintf(stderr,"new - 1.2\n");
 	if(bf == NULL){
-		fprintf(stderr,"new - 2\n");
+		//fprintf(stderr,"new - 2\n");
 		return picocoin_returnblankblock(rh);
 	}
 	bloomfilter_insert(bf, arrayref);
@@ -275,15 +339,20 @@ HV* picocoin_bloomfilter_new(SV* arrayref, int nElements, double nFPRate){
 	hv_store( rh, "success", 7, newSViv( 1 ), 0);
 	
 	// serialize
-	cstring *ser = cstr_new_sz(1024);
+	cstring *ser = cstr_new_sz(0);
 	ser_bloom(ser, bf);
 	bloom_free(bf);
+	
+	
 	size_t length = ser->len;
 	uint8_t *final = malloc(ser->len * sizeof(uint8_t));
 	memcpy(final,ser->str,ser->len);
 	cstr_free(ser,true);
+	
 	// TODO: check for memory leak
 	hv_store( rh, "data", 4, newSVpv( final,  length), 0);
+	//fprintf(stderr,"der test 2=%d\n",length);
+	
 	
 	return rh;
 }
@@ -328,3 +397,8 @@ picocoin_bloomfilter_new(arrayref,nElements,nFPRate)
 HV*
 picocoin_block_des(blockdata)
 	SV* blockdata
+	
+HV*
+picocoin_block_des_with_bloomfilter(blockdata,bfdata)
+	SV* blockdata
+	SV* bfdata
