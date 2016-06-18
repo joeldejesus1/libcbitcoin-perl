@@ -68,6 +68,9 @@ ok(
 	&& $block->hash_hex eq $blk120383json->{'hash'}
 , 'Big Block' );
 
+my $rh = join '', reverse split /(..)/, $block->hash_hex ;
+
+#warn "Block120383 hash=".$rh."\n";
 
 ########## Retest Genesis Block ############
 
@@ -81,7 +84,8 @@ ok( $block->{'success'} && $block->hash() eq $gen_hash, 'Genesis Block sub' );
 ############## Test Bloom Filter ############
 my @scripts;
 foreach my $addr (
-	'1HLoD9E4SDFFPDiYfNYnkBLQ85Y51J3Zb1','1CpJni8cZ63BV3pA6cSBp5nWd71hx5MgX2'
+	'1BhT26zK7g9hXb3PDkwenkxpBeGYa6MCK1','1BPxymA3FSdUbfHTEzBycf5CsVbWqDGp6A',
+	'1LoZdpsX9c662bKJTpt8cEfANmu8WRKKKN'
 ){
 	my $script = CBitcoin::Script::address_to_script($addr);
 	print "Bail out!" unless defined $script && 0 < length($script);
@@ -89,21 +93,24 @@ foreach my $addr (
 	print "Bail out!" unless defined $script && 0 < length($script);
 	push(@scripts,$script);
 }
+my @outpoints = (
+	['5c60efa2d20a77fd3885148522e09ee4711b610b04947b91f67ec1d48ba1ec5e',1],
+	['e44bebbea596c72b2a2d8d1b105fe54b74d791ffc161150bb2c18ac0bfed9a7b',0]
+);
 
-
-
-my $hash = CBitcoin::Block::picocoin_bloomfilter_new(\@scripts,1000,0.001);
+$block = CBitcoin::Block->deserialize_filtered(
+	$msg->payload(),\@scripts,\@outpoints,1000,0.001
+);
+#warn "Tx By Hash=".Data::Dumper::Dumper($block->{'tx'})."\n";
 ok(
-	defined $hash && ref($hash) eq 'HASH' && $hash->{'success'}
+	$block->{'success'}
+	&& $block->tx_by_hash('6295b025647bdc5fd3c0fee5b635daf786cdf1ba06cd8d0fbdb46dbdf340dfbf')
+	&& $block->tx_by_hash('4f3e834eb1d0ec1d2586a75ca6b2dd38e5da1b137fe422078af708a04791abed')
 	, 'successful serialization of bloom filter'
 );
-#warn "BF=".unpack('H*',$hash->{'data'});
-#warn "BF=".length($hash->{'data'})."\n";
-my $bhash = CBitcoin::Block::picocoin_block_des_with_bloomfilter(
-	$msg->payload(), $hash->{'data'}
-);
-warn "Success=".$bhash->{'success'}."\n";
 
+#warn "Success=".$bhash->{'success'}."\n";
+#warn "Bhash:".Data::Dumper::Dumper($bhash)."\n";
 # test these addresses 
 #$hash->{'data'} = '' unless defined $hash->{'data'};
 #warn "Got BF=".unpack('H*',$hash->{'data'})."\n";

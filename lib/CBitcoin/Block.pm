@@ -131,7 +131,7 @@ sub deserialize{
 	die "failed to parse" unless $this->{'success'};
 	bless($this,$package);
 	
-
+	$this->{'tx by hash'} = {};
 	
 #	$this->{'merkleRoot'} = pack('H*',$this->{'merkleRoot'});
 
@@ -154,6 +154,117 @@ sub deserialize{
 	
 	return $this;
 }
+
+=pod
+
+---+++ deserialize_filtered($payload,[$script1, ..],[[$prevHash1,$prevIndex1],.. ])
+
+Use this to deserialize blocks and get the transactions that are interesting by using Bloom filters.
+
+Scripts and prevHashs must be serialized (binary).
+
+
+=cut
+
+sub deserialize_filtered {
+	my ($package,$payload,$scripts_ref,$prevOuts_ref,$nHash,$nFP) = @_;
+	
+	return undef unless defined $payload && 80 < length($payload);
+
+	die "bad format for nHash" unless defined $nHash && $nHash =~ m/^(\d+)$/
+		&& 0 < $nHash;
+	die "bad format for nFP" unless defined $nFP && $nFP =~ m/^\d+(\.\d+)?$/
+		&& 0 < $nFP && $nFP < 1.0;
+	
+
+	my $script_H = {};
+	my @values;
+	if(
+		defined $scripts_ref 
+		&& ref($scripts_ref) eq 'ARRAY'  
+	){
+		foreach my $script (@{$scripts_ref}){
+			# scripts must have been serialized already
+			push(@values,$script);
+			$script_H->{$script} = 1;
+		}	
+	}
+	my $prevOut_H = {};
+	if(
+		defined $prevOuts_ref 
+		&& ref($prevOuts_ref) eq 'ARRAY' 
+	){
+		foreach my $prevOut (@{$prevOuts_ref}){
+			die "bad format" unless defined $prevOut
+				&& ref($prevOut) eq 'ARRAY'
+				&& scalar(@{$prevOut}) == 2;
+
+			push(@values,$prevOut->[0]);
+			$prevOut_H->{$prevOut->[0].$prevOut->[1]} = 1;
+		}			
+	}
+	
+	my $bfhash = CBitcoin::Block::picocoin_bloomfilter_new(\@values,$nHash,$nFP);
+	die "bad bloom filter" unless defined $bfhash->{'success'};
+	my $this = picocoin_block_des_with_bloomfilter($payload,$bfhash->{'data'});
+	die "failed to parse" unless $this->{'success'};
+	bless($this,$package);
+	$this->{'tx by hash'} = {};
+
+	
+#	$this->{'merkleRoot'} = pack('H*',$this->{'merkleRoot'});
+
+	foreach my $x ('sha256','prevBlockHash','merkleRoot'){
+		if(defined $this->{$x}){
+			# strip off 65th byte
+			$this->{$x} = substr($this->{$x},0,length($this->{$x}) - 1);
+			$this->{$x} = join '', reverse split /(..)/, $this->{$x};
+			$this->{$x} = pack('H*',$this->{$x});
+		}		
+	}
+
+	$this->{'data'} = $payload;
+	
+	$this->{'header'} = substr($payload,0,80);
+	
+	#$this->{'sha256'} = Digest::SHA::sha256($this->{'header'});
+	#$this->{'sha256'} = Digest::SHA::sha256($this->{'sha256'});	
+
+	# $script_H and $prevOut_H
+	my @keep_tx;
+	foreach my $tx_H (@{$this->{'tx'}}){
+		#$tx_H->{'hash'};
+		#warn "tx=".Data::Dumper::Dumper($tx_H->{'vin'})."\n";
+		my $keep_bool = 0;
+		foreach my $vin (@{$tx_H->{'vin'}}){
+			#next unless defined $vin;
+			last if $keep_bool;
+			if($prevOut_H->{substr($vin->{'prevHash'},0,64).$vin->{'prevIndex'}}){
+				$vin->{'prevHash'} = substr($vin->{'prevHash'},0,64);
+				$keep_bool = 1;
+			}
+		}
+		foreach my $vout (@{$tx_H->{'vout'}}){
+			last if $keep_bool;
+			
+			# script
+			if($script_H->{$vout->{'script'}}){
+				$keep_bool = 1;
+			}
+		}
+		
+		if($keep_bool){
+			$tx_H->{'hash'} = substr($tx_H->{'hash'},0,64);
+			push(@keep_tx,$tx_H);
+			$this->{'tx by hash'}->{$tx_H->{'hash'}} = $tx_H;
+		}
+	}
+	$this->{'tx'} = \@keep_tx;
+	
+	return $this;
+}
+
+
 
 =pod
 
@@ -254,6 +365,28 @@ sub data {
 	return shift->{'data'};
 }
 
+=pod
 
+---++ tx_by_hash($i)
+
+Given a hash (in hex form or binary), retrieve the corresponding transaction.
+
+=cut
+
+sub tx_by_hash {
+	my ($this,$hash) = @_;
+	if(!defined $hash){
+		return undef;
+	}
+	elsif(length($hash) == 32){
+		return $this->{'tx by hash'}->{unpack('H*',$hash)};
+	}
+	elsif(length($hash) == 64){
+		return $this->{'tx by hash'}->{$hash};
+	}
+	else{
+		die "bad hash format";
+	}
+}
 
 1;

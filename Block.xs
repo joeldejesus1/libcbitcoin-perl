@@ -182,6 +182,16 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf
 		
 		HV * rhSingleTX= (HV *) sv_2mortal ((SV *) newHV ());
 		
+		bp_tx_calc_sha256(tx);
+		
+		if(tx->sha256_valid){
+			char txhash[BU256_STRSZ];
+			bu256_hex(txhash, &tx->sha256);
+			hv_store( rhSingleTX, "hash", 4, newSVpv( txhash,  BU256_STRSZ), 0);
+		}
+
+		
+		bool add_tx_to_db = false;
 		//tx->vin tx->vout
 		if(tx->vin && tx->vin->len){
 			int j;
@@ -202,6 +212,14 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf
 				
 				hv_store( rhtxin, "prevHash", 8, newSVpv( prevHash,  BU256_STRSZ), 0);
 				hv_store( rhtxin, "prevIndex", 9, newSViv(txin->prevout.n), 0);
+				//fprintf(stderr,"hash[%s]\n",prevHash);
+				if(bf != NULL && !add_tx_to_db){
+					// check to see if this transaction should be included
+					add_tx_to_db = bloom_contains(bf,prevHash,BU256_STRSZ-1);
+
+				}
+				
+				
 				
 				if(txin->scriptSig && txin->scriptSig->len){
 					// scriptSig
@@ -209,6 +227,7 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf
 					memcpy(scriptSig,txin->scriptSig->str,txin->scriptSig->len);
 					//SV* ans_sv = newSVpv(answer,length);
 					hv_store( rhtxin, "scriptSig", 9, newSVpv( scriptSig,  txin->scriptSig->len), 0);
+					
 				}
 				
 				
@@ -216,7 +235,7 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf
 				//av_push(avtxin, newSViv(j));
 			}
 			
-			hv_store( rhSingleTX, "vin", 4, newRV((SV *)avtxin), 0);
+			hv_store( rhSingleTX, "vin", 3, newRV((SV *)avtxin), 0);
 		}
 		
 		if(tx->vout && tx->vout->len){
@@ -237,17 +256,23 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf
 				memcpy(spk,txout->scriptPubKey->str,txout->scriptPubKey->len);				
 				hv_store( rhtxout, "script", 6, newSVpv(spk,txout->scriptPubKey->len), 0);
 				
+				if(bf != NULL && !add_tx_to_db){
+					// check to see if this transaction should be included
+					add_tx_to_db = bloom_contains(bf,spk,txout->scriptPubKey->len);
+				}
+				
 				
 				av_push(avtxout, newRV((SV *) rhtxout));
 				//av_push(avtxin, newSViv(j));
 			}
 			//av_push(avTX, newRV((SV *)avtxout) );
-			
+			//bloom_contains(struct bloom *bf, const void *data, size_t data_len);
 			hv_store( rhSingleTX, "vout", 4, newRV((SV *)avtxout), 0);
 		}
 		
-		
-		av_push(avTX, newRV((SV *)rhSingleTX) );
+		if(bf == NULL || (bf != NULL && add_tx_to_db) ){
+			av_push(avTX, newRV((SV *)rhSingleTX) );
+		}
 	}
 	hv_store(rh, "tx", 2,  newRV((SV *)avTX)  , 0);
 	
