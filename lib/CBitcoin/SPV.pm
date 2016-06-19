@@ -47,7 +47,7 @@ sub new {
 	$this->{'transactions'} = {};
 	$this->initialize_chain();
 	$this->sort_chain();
-	warn "hello 4";
+	
 	# brain
 	$this->{'inv'} = [{},{},{},{}];
 	$this->{'inv search'} = [{},{},{},{}];
@@ -292,6 +292,7 @@ sub add_header_to_chain {
 sub add_header_to_inmemory_chain {
 	my ($this,$header) = @_;
 	
+	delete $header->{'data'};
 	
 	# style 2
 	#$this->{'chain'}->{'latest'};
@@ -301,7 +302,7 @@ sub add_header_to_inmemory_chain {
 	}
 	elsif($this->{'chain'}->{'latest'} ne $header->prevBlockHash){
 		#warn "Got orphan block\n";
-		$this->{'chain'}->{'orphans'}->{$header->hash};
+		#$this->{'chain'}->{'orphans'}->{$header->hash};
 		#print "Bail out!";
 		#die "orphan block";
 	}
@@ -509,6 +510,46 @@ sub version {
 
 sub peers_path {
 	return shift->{'db path'}.'/peers';
+}
+
+
+=pod
+
+---++ peer_set_sleepsub($socket,$sub)
+
+This sub is a little tricky, checkout 00-spv.t
+
+=cut
+
+sub peer_set_sleepsub {
+	my ($this,$socket,$sub) = @_;
+	
+	return undef unless defined $socket && 0 < fileno($socket);
+	return undef unless defined $sub && ref($sub) eq 'CODE';
+	
+	
+	my $peer = $this->peer_by_fileno(fileno($socket));
+	$this->{'peer sleepsub'}->{fileno($socket)} = sub{
+		my $p2 = $peer;
+		my $sub2 = $sub;
+		$sub2->($p2,@_);
+	};
+}
+
+=pod
+
+---++ peer_sleep($peer,$timeout)
+
+Put a peer to sleep when the data transmission rate has been exceeded.
+
+=cut
+
+sub peer_sleep {
+	my ($this,$peer,$timeout) = @_;
+	
+	warn "putting peer to sleep for $timeout";
+	# set 60 second timeout on EV::WRITE
+	$this->{'peer sleepsub'}->{fileno($peer->socket())}->($timeout);
 }
 
 =pod
@@ -850,7 +891,7 @@ sub peer_by_fileno {
 
 sub close_peer {
 	my ($this,$fileno) = @_;
-	
+	return undef unless defined $fileno;
 	# TODO: untaint everything!
 	
 	my $peer = $this->{'peers'}->{$fileno};
@@ -1001,6 +1042,7 @@ sub hook_peer_onreadidle {
 		if($this->block_height() < $peer->block_height()){
 			warn "alpha; block height diff=".( $peer->block_height() - $this->block_height() );
 			$peer->send_getblocks();
+			#$peer->send_getheaders();
 			#print "Bail out!";
 			#exit 0;
 		}
@@ -1349,6 +1391,7 @@ BEGIN{
 
 sub callback_gotaddr {
 	my ($this,$msg,$peer) = @_;
+	return undef;
 	#warn "gotaddr\n";
 	open(my $fh,'<',\$msg->{'payload'});
 	my $addr_ref = CBitcoin::Utilities::deserialize_addr($fh);
@@ -1540,6 +1583,8 @@ sub callback_gotinv {
 Got a block, so put it into the database.
 
 
+
+
 ---+++ Tx Format
 version
 inputs => [..]
@@ -1561,7 +1606,7 @@ BEGIN{
 sub callback_gotblock {
 	my ($this,$msg,$peer) = @_;
 	
-
+	# deserialize_filter for when you have a wallet
 	my $block = CBitcoin::Block->deserialize($msg->payload());
 	
 	return undef unless $block->{'success'};
@@ -1616,6 +1661,7 @@ sub callback_gotblock {
 	#$this->spv->{'inv'}->[2]->{$block->hash()} = $block;
 #	unlink($fp) if -f $fp;
 }
+
 
 
 1;

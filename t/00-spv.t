@@ -111,12 +111,18 @@ my $connectsub = sub{
 			PeerHost => $ipaddress,
 			PeerPort => $port,
 			Proto => 'tcp',
-		) or die "ERROR in Socket Creation : $!\n";
+		);
 		alarm 0;
+		unless(defined $sck1){
+			die "ERROR in Socket Creation : $!\n";
+		}
+		
+		
 		#warn "Doing connection now, part 2\n";
 		
 		# I/O watcher
-		$internal_fn_watcher->{fileno($sck1)} = EV::io $sck1, EV::READ | EV::WRITE, sub {
+		 
+		my $readwritesub = sub {
 			my ($w, $revents) = @_; # all callbacks receive the watcher and event mask
 			my $sck2 = $sck1;
 			my $sfn = fileno($sck2);
@@ -156,6 +162,37 @@ my $connectsub = sub{
 				}				
 			}
 		};
+		$internal_fn_watcher->{fileno($sck1)} = EV::io $sck1, EV::READ | EV::WRITE, $readwritesub;
+		
+		# the sub is $sub->($timeout)
+		$spv->peer_set_sleepsub($sck1,sub{
+			my ($peer2,$timeout) = @_;
+			
+			my $spv2 = $spv;
+			my $sck2 = $sck1;
+			my $rws2 = $readwritesub;
+			my $ifw2 = $internal_fn_watcher;
+			#return undef if $spv2->{'peer rate limiter'}->{fileno($sck2)};
+			
+			# set watcher to read only
+			warn "Peer is writing too much data.\n";
+			
+			return undef if $peer2->{'sleeping'};
+			$peer2->{'sleeping'} = 1;
+			
+			$ifw2->{fileno($sck2)}->events(EV::READ);
+			
+			$ifw2->{fileno($sck2).'ratelimiter'} = EV::timer $timeout, 0, sub {
+				my $sck3 = $sck2;
+				my $spv3 = $spv2;
+     			my $ifw3 = $ifw2;
+     			delete $ifw3->{fileno($sck3).'ratelimiter'};
+     			$peer2->{'sleeping'} = 0;
+     			warn "Adding peer socket back in\n";
+     			$ifw3->{fileno($sck3)}->events(EV::READ | EV::WRITE);
+     			
+			};
+		});
 	};
 	my $error = $@;
 	if($error){
@@ -200,6 +237,10 @@ my $loopsub = sub{
 };
 
 
+
+
+
+
 =pod
 
 ---+ Initialization
@@ -212,17 +253,19 @@ q6m5jhenk33wm4j4.onion
 10.19.202.164
 
 =cut
-
+# q6m5jhenk33wm4j4.onion
 my $spv = CBitcoin::SPV->new({
 	'address' => '127.0.0.1',
-	'port' => 8333,
+	'port' => 38333,
 	'isLocal' => 1,
 	'connect sub' => $connectsub,
 	'mark write sub' => $markwritesub ,
-	'read buffer size' => 8192 * 8
+	'read buffer size' => 8192
 });
 
-$spv->add_peer_to_inmemmory(pack('Q',1),'127.0.0.1','8333');		
+# q6m5jhenk33wm4j4.onion
+
+$spv->add_peer_to_inmemmory(pack('Q',1),'127.0.0.1','38333');		
 
 
 

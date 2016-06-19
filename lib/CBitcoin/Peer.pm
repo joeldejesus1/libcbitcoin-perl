@@ -79,7 +79,13 @@ sub init {
 		'message definition order' => ['magic','command', 'length', 'checksum','payload' ],
 		'command buffer' => {},
 		'receive rate' => [0,0] ,
-		'read buffer size' => $options->{'read buffer size'}
+		'read buffer size' => $options->{'read buffer size'},
+		'rate limiting' => {
+			'size' => 0,
+			'time' => time(),
+			'limit' => 3000, # bytes per second
+			'interval' => 60
+		}
 	};
 	$this->{'read buffer size'} ||= 8192;
 	
@@ -467,9 +473,11 @@ sub read_data {
 		#warn "Closing peer, socket was closed from the other end.\n";
 		$this->finish();
 	}
-	elsif(defined $n && $n > 0){
+	elsif(defined $n && 0 < $n){
 		$this->bytes_read($n);
 		#warn "Have ".$this->bytes_read()." bytes read into the buffer\n";
+		$this->{'rate limiting'}->{'size'} += $n;
+
 
 		while(my $msg = $this->read_data_parse_msg()){
 			if($msg->command eq 'version'){
@@ -685,7 +693,7 @@ sub write {
 	
 	#warn "Added ".length($data)." bytes to the write queue\n";
 	
-	if($this->write_data() == 0 && fileno($this->socket) > 0){
+	if(!$this->{'sleeping'} && $this->write_data() == 0 && 0 < fileno($this->socket)){
 		$this->spv->mark_write($this->socket);
 		return 0;
 	}
@@ -711,9 +719,27 @@ sub write_data {
 		$this->mark_finished();
 		return undef;
 	}
-	
-	
 	return undef unless defined $this->{'bytes to write'} && length($this->{'bytes to write'}) > 0;
+	
+	# check for rate limiting
+	my $rlref = $this->{'rate limiting'};
+	my $diff = (time() - $rlref->{'time'});
+	if(0 < $rlref->{'size'} && 0 < $diff && $diff < $rlref->{'interval'}){
+		# have written data, do check
+		my $rate = (1.0 * $rlref->{'size'})/$diff;
+		if($rlref->{'limit'} < $rate){
+			# sending out too much data
+			warn "sending too much data, take a break.\n";
+			#die "stop";
+			#$this->{'sleeping'} = 1;
+			#$this->spv->peer_sleep($this,15);
+			#return undef;
+		}
+	}
+	elsif($rlref->{'interval'} < $diff){
+		$rlref->{'size'} = 0;
+	}
+	
 	
 	my $n = syswrite($this->socket(),$this->{'bytes to write'},BUFFSIZE);
 
@@ -730,6 +756,9 @@ sub write_data {
 	else{
 		#warn "wrote $n bytes";
 		substr($this->{'bytes to write'},0,$n) = "";
+		
+		$this->{'rate limiting'}->{'size'} += $n;
+		
 		return $n;		
 	}
 	
@@ -822,13 +851,16 @@ sub send_pong {
 
 Calculate the block locator based on the block headers we have, then send a message out.
 
+This can only be run every 5 minutes per peer.
+
 =cut
 
 sub send_getblocks{
 	my ($this) = @_;
 	#warn "Checking get_blocks timeout\n";
+	
 	return undef if defined $this->{'command timeout'}->{'send_getblocks'}
-		&& time() - $this->{'command timeout'}->{'send_getblocks'} < 5;
+		&& time() - $this->{'command timeout'}->{'send_getblocks'} < 60;
 	warn "Sending get_blocks\n";
 	$this->{'command timeout'}->{'send_getblocks'} = time();
 
@@ -1180,6 +1212,10 @@ sub callback_gotblock {
 	#$this->spv->{'inv'}->[2]->{$block->hash()} = $block;
 	unlink($fp) if -f $fp;
 }
+
+
+
+
 
 =pod
 
