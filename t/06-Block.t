@@ -82,6 +82,11 @@ ok( $block->{'success'} && $block->hash() eq $gen_hash, 'Genesis Block sub' );
 
 
 ############## Test Bloom Filter ############
+my $bf = CBitcoin::BloomFilter->new({
+	'FalsePostiveRate' => 0.001,
+	'nHashFuncs' => 1000 
+});
+
 my @scripts;
 foreach my $addr (
 	'1BhT26zK7g9hXb3PDkwenkxpBeGYa6MCK1','1BPxymA3FSdUbfHTEzBycf5CsVbWqDGp6A',
@@ -91,16 +96,19 @@ foreach my $addr (
 	print "Bail out!" unless defined $script && 0 < length($script);
 	$script = CBitcoin::Script::serialize_script($script);
 	print "Bail out!" unless defined $script && 0 < length($script);
-	push(@scripts,$script);
+	$bf->add_script($script);
+	#push(@scripts,$script);
 }
-my @outpoints = (
+foreach my $outpoint (
 	['5c60efa2d20a77fd3885148522e09ee4711b610b04947b91f67ec1d48ba1ec5e',1],
 	['e44bebbea596c72b2a2d8d1b105fe54b74d791ffc161150bb2c18ac0bfed9a7b',0]
-);
+){
+	$bf->add_outpoint($outpoint->[0],$outpoint->[1]);
+}
 
-$block = CBitcoin::Block->deserialize_filtered(
-	$msg->payload(),\@scripts,\@outpoints,1000,0.001
-);
+
+
+$block = CBitcoin::Block->deserialize_filtered($msg->payload(),$bf);
 #warn "Tx By Hash=".Data::Dumper::Dumper($block->{'tx'})."\n";
 ok(
 	$block->{'success'}
@@ -109,11 +117,8 @@ ok(
 	, 'successful serialization of bloom filter'
 );
 
-#warn "Success=".$bhash->{'success'}."\n";
-#warn "Bhash:".Data::Dumper::Dumper($bhash)."\n";
-# test these addresses 
-#$hash->{'data'} = '' unless defined $hash->{'data'};
-#warn "Got BF=".unpack('H*',$hash->{'data'})."\n";
+
+
 
 
 __END__

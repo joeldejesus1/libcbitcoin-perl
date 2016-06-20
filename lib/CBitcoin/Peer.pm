@@ -860,7 +860,7 @@ sub send_getblocks{
 	#warn "Checking get_blocks timeout\n";
 	
 	return undef if defined $this->{'command timeout'}->{'send_getblocks'}
-		&& time() - $this->{'command timeout'}->{'send_getblocks'} < 60;
+		&& time() - $this->{'command timeout'}->{'send_getblocks'} < 5;
 	warn "Sending get_blocks\n";
 	$this->{'command timeout'}->{'send_getblocks'} = time();
 

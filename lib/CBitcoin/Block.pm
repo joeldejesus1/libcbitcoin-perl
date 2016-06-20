@@ -20,6 +20,7 @@ use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
 use CBitcoin::Transaction;
 use CBitcoin::Utilities;
+use CBitcoin::BloomFilter;
 use Digest::SHA;
 
 #use constant MAINNET    => 0xd9b4bef9, TESTNET => pack('L',0xdab5bffa), TESTNET3 => pack('L',0x0709110b), NAMECOIN => pack('L',0xfeb4bef9) ;
@@ -157,7 +158,7 @@ sub deserialize{
 
 =pod
 
----+++ deserialize_filtered($payload,[$script1, ..],[[$prevHash1,$prevIndex1],.. ])
+---+++ deserialize_filtered($payload,$bloomfilter)
 
 Use this to deserialize blocks and get the transactions that are interesting by using Bloom filters.
 
@@ -167,46 +168,14 @@ Scripts and prevHashs must be serialized (binary).
 =cut
 
 sub deserialize_filtered {
-	my ($package,$payload,$scripts_ref,$prevOuts_ref,$nHash,$nFP) = @_;
+	my ($package,$payload,$bf) = @_;
 	
 	return undef unless defined $payload && 80 < length($payload);
 
-	die "bad format for nHash" unless defined $nHash && $nHash =~ m/^(\d+)$/
-		&& 0 < $nHash;
-	die "bad format for nFP" unless defined $nFP && $nFP =~ m/^\d+(\.\d+)?$/
-		&& 0 < $nFP && $nFP < 1.0;
-	
 
-	my $script_H = {};
-	my @values;
-	if(
-		defined $scripts_ref 
-		&& ref($scripts_ref) eq 'ARRAY'  
-	){
-		foreach my $script (@{$scripts_ref}){
-			# scripts must have been serialized already
-			push(@values,$script);
-			$script_H->{$script} = 1;
-		}	
-	}
-	my $prevOut_H = {};
-	if(
-		defined $prevOuts_ref 
-		&& ref($prevOuts_ref) eq 'ARRAY' 
-	){
-		foreach my $prevOut (@{$prevOuts_ref}){
-			die "bad format" unless defined $prevOut
-				&& ref($prevOut) eq 'ARRAY'
-				&& scalar(@{$prevOut}) == 2;
 
-			push(@values,$prevOut->[0]);
-			$prevOut_H->{$prevOut->[0].$prevOut->[1]} = 1;
-		}			
-	}
-	
-	my $bfhash = CBitcoin::Block::picocoin_bloomfilter_new(\@values,$nHash,$nFP);
-	die "bad bloom filter" unless defined $bfhash->{'success'};
-	my $this = picocoin_block_des_with_bloomfilter($payload,$bfhash->{'data'});
+	die "bad bloom filter" unless defined $bf && ref($bf) =~ m/BloomFilter/;
+	my $this = picocoin_block_des_with_bloomfilter($payload,$bf->data());
 	die "failed to parse" unless $this->{'success'};
 	bless($this,$package);
 	$this->{'tx by hash'} = {};
@@ -223,43 +192,23 @@ sub deserialize_filtered {
 		}		
 	}
 
-	$this->{'data'} = $payload;
+	# do not store the full block.
+	#$this->{'data'} = $payload;
 	
 	$this->{'header'} = substr($payload,0,80);
 	
-	#$this->{'sha256'} = Digest::SHA::sha256($this->{'header'});
-	#$this->{'sha256'} = Digest::SHA::sha256($this->{'sha256'});	
-
-	# $script_H and $prevOut_H
-	my @keep_tx;
-	foreach my $tx_H (@{$this->{'tx'}}){
-		#$tx_H->{'hash'};
-		#warn "tx=".Data::Dumper::Dumper($tx_H->{'vin'})."\n";
-		my $keep_bool = 0;
-		foreach my $vin (@{$tx_H->{'vin'}}){
-			#next unless defined $vin;
-			last if $keep_bool;
-			if($prevOut_H->{substr($vin->{'prevHash'},0,64).$vin->{'prevIndex'}}){
-				$vin->{'prevHash'} = substr($vin->{'prevHash'},0,64);
-				$keep_bool = 1;
-			}
-		}
-		foreach my $vout (@{$tx_H->{'vout'}}){
-			last if $keep_bool;
-			
-			# script
-			if($script_H->{$vout->{'script'}}){
-				$keep_bool = 1;
-			}
-		}
-		
-		if($keep_bool){
-			$tx_H->{'hash'} = substr($tx_H->{'hash'},0,64);
-			push(@keep_tx,$tx_H);
-			$this->{'tx by hash'}->{$tx_H->{'hash'}} = $tx_H;
-		}
+	# Run the transactions that came out of the bloom filter through this sub
+	# ..in order to strip out false positives.	
+	# Also, keep a copy of the transaction hashes in order to figure out what the merkle root is
+	$this->{'tx by hash'} = $bf->tx_filter($this->{'tx'},1);
+	
+	if($this->{'tx by hash'}->{'_merkle'}){
+		$this->{'tx hashes'} = $this->{'tx by hash'}->{'_merkle'};
+		delete $this->{'tx by hash'}->{'_merkle'};
 	}
-	$this->{'tx'} = \@keep_tx;
+	
+	# do not store all the transactions
+	$this->{'tx'} = [];
 	
 	return $this;
 }
@@ -310,6 +259,11 @@ sub version {
 sub transactionNum {
 	my $this = shift;
 	return scalar(@{$this->{'tx'}});
+}
+# bloom filtered transactions
+sub transactionNum_bf {
+	my $this = shift;
+	return scalar(keys %{$this->{'tx by hash'}});
 }
 
 sub bits {
@@ -365,9 +319,13 @@ sub data {
 	return shift->{'data'};
 }
 
+sub header {
+	return shift->{'header'};
+}
+
 =pod
 
----++ tx_by_hash($i)
+---++ tx_by_hash($blockhash)
 
 Given a hash (in hex form or binary), retrieve the corresponding transaction.
 
@@ -388,5 +346,8 @@ sub tx_by_hash {
 		die "bad hash format";
 	}
 }
+
+
+
 
 1;

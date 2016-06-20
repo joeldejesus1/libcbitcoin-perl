@@ -237,7 +237,32 @@ my $loopsub = sub{
 };
 
 
+=pod
 
+---+ Set Up Wallet
+
+=cut
+
+my $bloomfilter = CBitcoin::BloomFilter->new({
+	'FalsePostiveRate' => 0.001,
+	'nHashFuncs' => 1000 
+});
+
+########### Set up a wallet ######################
+# these are in block 120383
+foreach my $addr (
+	'1BhT26zK7g9hXb3PDkwenkxpBeGYa6MCK1','1BPxymA3FSdUbfHTEzBycf5CsVbWqDGp6A',
+	'1LoZdpsX9c662bKJTpt8cEfANmu8WRKKKN'
+){
+	my $script = CBitcoin::Script::address_to_script($addr);
+	print "Bail out!" unless defined $script && 0 < length($script);
+	$script = CBitcoin::Script::serialize_script($script);
+	print "Bail out!" unless defined $script && 0 < length($script);
+	$bloomfilter->add_script($script);
+	#push(@scripts,$script);
+}
+
+#########################################################
 
 
 
@@ -256,17 +281,21 @@ q6m5jhenk33wm4j4.onion
 # q6m5jhenk33wm4j4.onion
 my $spv = CBitcoin::SPV->new({
 	'address' => '127.0.0.1',
-	'port' => 38333,
+	'port' => 8333,
 	'isLocal' => 1,
 	'connect sub' => $connectsub,
 	'mark write sub' => $markwritesub ,
-	'read buffer size' => 8192
+	'read buffer size' => 8192*4,
+	'bloom filter' => $bloomfilter
 });
 
 # q6m5jhenk33wm4j4.onion
 
-$spv->add_peer_to_inmemmory(pack('Q',1),'127.0.0.1','38333');		
-
+#$spv->add_peer_to_inmemmory(pack('Q',1),'127.0.0.1','38333');		
+$spv->add_peer_to_inmemmory(pack('Q',1),'q6m5jhenk33wm4j4.onion','8333');
+$spv->add_peer_to_inmemmory(pack('Q',1),'l4xfmcziytzeehcz.onion','8333');
+$spv->add_peer_to_inmemmory(pack('Q',1),'gb5ypqt63du3wfhn.onion','8333');
+$spv->add_peer_to_inmemmory(pack('Q',1),'syvoftjowwyccwdp.onion','8333');
 
 
 =pod

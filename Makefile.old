@@ -191,6 +191,7 @@ MAN1PODS = scripts/spv
 MAN3PODS = lib/CBitcoin.pm \
 	lib/CBitcoin/Base58.pm \
 	lib/CBitcoin/Block.pm \
+	lib/CBitcoin/BloomFilter.pm \
 	lib/CBitcoin/CBHD.pm \
 	lib/CBitcoin/Message.pm \
 	lib/CBitcoin/Peer.pm \
@@ -225,6 +226,7 @@ PERL_ARCHIVE_AFTER =
 TO_INST_PM = lib/CBitcoin.pm \
 	lib/CBitcoin/Base58.pm \
 	lib/CBitcoin/Block.pm \
+	lib/CBitcoin/BloomFilter.pm \
 	lib/CBitcoin/CBHD.pm \
 	lib/CBitcoin/Message.pm \
 	lib/CBitcoin/Message/Version.pm \
@@ -242,6 +244,8 @@ PM_TO_BLIB = lib/CBitcoin.pm \
 	blib/lib/CBitcoin/Base58.pm \
 	lib/CBitcoin/Block.pm \
 	blib/lib/CBitcoin/Block.pm \
+	lib/CBitcoin/BloomFilter.pm \
+	blib/lib/CBitcoin/BloomFilter.pm \
 	lib/CBitcoin/CBHD.pm \
 	blib/lib/CBitcoin/CBHD.pm \
 	lib/CBitcoin/Message.pm \
@@ -576,6 +580,7 @@ manifypods : pure_all  \
 	lib/CBitcoin.pm \
 	lib/CBitcoin/Base58.pm \
 	lib/CBitcoin/Block.pm \
+	lib/CBitcoin/BloomFilter.pm \
 	lib/CBitcoin/CBHD.pm \
 	lib/CBitcoin/Message.pm \
 	lib/CBitcoin/Peer.pm \
@@ -592,6 +597,7 @@ manifypods : pure_all  \
 	  lib/CBitcoin.pm $(INST_MAN3DIR)/CBitcoin.$(MAN3EXT) \
 	  lib/CBitcoin/Base58.pm $(INST_MAN3DIR)/CBitcoin::Base58.$(MAN3EXT) \
 	  lib/CBitcoin/Block.pm $(INST_MAN3DIR)/CBitcoin::Block.$(MAN3EXT) \
+	  lib/CBitcoin/BloomFilter.pm $(INST_MAN3DIR)/CBitcoin::BloomFilter.$(MAN3EXT) \
 	  lib/CBitcoin/CBHD.pm $(INST_MAN3DIR)/CBitcoin::CBHD.$(MAN3EXT) \
 	  lib/CBitcoin/Message.pm $(INST_MAN3DIR)/CBitcoin::Message.$(MAN3EXT) \
 	  lib/CBitcoin/Peer.pm $(INST_MAN3DIR)/CBitcoin::Peer.$(MAN3EXT) \
@@ -677,7 +683,7 @@ realclean_subdirs :
 # Delete temporary files (via clean) and also delete dist files
 realclean purge ::  clean realclean_subdirs
 	- $(RM_F) \
-	  $(FIRST_MAKEFILE) $(MAKEFILE_OLD) \
+	  $(MAKEFILE_OLD) $(FIRST_MAKEFILE) \
 	  $(OBJECT) 
 	- $(RM_RF) \
 	  $(DISTVNAME) 
@@ -1145,6 +1151,7 @@ pm_to_blib : $(FIRST_MAKEFILE) $(TO_INST_PM)
 	  lib/CBitcoin.pm blib/lib/CBitcoin.pm \
 	  lib/CBitcoin/Base58.pm blib/lib/CBitcoin/Base58.pm \
 	  lib/CBitcoin/Block.pm blib/lib/CBitcoin/Block.pm \
+	  lib/CBitcoin/BloomFilter.pm blib/lib/CBitcoin/BloomFilter.pm \
 	  lib/CBitcoin/CBHD.pm blib/lib/CBitcoin/CBHD.pm \
 	  lib/CBitcoin/Message.pm blib/lib/CBitcoin/Message.pm \
 	  lib/CBitcoin/Message/Version.pm blib/lib/CBitcoin/Message/Version.pm \

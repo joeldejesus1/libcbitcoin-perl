@@ -104,6 +104,12 @@ sub init {
 		defined $options->{'read buffer size'} && $options->{'read buffer size'} =~ m/^\d+$/;
 	
 	
+	$this->add_bloom_filter($options->{'bloom filter'});
+	
+	
+	$this->add_socks5($options->{'socks5 address'},$options->{'socks5 port'});
+	
+	
 	return $options;
 }
 
@@ -623,6 +629,17 @@ sub block_height {
 	return scalar(@{$this->{'headers'}}) - 1;
 }
 
+
+=pod
+
+---++ bloom_filter
+
+=cut
+
+sub bloom_filter {
+	return shift->{'bloom filter'};
+}
+
 =pod
 
 ---++ our_address
@@ -646,6 +663,27 @@ sub our_address {
 ---+ Peer Management
 
 =cut
+
+
+=pod
+
+---++ add_bloom_filter
+
+Basically, this is the "wallet" part of this module.
+
+See callback_gotblock to see how the bloom filter is used.
+
+=cut
+
+sub add_bloom_filter {
+	my ($this,$bf) = @_;
+	die "not a bloom filter" unless defined $bf && ref($bf) =~ m/BloomFilter/;
+	# calculates the bloom filter, dies if we have bad stuff.
+	$bf->data();
+	
+	$this->{'bloom filter'} = $bf;
+}
+
 
 
 
@@ -844,7 +882,7 @@ Overload this.
 =cut
 
 sub client_name {
-	return '';
+	return '/BitcoinJ:0.2(iPad; U; CPU OS 3_2_1)/AndroidBuild:0.8/';
 }
 
 
@@ -930,7 +968,6 @@ Here, these subroutines figure out what data we need to get from peers based on 
 =cut
 
 =pod
-
 
 ---++ peer_hook_handshake_finished()
 
@@ -1391,7 +1428,7 @@ BEGIN{
 
 sub callback_gotaddr {
 	my ($this,$msg,$peer) = @_;
-	return undef;
+	#return undef;
 	#warn "gotaddr\n";
 	open(my $fh,'<',\$msg->{'payload'});
 	my $addr_ref = CBitcoin::Utilities::deserialize_addr($fh);
@@ -1607,61 +1644,61 @@ sub callback_gotblock {
 	my ($this,$msg,$peer) = @_;
 	
 	# deserialize_filter for when you have a wallet
-	my $block = CBitcoin::Block->deserialize($msg->payload());
+	my $block = CBitcoin::Block->deserialize_filtered($msg->payload(),$this->bloom_filter());
+	#my $block = CBitcoin::Block->deserialize($msg->payload());
 	
 	return undef unless $block->{'success'};
 	
 	# TODO: Fix the faulty prevBlockHash (returning bogus hash....)
 	
-	warn "Got block with hash=".$block->hash_hex().
-		" and transactionNum=".$block->transactionNum.
-		" and prevBlockHash=".$block->prevBlockHash_hex()."\n";
+	warn "Got block=[".$block->hash_hex().
+		";".$block->transactionNum.
+		";".length($msg->payload())."]\n";
 	my $count = $block->transactionNum;
 		#die "let us finish early\n";
 		
 	$this->add_header_to_chain($block);
-		
-	#if(defined $this->{'header hash to hash'}->{$block->prevBlockHash}){
-	#	warn "block exists in chain with prev hash=".$block->prevBlockHash_hex."\n";
-	#}
-	#else{
-	#	warn "block does not exist";
-		#print "Bail out!";
-		#die "failed";
-	#}
-	#print "Bail out!";
-	#die "failed";
-		#if(0 < $count){
-		#	for(my $i=0;$i<$count;$i++){
-		#		#warn "looping\n";		
-		#		$this->add_tx_to_db(
-		#			$block->hash(),
-		#			CBitcoin::Transaction->deserialize($fh)
-		#		);
-		#	}
-		#}
-		#else{
-		#	die "weird block\n";
-		#}
-		
-		# delete it in inv search.
+	
 	#delete $this->{'inv search'}->[2]->{$block->hash()};
 	if(defined  $this->{'inv search'}->[2]->{$block->hash()}){
-		warn "deleting inv with hash=".$block->hash_hex()."\n";
+		#warn "deleting inv with hash=".$block->hash_hex()."\n";
 		delete $this->{'inv search'}->[2]->{$block->hash()};# = undef;
 	}
 	else{
-		warn "missing inv with hash=".$block->hash_hex()."\n";
+		#warn "missing inv with hash=".$block->hash_hex()."\n";
 	}
 	
 	
 	$this->hook_peer_onreadidle($peer);
+	
+	if($block->transactionNum_bf()){
+		$this->callback_gotblock_withtx($block);
+	}
 	
 	
 	#$this->spv->{'inv'}->[2]->{$block->hash()} = $block;
 #	unlink($fp) if -f $fp;
 }
 
+
+=pod
+
+---++ callback_gotblock_withtx
+
+For when we have a block that has transactions of interest.  Overload this subroutine in order to do accounting for balances.
+
+=cut
+
+sub callback_gotblock_withtx{
+	my ($this,$block) = @_;
+	my $header = $block->header();
+	open(my $fh,'>','/tmp/spv/'.$block->hash_hex);
+	my ($m) = (0);
+	while(0 < length($header) - $m){
+		$m += syswrite($fh,$header,8192,$m);
+	}
+	close($fh);
+}
 
 
 1;
