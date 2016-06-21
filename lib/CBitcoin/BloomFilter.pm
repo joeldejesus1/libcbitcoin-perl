@@ -203,7 +203,7 @@ sub tx_filter {
 				$prevOut_H->{$vin->{'prevHash'}}
 				&& $prevOut_H->{$vin->{'prevHash'}}->{$vin->{'prevIndex'}}
 			){
-				
+				$tx_H->{'matched'} = 'prevHash';
 				$keep_bool = 1;
 			}
 		}
@@ -212,6 +212,7 @@ sub tx_filter {
 			
 			# script
 			if($script_H->{$vout->{'script'}}){
+				$tx_H->{'matched'} = 'script';
 				$keep_bool = 1;
 			}
 		}

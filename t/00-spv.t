@@ -4,6 +4,7 @@ use warnings;
 use CBitcoin::Message;
 use CBitcoin::SPV;
 use IO::Socket::INET;
+use IO::Socket::Socks;
 use IO::Epoll;
 use EV;
 
@@ -106,12 +107,25 @@ my $connectsub = sub{
 	
 	eval{
 		local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
-		alarm 5;
-		$sck1 = new IO::Socket::INET (
-			PeerHost => $ipaddress,
-			PeerPort => $port,
-			Proto => 'tcp',
-		);
+		alarm 15;
+		
+		if($spv->{'socks5'}){
+			warn "connection to $ipaddress via socks5\n";
+			$sck1 = IO::Socket::Socks->new(
+				ProxyAddr   => $spv->{'socks5'}->{'address'},
+				ProxyPort   => $spv->{'socks5'}->{'port'},
+				ConnectAddr => $ipaddress,
+    			ConnectPort => $port,
+			) || (alarm 0 && die $SOCKS_ERROR);
+		}
+		else{
+			warn "connection using normal INET\n";
+			$sck1 = new IO::Socket::INET (
+				PeerHost => $ipaddress,
+				PeerPort => $port,
+				Proto => 'tcp',
+			);
+		}
 		alarm 0;
 		unless(defined $sck1){
 			die "ERROR in Socket Creation : $!\n";
@@ -198,7 +212,7 @@ my $connectsub = sub{
 	if($error){
 		alarm 0;
 		warn "bad connection, error=$error";
-		delete $internal_fn_watcher->{fileno($sck1)};
+		delete $internal_fn_watcher->{fileno($sck1)} if defined $sck1;
 		return undef;
 	}
 	else{
@@ -280,24 +294,30 @@ q6m5jhenk33wm4j4.onion
 =cut
 # q6m5jhenk33wm4j4.onion
 my $spv = CBitcoin::SPV->new({
-	'address' => '127.0.0.1',
+	'address' => '10.202.177.155',
 	'port' => 8333,
 	'isLocal' => 1,
 	'connect sub' => $connectsub,
 	'mark write sub' => $markwritesub ,
 	'read buffer size' => 8192*4,
-	'bloom filter' => $bloomfilter
+	'bloom filter' => $bloomfilter,
+	'socks5 address' => '127.0.0.1',
+	'socks5 port' => 9999
 });
+
+die "no socks5" unless $spv->{'socks5'};
 
 # q6m5jhenk33wm4j4.onion
 
 #$spv->add_peer_to_inmemmory(pack('Q',1),'127.0.0.1','38333');		
-$spv->add_peer_to_inmemmory(pack('Q',1),'q6m5jhenk33wm4j4.onion','8333');
-$spv->add_peer_to_inmemmory(pack('Q',1),'l4xfmcziytzeehcz.onion','8333');
-$spv->add_peer_to_inmemmory(pack('Q',1),'gb5ypqt63du3wfhn.onion','8333');
-$spv->add_peer_to_inmemmory(pack('Q',1),'syvoftjowwyccwdp.onion','8333');
+$spv->add_peer_to_inmemmory(pack('Q',1),'10.202.177.155','8333'); # q6m5jhenk33wm4j4.onion
+$spv->add_peer_to_inmemmory(pack('Q',1),'10.193.178.58','8333'); # l4xfmcziytzeehcz.onion
+$spv->add_peer_to_inmemmory(pack('Q',1),'10.251.166.108','8333'); # gb5ypqt63du3wfhn.onion
+$spv->add_peer_to_inmemmory(pack('Q',1),'10.243.114.46','8333'); # syvoftjowwyccwdp.onion
 
-
+# jhjuld3x27srjpby.onion 10.211.136.179
+# a6obdgzn67l7exu3.onion 10.207.89.205
+# 4okypmflcectloz5.onion 10.201.181.38
 =pod
 
 Then, put some fresh, online nodes into the peer pool.  After that, run the event loop.

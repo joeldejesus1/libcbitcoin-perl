@@ -122,6 +122,17 @@ HV* picocoin_returnblankblock(HV * rh){
 	return rh;
 }
 
+/*
+bool difficulty_correct(const struct bp_block *block){
+	bu256_t * sha256 = &block->sha256;
+	mpz_t target, sha256;
+	mpz_init(target);
+	mpz_init(sha256);
+	u256_from_compact(target, block->nBits);
+	
+}
+*/
+
 // given a full hdkey, fill in a perl hash with relevant data
 HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf){
 	//fprintf(stderr,"hi - 4\n");
@@ -163,6 +174,8 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf
 		//copy256bithash(hash3,&block->sha256);
 		//hv_store(rh, "sha256", 6, newSVpv(hash3,32), 0);
 	}
+	
+	
 	
 	//hd_extended_key_free(&hdkey);
 	// parr *vtx; 
@@ -271,6 +284,9 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf
 		}
 		
 		if(bf == NULL || (bf != NULL && add_tx_to_db) ){
+			// bp_block_merkle_branch(const struct bp_block *block,const parr *mrktree,unsigned int txidx)
+			// bp_check_merkle_branch(bu256_t *hash, const bu256_t *txhash_in,const parr *mrkbranch, unsigned int txidx)
+			// provide a merkle branch for each transaction
 			av_push(avTX, newRV((SV *)rhSingleTX) );
 		}
 	}
@@ -302,6 +318,9 @@ HV* picocoin_block_des(SV* blockdata){
 	}
 	//fprintf(stderr,"hi - 3\n");
 	bp_block_calc_sha256(&block);
+	
+	
+	
 	
 	picocoin_returnblock(rh,&block,NULL);
 	bp_block_free(&block);

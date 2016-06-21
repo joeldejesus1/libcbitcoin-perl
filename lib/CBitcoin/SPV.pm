@@ -34,8 +34,8 @@ sub new {
 	
 	my $this = {};
 	bless($this,$package);
-	$this = $this->init($options);
-	bless($this,$package);
+	$this->init($options);
+
 	
 	$this->{'getblocks timeout'} = 0;
 	$this->{'callbacks nonce'} = 1;
@@ -104,13 +104,16 @@ sub init {
 		defined $options->{'read buffer size'} && $options->{'read buffer size'} =~ m/^\d+$/;
 	
 	
+	foreach my $key (keys %{$options}){
+		$this->{$key} = $options->{$key};
+	}
+	
+	
 	$this->add_bloom_filter($options->{'bloom filter'});
 	
 	
 	$this->add_socks5($options->{'socks5 address'},$options->{'socks5 port'});
 	
-	
-	return $options;
 }
 
 
@@ -684,6 +687,31 @@ sub add_bloom_filter {
 	$this->{'bloom filter'} = $bf;
 }
 
+
+=pod
+
+---++ add_socks5
+
+Allow tor connections via a socks5 proxy. Only allowing ipv4 addresses.  The default port is 9050.
+
+=cut
+
+sub add_socks5 {
+	my ($this,$address,$port) = @_;
+	#warn "add socks not done";
+	return undef unless defined $address && $address =~ m/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/;
+	#warn "add socks done";
+	$this->{'socks5'}->{'address'} = $1;
+	if(defined $port && $port =~ m/^(\d+)$/){
+		$this->{'socks5'}->{'port'} = $1;
+	}
+	elsif(!defined $port){
+		$this->{'socks5'}->{'port'} = 9050;
+	}
+	else{
+		$this->{'socks5'}->{'port'} = 9050;
+	}
+}
 
 
 
