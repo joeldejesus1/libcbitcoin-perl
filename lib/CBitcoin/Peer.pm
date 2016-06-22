@@ -31,7 +31,7 @@ sub new {
 	my $this = {};
 	bless($this,$package);
 	$this = $this->init(shift);
-	
+	$this->initialize_chain();
 	return $this;
 }
 
@@ -90,6 +90,8 @@ sub init {
 	$this->{'read buffer size'} ||= 8192;
 	
 	bless($this,$ref);
+	
+	
 	# to have some human readable stuff for later 
 	$this->{'address'} = $options->{'address'};
 	$this->{'port'} = $options->{'port'};
@@ -104,6 +106,22 @@ sub init {
 	#die "Socket=".fileno($options->{'socket'})."\n";
 
 	return $this;
+}
+
+
+=pod
+
+---++ initialize_chain
+
+Mimic the same subroutine in the SPV module.
+
+=cut
+
+sub initialize_chain{
+	my ($this) = @_;
+	
+	# makes a clean copy of the spv chain, so the peer can independently figure out what the chain is....???
+	$this->{'chain'} = $this->spv->initialize_peerchain();
 }
 
 
@@ -290,7 +308,15 @@ sub our_version {
 	return shift->{'handshake'}->{'our version'};
 }
 
+=pod
 
+---++ chain
+
+=cut
+
+sub chain {
+	return shift->{'chain'};
+}
 
 =pod
 
@@ -494,21 +520,18 @@ sub read_data {
 				
 			}
 			elsif($this->handshake_finished()){
-				#push(@{$this->{'messages to be processed'}},$msg);
-				#return 1;
-				#$this->hook_callback($msg);
 				$this->spv->callback_run($msg,$this);
 			}
 			else{
-				#warn "bad client behavior\n";
 				$this->mark_finished();
 			}
 		}
 		
-		$this->spv->hook_peer_onreadidle($this);
-		
 		if($this->is_marked_finished()){
 			$this->finish();
+		}
+		else{
+			$this->spv->hook_peer_onreadidle($this);
 		}
 	}
 	else{
@@ -924,49 +947,6 @@ When a message is recieved, the command is parsed from the message and used to f
 
 =pod
 
----++ callback_gotaddr
-
-Store the new addr in the peer database.
-
-=cut
-
-BEGIN{
-	$callback_mapper->{'command'}->{'addr'} = {
-		'subroutine' => \&callback_gotaddr
-	}
-};
-
-sub callback_gotaddr {
-	my $this = shift;
-	my $msg = shift;
-	#warn "gotaddr\n";
-	open(my $fh,'<',\$msg->{'payload'});
-	my $addr_ref = CBitcoin::Utilities::deserialize_addr($fh);
-	close($fh);
-	if(defined $addr_ref && ref($addr_ref) eq 'ARRAY'){
-		#warn "Got ".scalar(@{$addr_ref})." new addresses\n";
-		
-		foreach my $addr (@{$addr_ref}){
-			# timestamp, services, ipaddress, port
-			$this->spv->add_peer_to_inmemmory(
-				$addr->{'services'},
-				$addr->{'ipaddress'},
-				$addr->{'port'}
-			);
-		}
-		
-		
-	}
-	else{
-		#warn "Got no new addresses\n";
-	}
-	return 1;
-	
-}
-
-
-=pod
-
 ---++ callback_gotversion
 
 Used in the handshake between peers.
@@ -1088,168 +1068,6 @@ sub callback_gotpong {
 }
 
 
-=pod
 
----++ callback_gotinv
-
-Used when inventory vectors have been received.  The next step is to fetch the corresponding content via getdata.  See hook_getdata for information on how getdata is handled.
-
-=cut
-
-BEGIN{
-	$callback_mapper->{'command'}->{'inv'} = {
-		'subroutine' => \&callback_gotinv
-	}
-};
-
-sub callback_gotinv {
-	my $this = shift;
-	my $msg = shift;
-	warn "Got inv\n";
-	unless($this->handshake_finished()){
-		#warn "got inv before handshake finsihed\n";
-		$this->mark_finished();
-		return undef;
-	}
-	open(my $fh,'<',\($msg->payload()));
-	binmode($fh);
-	my $count = CBitcoin::Utilities::deserialize_varint($fh);
-	warn "gotinv: count=$count\n";
-	for(my $i=0;$i < $count;$i++){
-		$this->spv->hook_inv(@{CBitcoin::Utilities::deserialize_inv($fh)});
-	}
-	close($fh);
-		
-	# go fetch the data
-	$this->send_getdata($this->spv->hook_getdata());
-	
-}
-
-
-=pod
-
----++ callback_gotblock
-
-Got a block, so put it into the database.
-
-
----+++ Tx Format
-version
-inputs => [..]
-outputs => [..]
-locktime
-
-input = {prevHash, prevIndex, script, sequence}
-output = {value, script}
-
-
-=cut
-
-BEGIN{
-	$callback_mapper->{'command'}->{'block'} = {
-		'subroutine' => \&callback_gotblock
-	}
-};
-
-sub callback_gotblock {
-	my $this = shift;
-	my $msg = shift;
-	
-	
-	# write this to disk
-	my $fp = '/tmp/spv/tmp.'.$$.'.block';
-	open(my $fh,'<',\($msg->payload()));
-	if( 100_000 < length($msg->payload()) ){
-		open(my $fhout,'>',$fp) || die "cannot write to disk";
-		binmode($fh);
-		binmode($fhout);
-		
-		my ($n,$buf);
-		while($n = read($fh,$buf,8192)){
-			my $m = 0;
-			while(0 < $n - $m){
-				$m += syswrite($fhout,$buf,$n - $m,$m);
-			}
-		}
-		close($fhout);
-		close($fh);
-		open($fh,'<',$fp) || die "cannot read from disk";		
-	}
-	
-	eval{
-		
-		my $block = CBitcoin::Block->deserialize($fh);
-		
-		#warn "Got block with hash=".$block->hash_hex().
-		#	" and transactionNum=".$block->transactionNum.
-		#	" and prevBlockHash=".$block->prevBlockHash_hex()."\n";
-		my $count = $block->transactionNum;
-		#die "let us finish early\n";
-		$this->spv->add_header_to_chain($block);
-		
-		if(0 < $count){
-			for(my $i=0;$i<$count;$i++){
-				#warn "looping\n";		
-				$this->spv->add_tx_to_db(
-					$block->hash(),
-					CBitcoin::Transaction->deserialize($fh)
-				);
-			}
-		}
-		else{
-			die "weird block\n";
-		}
-		
-		# delete it in inv search.
-		delete $this->spv->{'inv search'}->[2]->{$block->hash()};
-		
-	} || do {
-		my $error = $@;
-		warn "Error:$error\n";
-	};
-	
-	
-	#$this->spv->{'inv'}->[2]->{$block->hash()} = $block;
-	unlink($fp) if -f $fp;
-}
-
-
-
-
-
-=pod
-
----+ hooks
-
-=cut
-
-=pod
-
----++ hook_callback($msg)
-
-Take the command out of a message, and map it to a subroutine.
-
-=cut
-
-sub hook_callback{
-	my $this = shift;
-	my $msg = shift;
-	
-	#warn "Got message of type=".$msg->command."\n";
-	if(
-		defined $callback_mapper->{'command'}->{$msg->command()}
-		&&  ref($callback_mapper->{'command'}->{$msg->command()}) eq 'HASH'
-		&& defined $callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}
-		&& ref($callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}) eq 'CODE'
-	){
-		#warn "Running subroutine for ".$msg->command()."\n";
-		return $callback_mapper->{'command'}->{$msg->command()}->{'subroutine'}->($this,$msg);
-		
-	}
-	else{
-		#warn "Not running subroutine for ".$msg->command()."\n";
-		return 1;
-	}
-}
 
 1;

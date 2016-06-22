@@ -21,6 +21,7 @@ use CBitcoin::TransactionOutput;
 use CBitcoin::Transaction;
 use CBitcoin::Utilities;
 use CBitcoin::BloomFilter;
+use Math::BigInt lib => 'GMP';
 use Digest::SHA;
 
 #use constant MAINNET    => 0xd9b4bef9, TESTNET => pack('L',0xdab5bffa), TESTNET3 => pack('L',0x0709110b), NAMECOIN => pack('L',0xfeb4bef9) ;
@@ -137,9 +138,17 @@ sub deserialize{
 #	$this->{'merkleRoot'} = pack('H*',$this->{'merkleRoot'});
 
 	foreach my $x ('sha256','prevBlockHash','merkleRoot'){
+		
 		if(defined $this->{$x}){
 			# strip off 65th byte
 			$this->{$x} = substr($this->{$x},0,length($this->{$x}) - 1);
+			
+			if($x eq 'sha256'){
+				# store the bigint number before changing the endianness
+				$this->{'sha256 bigint'} = Math::BigInt->from_hex($this->{$x});
+			}
+			
+			
 			$this->{$x} = join '', reverse split /(..)/, $this->{$x};
 			$this->{$x} = pack('H*',$this->{$x});
 		}		
@@ -187,6 +196,12 @@ sub deserialize_filtered {
 		if(defined $this->{$x}){
 			# strip off 65th byte
 			$this->{$x} = substr($this->{$x},0,length($this->{$x}) - 1);
+			
+			if($x eq 'sha256'){
+				# store the bigint number before changing the endianness to match what comes off the wire
+				$this->{'sha256 bigint'} = Math::BigInt->from_hex($this->{$x});
+			}
+			
 			$this->{$x} = join '', reverse split /(..)/, $this->{$x};
 			$this->{$x} = pack('H*',$this->{$x});
 		}		
@@ -246,6 +261,14 @@ sub timestamp {
 
 sub target {
 	return shift->{'bits'};
+}
+
+sub target_bigint{
+	my ($this) = @_;
+	unless(defined $this->{'bits bigint'}){
+		$this->{'bits bigint'} = Math::BigInt->from_hex(substr($this->{'bitslong'},0,64));
+	}
+	return $this->{'bits bigint'};
 }
 
 sub nonce {
@@ -315,12 +338,62 @@ sub hash_hex {
 	return unpack('H*',shift->hash());
 }
 
+sub hash_bigint {
+	return shift->{'sha256 bigint'};
+}
+
 sub data {
 	return shift->{'data'};
 }
 
 sub header {
 	return shift->{'header'};
+}
+
+=pod
+
+---++ height($newheight)
+
+The spv assigns this number.  The spv uses this block object as a convenient place to store chain information regarding the height and difficulty.
+
+=cut
+
+sub height {
+	my ($this,$x) = @_;
+	if(!defined $x){
+		$this->{'block height'} = -1 unless defined $this->{'block height'};
+		return $this->{'block height'};
+	}
+	elsif($x =~ m/^(\d+)$/){
+		$this->{'block height'} = $1;
+	}
+	else{
+		die "bad format for block height";
+	}
+}
+
+=pod
+
+---++ cummulative_difficulty($newdifficulty)
+
+Used by the spv to track which chain is the "Longest" (ie in terms of difficulty)
+
+=cut
+
+
+sub cummulative_difficulty{
+	my ($this,$x) = @_;
+	if(!defined $x){
+		$this->{'cummulative difficulty'} = -1 unless defined $this->{'cummulative difficulty'};
+		return $this->{'cummulative difficulty'};
+	}
+	elsif(ref($x) =~ m/BigInt/){
+		$this->{'cummulative difficulty'} = $x;
+	}
+	else{
+		die "bad format for cummulative difficulty";
+	}
+	
 }
 
 =pod

@@ -122,16 +122,6 @@ HV* picocoin_returnblankblock(HV * rh){
 	return rh;
 }
 
-/*
-bool difficulty_correct(const struct bp_block *block){
-	bu256_t * sha256 = &block->sha256;
-	mpz_t target, sha256;
-	mpz_init(target);
-	mpz_init(sha256);
-	u256_from_compact(target, block->nBits);
-	
-}
-*/
 
 // given a full hdkey, fill in a perl hash with relevant data
 HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf){
@@ -145,6 +135,15 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf
 	hv_store(rh, "nonce", 5, newSViv( block->nNonce), 0);
 	//fprintf(stderr,"nonce=%d\n",block->nNonce);
 	hv_store(rh, "success", 7, newSViv((int) 1), 0);
+	
+	// put bits into hex format (full 256bit integer to make it easier to handle in perl)
+	mpz_t target;
+	mpz_init(target);
+	u256_from_compact(target, block->nBits);
+	uint8_t * bitslong = mpz_get_str(NULL, 16, target);
+	mpz_clear(target);
+	hv_store(rh, "bitslong", 8, newSVpv(bitslong,strlen(bitslong) + 1), 0);
+	
 	
 	
 	char x1[BU256_STRSZ];
@@ -400,7 +399,6 @@ HV* picocoin_bloomfilter_new(SV* arrayref, int nElements, double nFPRate){
 	
 	return rh;
 }
-
 
 
 /*

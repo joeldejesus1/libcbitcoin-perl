@@ -206,16 +206,23 @@ sub initialize_chain{
 	# must get genesis block
 	$this->{'genesis block'} = CBitcoin::Block->genesis_block();
 	
+	$this->{'genesis block'}->height(1);
+	$this->{'genesis block'}->cummulative_difficulty( $this->{'genesis block'}->hash_bigint());
+	
 	$this->{'header hash to hash'}->{$this->{'genesis block'}->hash()} = 
 		[$this->{'genesis block'}->prevBlockHash(),''];
 		
 		
-	# style 2
+	# chain sorting for the spv.   copy these data structures in order to organize chains on peers.
 	$this->{'chain'}->{'genesis block'} = $this->{'genesis block'}->hash();
 	$this->{'chain'}->{'latest'} = $this->{'chain'}->{'genesis block'};
+	$this->{'chain'}->{'cummulative difficulty'} = $this->{'genesis block'}->cummulative_difficulty();
 	$this->{'chain'}->{'orphans'} = {};
+	$this->{'chain'}->{'current target'} = $this->{'genesis block'}->target_bigint();
+	# max target implies lowest difficulty (use this number to figure out "work done")
+	$this->{'chain'}->{'maximum target'} = Math::BigInt->from_hex('00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF');
 	$this->{'headers'}->[0] = $this->{'genesis block'}->hash();
-	
+	$this->{'header by hash'}->{$this->{'genesis block'}->hash()} = $this->{'genesis block'};
 	$this->{'header changed'} = 1;
 	$this->sort_chain();
 	#print "Bail out!";
@@ -228,6 +235,29 @@ sub initialize_chain{
 	#push(@{$this->{'headers'}},$gen_block->hash);
 	
 	return 1;
+}
+
+=pod
+
+---++ initialize_peerchain
+
+When a new peer is added, set it up with the correct peer chain stuff.
+
+=cut
+
+sub initialize_peerchain {
+	my ($this) = @_;
+	
+	return {
+		'genesis block' => $this->{'chain'}->{'genesis block'}
+		,'latest' => $this->{'chain'}->{'latest'}
+		,'cummulative difficulty' => $this->{'chain'}->{'cummulative difficulty'},
+		,'current target' => $this->{'chain'}->{'current target'}
+		,'orphans' => {}
+		,'headers' => [$this->{'genesis block'}->hash()]
+		,'maximum target' => $this->{'chain'}->{'maximum target'}
+	};
+	
 }
 
 =pod
@@ -282,13 +312,12 @@ In the directory:
 =cut
 
 sub add_header_to_chain {
-	my $this = shift;
-	my $header = shift;
+	my ($this,$peer, $header) = @_;
 	die "header is null" unless defined $header;
 
 	
 
-	$this->add_header_to_inmemory_chain($header);
+	$this->add_header_to_inmemory_chain($peer, $header);
 	#return $this->block_height(1);
 }
 
@@ -299,26 +328,49 @@ sub add_header_to_chain {
 =cut
 
 sub add_header_to_inmemory_chain {
-	my ($this,$header) = @_;
-	
+	my ($this,$peer, $header) = @_;
 	delete $header->{'data'};
 	
-	# style 2
-	#$this->{'chain'}->{'latest'};
+	###### Store the header in $spv ################
 	if(defined $this->{'header hash to hash'}->{$header->hash}){
-		#warn "we already have this block\n";
+		#$this->{'header hash to hash'}->{$header->hash} = $header;
 		return undef;
 	}
-	elsif($this->{'chain'}->{'latest'} ne $header->prevBlockHash){
-		#warn "Got orphan block\n";
-		#$this->{'chain'}->{'orphans'}->{$header->hash};
-		#print "Bail out!";
-		#die "orphan block";
+
+	if(!defined $this->{'header by hash'}->{$header->hash}){
+		#$this->{'header hash to hash'}->{$header->hash} = $header;
+		$this->{'header by hash'}->{$header->hash} = $header;
+		#return undef;
+	}	
+	
+
+	
+	my $pchain = $peer->chain();
+	
+	##### modify peer chain ########
+	if($pchain->{'latest'} ne $header->prevBlockHash){
+		# got out of order block, either an orphan or chain reorganization
+		# TODO: set up chain reorg subroutine
+		$pchain->{'orphans'}->{$header->hash} = $header;
 	}
 	else{
-		#warn "Got main chain block\n";
-		$this->{'chain'}->{'latest'} = $header->hash;
+		# calculate the cummulative difficulty
+		my $prevBlock = $this->{'header by hash'}->{$header->prevBlockHash};
+		my $cd = $prevBlock->cummulative_difficulty()->copy();
+		my $maxtarget = $this->{'chain'}->{'maximum target'}->copy();
+		$cd->badd( $maxtarget->bsub($header->hash_bigint()) );
+		$header->cummulative_difficulty($cd);
+				
+		# TODO: check the target
+		$pchain->{'current target'} = $header->target_bigint(); 
+
+		$pchain->{'latest'} = $header->hash;
+		push(@{$pchain->{'headers'}},$header->hash);
+		
+		# what do do with the rest?
+		warn "Adding header to official chain\n";
 		push(@{$this->{'headers'}},$header->hash);
+		
 		#print "Bail out!";
 		#die "main chain block";
 	}
@@ -1685,7 +1737,7 @@ sub callback_gotblock {
 	my $count = $block->transactionNum;
 		#die "let us finish early\n";
 		
-	$this->add_header_to_chain($block);
+	$this->add_header_to_chain($peer,$block);
 	
 	#delete $this->{'inv search'}->[2]->{$block->hash()};
 	if(defined  $this->{'inv search'}->[2]->{$block->hash()}){
@@ -1695,13 +1747,16 @@ sub callback_gotblock {
 	else{
 		#warn "missing inv with hash=".$block->hash_hex()."\n";
 	}
+
+
+	if($block->transactionNum_bf()){
+		$this->callback_gotblock_withtx($block);
+	}
 	
 	
 	$this->hook_peer_onreadidle($peer);
 	
-	if($block->transactionNum_bf()){
-		$this->callback_gotblock_withtx($block);
-	}
+
 	
 	
 	#$this->spv->{'inv'}->[2]->{$block->hash()} = $block;
