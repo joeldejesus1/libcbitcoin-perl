@@ -202,7 +202,7 @@ sub initialize_chain{
 	my $this = shift;
 	my $base = $this->db_path();
 
-	warn "initialize chain 2\n";
+	warn "initialize chain\n";
 	# must get genesis block
 	$this->{'genesis block'} = CBitcoin::Block->genesis_block();
 	
@@ -230,9 +230,15 @@ sub initialize_chain{
 	#$this->{'headers'}->[0] = $gen_block->hash;
 	
 	#warn "initialize chain 5 hash=".unpack('H*',$gen_block->hash)."\n";
-	
+	$this->{'chain'}->{'last checkpoint'} = 0; # every 1000 blocks;
+	$this->{'chain'}->{'checkpoint frequency'} = 500 unless defined $this->{'chain'}->{'checkpoint frequency'}; 
 	#$this->add_header_to_chain($gen_block);
 	#push(@{$this->{'headers'}},$gen_block->hash);
+	
+	# make sure to call this before calling checkpoint_savefh
+	$this->initialize_chain_scan_files();
+	
+	$this->checkpoint_savefh();
 	
 	return 1;
 }
@@ -247,6 +253,9 @@ When a new peer is added, set it up with the correct peer chain stuff.
 
 sub initialize_peerchain {
 	my ($this) = @_;
+	my @headers = @{$this->{'headers'}};
+	
+	# TODO: deep copy of $hchain->{'header hash to hash'}->{$header->hash} = [$header->prevBlockHash,''];
 	
 	return {
 		'genesis block' => $this->{'chain'}->{'genesis block'}
@@ -254,8 +263,9 @@ sub initialize_peerchain {
 		,'cummulative difficulty' => $this->{'chain'}->{'cummulative difficulty'},
 		,'current target' => $this->{'chain'}->{'current target'}
 		,'orphans' => {}
-		,'headers' => [$this->{'genesis block'}->hash()]
+		,'headers' => \@headers
 		,'maximum target' => $this->{'chain'}->{'maximum target'}
+		,'header hash to hash' => {}
 	};
 	
 }
@@ -272,31 +282,100 @@ Make sure the hash/directory relationship matches that in CBitcoin::Utilities::H
 
 sub initialize_chain_scan_files {
 	my ($this,$files_ref) = @_;
-	
 	my $base = $this->db_path();
+	die "no checkpoint file" unless -f $base.'/checkpoints';
+	
+	
 	
 	#my $gen_block = CBitcoin::Block->genesis_block();
-	
+	my $hchain = $this->{'chain'};
 	# get all the hashes
 	# format=1,3,the rest
-	foreach my $f1 (@{$files_ref}){
-		opendir(my $fh2,"$base/headers/$f1") || die "cannot open directory";
-		while(my $f2 = readdir($fh2)) {
-		 	next if $f2 eq '.' || $f2 eq '..';
-		 	#warn "in directory=$base/headers/$f1/$f2\n";
-		 	opendir(my $fh3,"$base/headers/$f1/$f2") || die "cannot open directory";
-		 	while(my $f3 = readdir($fh3)){
-		 		next if $f3 eq '.' || $f3 eq '..';
-		 		open(my $fhdata,'<',"$base/headers/$f1/$f2/$f3") || die "cannot read data";
-		 		$this->add_header_to_inmemory_chain(CBitcoin::Block->deserialize($fhdata));
-		 		close($fhdata);
-		 	}
-		 	closedir($fh3);
+	open(my $fh,'<','/tmp/spv/checkpoints');
+	my ($n,$buf,$leftover);
+#	$leftover = '';
+	my $i = 0;
+	
+	
+	
+	while($n = sysread($fh,$buf,8192)){
+		$leftover = $leftover.$buf;
+		my $len = length($leftover);
+		my $m = 0;
+		while(80 < $len - $m){
+			# append a 0 to indicate that there are no transactions to scan in
+			#warn "Block:".unpack('H*',substr($leftover,$m,80).pack('C',0))."\n";
+			my $header = CBitcoin::Block->deserialize(substr($leftover,$m,80).pack('C',0));
+			$m += 80;
+			next if defined $this->{'header by hash'}->{$header->hash()};
+			$hchain->{'latest'} = $header->hash();
+			push(@{$this->{'headers'}},$header->hash());
+			$hchain->{'current target'} = $header->target_bigint();
+			
+			if(!defined $hchain->{'genesis block'}){
+				$hchain->{'genesis block'} = $header->hash();
+				$hchain->{'cummulative difficulty'} = $header->hash_bigint();
+				$hchain->{'header hash to hash'}->{$header->hash} = ['',''];
+			}
+			else{
+				warn "Adding block[".$header->hash_hex.";".$i."]\n" if $i % $this->{'chain'}->{'checkpoint frequency'} == 0;
+				$hchain->{'cummulative difficulty'}->badd(
+					$hchain->{'maximum target'}->copy()->bsub($header->hash_bigint())
+				);
+				$hchain->{'header hash to hash'}->{$header->hash} = [$header->prevBlockHash,''];
+				$hchain->{'header hash to hash'}->{$header->prevBlockHash}->[1] = $header->hash;
+			}
+			$i += 1;
 		}
-		closedir($fh2);
+	}
+	#die "finished scanning block";
+}
+
+=pod
+
+---++ checkpoint_save
+
+		if( 
+			$this->{'chain'}->{'checkpoint frequency'} <
+				scalar(@{$this->{'headers'}}) -  
+				$this->{'chain'}->{'checkpoint frequency'} * scalar(@{$this->{'chain'}->{'checkpoints'}})
+		){
+
+=cut
+
+sub checkpoint_save {
+	my ($this) = @_;
+	
+	my $fh = $this->checkpoint_savefh();
+	
+	# find out the last checkpoint
+	my $last_checkpoint_i = $this->{'chain'}->{'last checkpoint'};
+	
+	my ($buf,$len,$m);
+	for(my $j=($last_checkpoint_i + 1);$j<( scalar(@{$this->{'headers'}}) - $this->{'chain'}->{'checkpoint frequency'});$j++){
+		$buf .= $this->{'header by hash'}->{$this->{'headers'}->[$j]}->header();
+	}
+	$len = length($buf);
+	warn "Adding header checkpoints of size=$len\n";
+	$m = 0;
+	while(0 < $len - $m){
+		$m += syswrite($fh,$buf,8192,$m);
 	}
 	
-	$this->sort_chain();
+	$this->{'chain'}->{'last checkpoint'} = ( scalar(@{$this->{'headers'}}) - $this->{'chain'}->{'checkpoint frequency'}) - 1;
+	
+}
+
+
+sub checkpoint_savefh {
+	my ($this) = @_;
+	return $this->{'chain'}->{'checkpoint filehandle'} if defined $this->{'chain'}->{'checkpoint filehandle'};
+	
+	open(my $cpfh,'>>','/tmp/spv/checkpoints') || die "cannot open checkpoint file";
+	$this->{'chain'}->{'checkpoint filehandle'} = $cpfh;
+	
+	
+	return $this->{'chain'}->{'checkpoint filehandle'};
 }
 
 =pod
@@ -331,8 +410,10 @@ sub add_header_to_inmemory_chain {
 	my ($this,$peer, $header) = @_;
 	delete $header->{'data'};
 	
+	my $pchain = $peer->chain();
+	
 	###### Store the header in $spv ################
-	if(defined $this->{'header hash to hash'}->{$header->hash}){
+	if(defined $pchain->{'header hash to hash'}->{$header->hash}){
 		#$this->{'header hash to hash'}->{$header->hash} = $header;
 		return undef;
 	}
@@ -345,7 +426,7 @@ sub add_header_to_inmemory_chain {
 	
 
 	
-	my $pchain = $peer->chain();
+	
 	
 	##### modify peer chain ########
 	if($pchain->{'latest'} ne $header->prevBlockHash){
@@ -369,28 +450,29 @@ sub add_header_to_inmemory_chain {
 		
 		# what do do with the rest?
 		warn "Adding header to official chain\n";
-		push(@{$this->{'headers'}},$header->hash);
+		#push(@{$this->{'headers'}},$header->hash);
 		
 		#print "Bail out!";
 		#die "main chain block";
 	}
 	
 	# this section handles relationships between blocks
-	if(defined $this->{'header hash to hash'}->{$header->hash} ){
-		$this->{'header hash to hash'}->{$header->hash}->[0] = $header->prevBlockHash;
+	if(defined $pchain->{'header hash to hash'}->{$header->hash} ){
+		$pchain->{'header hash to hash'}->{$header->hash}->[0] = $header->prevBlockHash;
 	}
 	else{
-		$this->{'header hash to hash'}->{$header->hash} = [$header->prevBlockHash,''];
+		$pchain->{'header hash to hash'}->{$header->hash} = [$header->prevBlockHash,''];
 	}
 	
-	if(defined $this->{'header hash to hash'}->{$header->prevBlockHash}){
+	if(defined $pchain->{'header hash to hash'}->{$header->prevBlockHash}){
 #		warn "should be here!";
-		$this->{'header hash to hash'}->{$header->prevBlockHash}->[1] = $header->hash;
+		$pchain->{'header hash to hash'}->{$header->prevBlockHash}->[1] = $header->hash;
 	}
 	else{
 #		warn "should not be here!";
-		$this->{'header hash to hash'}->{$header->prevBlockHash} = ['',$header->hash];
+		$pchain->{'header hash to hash'}->{$header->prevBlockHash} = ['',$header->hash];
 	}
+	$pchain->{'header changed'} = 1;
 	
 	$this->{'header changed'} = 1;
 	
@@ -410,28 +492,79 @@ sub sort_chain {
 	
 	return undef unless $this->{'header changed'};
 	
+	my $peer_with_longest_chain;
+	my $tmpcd;
+	foreach my $fd (keys %{$this->{'peers'}}){
+		my $peer = $this->{'peers'}->{$fd};
+		#$peer->sort_chain();
+		my $cd = $this->sort_chain_by_peer($peer);
+		
+		if(!(defined $tmpcd) || $tmpcd->bcmp($cd) < 0  ){
+			$tmpcd = $cd;
+			$peer_with_longest_chain = $peer;
+		}
+	}
+	if(defined $peer_with_longest_chain){
+		$this->{'chain'}->{'peer with longest chain'} = $peer_with_longest_chain;
+		$this->{'header changed'} = 0;
+	
+		my $pchain = $peer_with_longest_chain->chain();
+		$this->{'headers'} = $pchain->{'headers'};
+		
+		if( 
+			$this->{'chain'}->{'checkpoint frequency'} * 2 <
+				scalar(@{$this->{'headers'}}) -  $this->{'chain'}->{'last checkpoint'}
+		){
+			$this->checkpoint_save();
+		}
+	}
+	
+
+	#push(@{$this->{'headers'}},$header->hash);
+}
+	
+sub sort_chain_by_peer{
+	my ($this,$peer) = @_;
+	
+	my $pchain = $peer->chain();
+	return undef unless $pchain->{'header changed'};
+	
+	# $this->{'peers'}->{$fileno}
+	
 	#$this->{'headers'} = [];
 	
-	my $mainref = $this->{'header hash to hash'};
+	my $mainref = $pchain->{'header hash to hash'};
 	my $gen_block = $this->{'genesis block'};
 	my $curr_hash = $gen_block->hash;
 	my $loopcheck = {}; # to see if the chain is actually a loop, prevent infinite loops
 	my $index = 0;
-	my $orig_height = scalar(@{$this->{'headers'}}) - 1;
+	my $orig_height = scalar(@{$pchain->{'headers'}}) - 1;
+	my $maxtarget = $this->{'chain'}->{'maximum target'}->copy();
+	my $cummulative_difficulty = $maxtarget->copy()->bsub($gen_block->hash_bigint());
+	my $curr_target = $gen_block->target_bigint();
+	my $dweek = 2.0*7*24*60*60;
+	my @W1 = ($dweek/4.0 , $dweek * 4.0);
 	while(defined $curr_hash && $curr_hash ne '' && !($loopcheck->{$curr_hash})){
-		
+		my $header = $this->{'header by hash'}->{$curr_hash};
 		if($orig_height <= $index){
 			# new blocks
-			$this->{'chain'}->{'latest'} = $curr_hash;
-			$this->{'headers'}->[$index] = $curr_hash;
-			if(defined $this->{'chain'}->{'orphans'}->{$curr_hash}){
+			$pchain->{'latest'} = $curr_hash;
+			$pchain->{'headers'}->[$index] = $curr_hash;
+			if(defined $pchain->{'orphans'}->{$curr_hash}){
 				#warn "deleting orphan\n";
-				delete $this->{'chain'}->{'orphans'}->{$curr_hash};
+				delete $pchain->{'orphans'}->{$curr_hash};
 			}
+			
+			$cummulative_difficulty = $cummulative_difficulty->badd(  
+				$maxtarget->copy()->bsub($header->hash_bigint())  
+			);
 		}
 		elsif(
-			$this->{'headers'}->[$index] eq $curr_hash
+			$pchain->{'headers'}->[$index] eq $curr_hash && 0 < $index
 		){
+			$cummulative_difficulty = $cummulative_difficulty->badd(  
+				$maxtarget->copy()->bsub($header->hash_bigint())  
+			);
 			#warn "chain not finished, keep going\n";
 			#last;
 		}
@@ -439,15 +572,36 @@ sub sort_chain {
 			#warn "chain does not match!";
 			
 		}
+		
+		if(0 < $index && $index % 2016 == 0){
+			# change target difficulty
+			# last 2015 blocks not 2016 due to bug in main implementation
+			my $a = $this->{'header by hash'}->{$pchain->{'headers'}->[$index - 2015]}->timestamp();
+			my $b = $header->timestamp();
+			
+			my $diff = $b - $a;
+			if($diff < $W1[0]){
+				$diff = $W1[0];
+			}
+			elsif($W1[1] < $diff){
+				$diff = $W1[1];
+			}
+			
+			$curr_target->bmul(Math::BigInt->new($diff / $dweek));
+		}
+		
+		
 		$loopcheck->{$curr_hash} = 1;
 		$curr_hash = $mainref->{$curr_hash}->[1];
 		$index += 1;
 	}
+	
+	$pchain->{'cummulative difficulty'} = $cummulative_difficulty;
+	
 	#warn "finished sorting, new block_height=".scalar(@{$this->{'headers'}})."\n";
-	$this->{'header changed'} = 0;
+	$pchain->{'header changed'} = 1;
 	
-	
-
+	return $cummulative_difficulty;
 }
 
 =pod
@@ -1734,6 +1888,7 @@ sub callback_gotblock {
 	warn "Got block=[".$block->hash_hex().
 		";".$block->transactionNum.
 		";".length($msg->payload())."]\n";
+	warn "Cummulative Difficulty:".$peer->chain()->{'cummulative difficulty'}->as_hex()."\n";
 	my $count = $block->transactionNum;
 		#die "let us finish early\n";
 		

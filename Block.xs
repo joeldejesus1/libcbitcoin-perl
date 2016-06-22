@@ -295,7 +295,7 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf
 	return rh;
 }
 
-HV* picocoin_block_des(SV* blockdata){
+HV* picocoin_block_des(SV* blockdata,int headerOnly){
 	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
 	
 	STRLEN len_blkdata;
@@ -311,12 +311,15 @@ HV* picocoin_block_des(SV* blockdata){
 		return picocoin_returnblankblock(rh);
 	}
 	//fprintf(stderr,"hi - 2\n");
-	if(!bp_block_valid(&block)){
+	if(headerOnly == 0 && !bp_block_valid(&block)){
 		bp_block_free(&block);
 		return picocoin_returnblankblock(rh);
 	}
+	else{
+		bp_block_calc_sha256(&block);
+	}
 	//fprintf(stderr,"hi - 3\n");
-	bp_block_calc_sha256(&block);
+	
 	
 	
 	
@@ -437,8 +440,9 @@ picocoin_bloomfilter_new(arrayref,nElements,nFPRate)
 	double nFPRate
 	
 HV*
-picocoin_block_des(blockdata)
+picocoin_block_des(blockdata,headerOnly)
 	SV* blockdata
+	int headerOnly
 	
 HV*
 picocoin_block_des_with_bloomfilter(blockdata,bfdata)

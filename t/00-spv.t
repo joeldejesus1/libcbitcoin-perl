@@ -55,6 +55,8 @@ my $mode_setting = sub{
 # $resettimeout->($spv,$socket)
 my $resettimeout = sub{
 	my ($spv,$sck1) = @_;
+	return undef unless defined $sck1 && 0 < fileno($sck1);
+	
 	my $internal_fn_watcher = $fn_to_watcher;
 	my $c1 = $config;
 	
@@ -107,7 +109,7 @@ my $connectsub = sub{
 	
 	eval{
 		local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
-		alarm 15;
+		alarm 5;
 		
 		if($spv->{'socks5'}){
 			warn "connection to $ipaddress via socks5\n";

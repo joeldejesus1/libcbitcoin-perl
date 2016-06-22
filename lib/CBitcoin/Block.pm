@@ -129,7 +129,13 @@ sub serialize_header2 {
 sub deserialize{
 	my $package = shift;
 	my $payload = shift;
-	my $this = picocoin_block_des($payload);
+	#warn "loading payload\n";
+	my $headBool = 0;
+	if(length($payload) == 81 ){
+		$headBool = 1;
+	}
+	
+	my $this = picocoin_block_des($payload,$headBool);
 	die "failed to parse" unless $this->{'success'};
 	bless($this,$package);
 	
