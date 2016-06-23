@@ -253,9 +253,15 @@ When a new peer is added, set it up with the correct peer chain stuff.
 
 sub initialize_peerchain {
 	my ($this) = @_;
+	
+	my $hchain = $this->{'chain'};
+	
 	my @headers = @{$this->{'headers'}};
 	
-	# TODO: deep copy of $hchain->{'header hash to hash'}->{$header->hash} = [$header->prevBlockHash,''];
+	my $ph2h = {};
+	foreach my $h2h (keys %{$hchain->{'header hash to hash'}}){
+		$ph2h->{$h2h} = [$hchain->{'header hash to hash'}->{$h2h}->[0],$hchain->{'header hash to hash'}->{$h2h}->[1]];
+	}
 	
 	return {
 		'genesis block' => $this->{'chain'}->{'genesis block'}
@@ -265,7 +271,7 @@ sub initialize_peerchain {
 		,'orphans' => {}
 		,'headers' => \@headers
 		,'maximum target' => $this->{'chain'}->{'maximum target'}
-		,'header hash to hash' => {}
+		,'header hash to hash' => $ph2h
 	};
 	
 }
@@ -283,8 +289,8 @@ Make sure the hash/directory relationship matches that in CBitcoin::Utilities::H
 sub initialize_chain_scan_files {
 	my ($this,$files_ref) = @_;
 	my $base = $this->db_path();
-	die "no checkpoint file" unless -f $base.'/checkpoints';
-	
+	#die "no checkpoint file" unless -f $base.'/checkpoints';
+	return undef unless -f $base.'/checkpoints';
 	
 	
 	#my $gen_block = CBitcoin::Block->genesis_block();
@@ -327,6 +333,7 @@ sub initialize_chain_scan_files {
 			}
 			$i += 1;
 		}
+		$leftover = substr($leftover,$m);
 	}
 	#die "finished scanning block";
 }
@@ -353,6 +360,7 @@ sub checkpoint_save {
 	
 	my ($buf,$len,$m);
 	for(my $j=($last_checkpoint_i + 1);$j<( scalar(@{$this->{'headers'}}) - $this->{'chain'}->{'checkpoint frequency'});$j++){
+		return undef unless defined $this->{'headers'}->[$j] && defined $this->{'header by hash'}->{$this->{'headers'}->[$j]};
 		$buf .= $this->{'header by hash'}->{$this->{'headers'}->[$j]}->header();
 	}
 	$len = length($buf);
@@ -371,7 +379,7 @@ sub checkpoint_savefh {
 	my ($this) = @_;
 	return $this->{'chain'}->{'checkpoint filehandle'} if defined $this->{'chain'}->{'checkpoint filehandle'};
 	
-	open(my $cpfh,'>>','/tmp/spv/checkpoints') || die "cannot open checkpoint file";
+	open(my $cpfh,'>>',$this->db_path().'/checkpoints') || die "cannot open checkpoint file";
 	$this->{'chain'}->{'checkpoint filehandle'} = $cpfh;
 	
 	
@@ -529,23 +537,25 @@ sub sort_chain_by_peer{
 	my $pchain = $peer->chain();
 	return undef unless $pchain->{'header changed'};
 	
-	# $this->{'peers'}->{$fileno}
+	# only sort from the last checkpoint
+	my $last_checkpoint_i = $this->{'chain'}->{'last checkpoint'};
 	
-	#$this->{'headers'} = [];
 	
 	my $mainref = $pchain->{'header hash to hash'};
-	my $gen_block = $this->{'genesis block'};
-	my $curr_hash = $gen_block->hash;
+	my $curr_hash = $this->{'headers'}->[$last_checkpoint_i];
+	my $header = $this->{'header by hash'}->{$curr_hash};
 	my $loopcheck = {}; # to see if the chain is actually a loop, prevent infinite loops
 	my $index = 0;
 	my $orig_height = scalar(@{$pchain->{'headers'}}) - 1;
 	my $maxtarget = $this->{'chain'}->{'maximum target'}->copy();
-	my $cummulative_difficulty = $maxtarget->copy()->bsub($gen_block->hash_bigint());
-	my $curr_target = $gen_block->target_bigint();
+	my $cummulative_difficulty = $maxtarget->copy()->bsub($header->hash_bigint());
+	my $curr_target = $header->target_bigint();
 	my $dweek = 2.0*7*24*60*60;
 	my @W1 = ($dweek/4.0 , $dweek * 4.0);
 	while(defined $curr_hash && $curr_hash ne '' && !($loopcheck->{$curr_hash})){
-		my $header = $this->{'header by hash'}->{$curr_hash};
+		$header = $this->{'header by hash'}->{$curr_hash};
+		last unless defined $header;
+		
 		if($orig_height <= $index){
 			# new blocks
 			$pchain->{'latest'} = $curr_hash;
@@ -628,7 +638,7 @@ sub calculate_block_locator {
 	
 	my @ans;
 	foreach my $i (CBitcoin::Utilities::block_locator_indicies($this->block_height())){
-		#warn "need block=$i\n";
+		warn "need block=$i\n";
 		my $hash = $this->block($i);
 		die "bad index, rebuild block header database" unless defined $hash;
 		push(@ans,$hash);
@@ -1246,8 +1256,11 @@ sub hook_inv {
 	# length($hash) should be equal to 32 (256bits), but in the future that might change.
 	
 	if($type == 2){
-		#delete $this->{'command timeout'}->{'send_getblocks'};
+		# block
+		return undef if $this->{'header by hash'}->{$hash};
+		
 		$this->{'command timeout'}->{'send_getblocks'} = 0;
+		
 	}
 	
 	
@@ -1876,6 +1889,12 @@ sub callback_gotblock {
 		";".$block->transactionNum.
 		";".length($msg->payload())."]\n";
 	warn "Cummulative Difficulty:".$peer->chain()->{'cummulative difficulty'}->as_hex()."\n";
+	if(defined $this->{'header by hash'}->{$block->hash()}){
+		warn "already stored....................\n";
+	}
+	else{
+		warn "new block....................\n";
+	}
 	my $count = $block->transactionNum;
 		#die "let us finish early\n";
 		

@@ -49,7 +49,7 @@ Create an spv object and have it connect to one peer.
 =cut
 
 my $spv = CBitcoin::SPV->new({
-	'client name' => '/BitcoinJ:0.2(iPad; U; CPU OS 3_2_1)/AndroidBuild:0.8/'
+	'client name' => '/BitcoinJ:0.2(iPad; U; CPU OS 3_2_1)/AndroidBuild:0.8/',
 	'address' => '10.202.177.155',	'port' => 8333, # this line is for the purpose of creating version messages (not related to the event loop)
 	'isLocal' => 1,
 	'read buffer size' => 8192*4, # the spv code does have access to the file handle/socket
@@ -61,7 +61,7 @@ my $spv = CBitcoin::SPV->new({
 	})
 });
 
-die "no socks5" unless $spv->{'socks5'};
+#die "no socks5" unless $spv->{'socks5'};
 
 # q6m5jhenk33wm4j4.onion
 
