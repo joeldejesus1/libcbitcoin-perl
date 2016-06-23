@@ -1,10 +1,8 @@
-package CBitcoin::DefaultWorker;
+package CBitcoin::DefaultEventLoop;
 
 use strict;
 use warnings;
 
-use CBitcoin::Message;
-use CBitcoin::SPV;
 use IO::Socket::INET;
 use IO::Socket::Socks;
 use IO::Epoll;
@@ -12,14 +10,29 @@ use EV;
 
 =pod
 
----++ setup
+---++ set_up_event_loop
 
 This subroutine creates all of the closures (anonymous subs) needed to make the event loop work.  The author of this module finds himself using multiple event loops over time.  Therefore, he wanted to separate the SPV code from the event loop code by as much as possible.  The unfortunate side effect is having an ugly setup sub.
+
+<verbatim>$eventloop =  {
+	'mode setting' => $ms
+	,'reset timeout' => $rt
+	,'connectsub' => $connectsub
+	,'markwritesub' => $markwritesub 
+	,'loop' => $loopsub 
+}</verbatim>
 
 =cut
 
 
-sub setup {
+sub set_up_event_loop {
+	my ($package,$config) = @_;
+
+	
+	$config = {
+		'timeout' => 60
+	} unless defined $config;
+	
 	local $| = 1;
 	
 	my $gen_block = CBitcoin::Block->genesis_block();
@@ -39,9 +52,6 @@ sub setup {
 	
 	my $fn_to_watcher = {};
 	
-	my $config = {
-		'timeout' => 60
-	};
 	
 	
 	my $mode = 0;
@@ -107,25 +117,32 @@ sub setup {
 	
 	};
 	
+	# figure out socks 5 stuff
+	my $socks5 = add_socks5($config->{'socks5 address'},$config->{'socks5 port'});
 	
 	
 	my $connectsub = sub{
 		my ($spv,$ipaddress,$port) = @_;
 		my $sck1;
+		my $c2 = $config;
+		my $socks5_2 = $socks5;
 		#warn "Doing connection now, part 1\n";
 		
 		my $internal_fn_watcher = $fn_to_watcher;
 		my $rst1 = $resettimeout;
 		
+		
+		
+		
 		eval{
 			local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
 			alarm 5;
-			
-			if($spv->{'socks5'}){
+
+			if(defined $socks5_2){
 				warn "connection to $ipaddress via socks5\n";
 				$sck1 = IO::Socket::Socks->new(
-					ProxyAddr   => $spv->{'socks5'}->{'address'},
-					ProxyPort   => $spv->{'socks5'}->{'port'},
+					ProxyAddr   => $socks5_2->{'address'},
+					ProxyPort   => $socks5_2->{'port'},
 					ConnectAddr => $ipaddress,
 	    			ConnectPort => $port,
 				) || (alarm 0 && die $SOCKS_ERROR);
@@ -261,100 +278,78 @@ sub setup {
 		warn "entering loop";
 		EV::run;
 	};
+	
+	
+	my $this = {
+		'mode setting' => $mode_setting
+		,'reset timeout' => $resettimeout
+		,'connect' => $connectsub
+		,'mark write' => $markwritesub 
+		,'loop' => $loopsub 
+	};
+	bless($this,$package);
+	
+	return $this;
 }
 
 =pod
 
----+ Set Up Wallet
+---+ Getters/Setters
 
 =cut
 
-my $bloomfilter = CBitcoin::BloomFilter->new({
-	'FalsePostiveRate' => 0.001,
-	'nHashFuncs' => 1000 
-});
-
-########### Set up a wallet ######################
-# these are in block 120383
-foreach my $addr (
-	'1BhT26zK7g9hXb3PDkwenkxpBeGYa6MCK1','1BPxymA3FSdUbfHTEzBycf5CsVbWqDGp6A',
-	'1LoZdpsX9c662bKJTpt8cEfANmu8WRKKKN'
-){
-	my $script = CBitcoin::Script::address_to_script($addr);
-	print "Bail out!" unless defined $script && 0 < length($script);
-	$script = CBitcoin::Script::serialize_script($script);
-	print "Bail out!" unless defined $script && 0 < length($script);
-	$bloomfilter->add_script($script);
-	#push(@scripts,$script);
+sub set_mode{
+	return shift->{'mode setting'};
 }
 
-#########################################################
+sub reset_timeout {
+	return shift->{'reset timeout'};
+}
 
+sub connect {
+	return shift->{'connect'};
+}
 
+sub mark_write {
+	return shift->{'mark write'};
+}
+
+sub loop {
+	return shift->{'loop'};
+}
 
 =pod
 
----+ Initialization
-
-Create an spv object and have it connect to one peer.
-
-
-
-q6m5jhenk33wm4j4.onion
-10.19.202.164
+---+ utilities
 
 =cut
-# q6m5jhenk33wm4j4.onion
-my $spv = CBitcoin::SPV->new({
-	'address' => '10.202.177.155',
-	'port' => 8333,
-	'isLocal' => 1,
-	'connect sub' => $connectsub,
-	'mark write sub' => $markwritesub ,
-	'read buffer size' => 8192*4,
-	'bloom filter' => $bloomfilter,
-	'socks5 address' => '127.0.0.1',
-	'socks5 port' => 9999
-});
 
-die "no socks5" unless $spv->{'socks5'};
-
-# q6m5jhenk33wm4j4.onion
-
-#$spv->add_peer_to_inmemmory(pack('Q',1),'127.0.0.1','38333');		
-$spv->add_peer_to_inmemmory(pack('Q',1),'10.202.177.155','8333'); # q6m5jhenk33wm4j4.onion
-$spv->add_peer_to_inmemmory(pack('Q',1),'10.193.178.58','8333'); # l4xfmcziytzeehcz.onion
-$spv->add_peer_to_inmemmory(pack('Q',1),'10.251.166.108','8333'); # gb5ypqt63du3wfhn.onion
-$spv->add_peer_to_inmemmory(pack('Q',1),'10.243.114.46','8333'); # syvoftjowwyccwdp.onion
-
-# jhjuld3x27srjpby.onion 10.211.136.179
-# a6obdgzn67l7exu3.onion 10.207.89.205
-# 4okypmflcectloz5.onion 10.201.181.38
 =pod
 
-Then, put some fresh, online nodes into the peer pool.  After that, run the event loop.
+---++ add_socks5
 
-q6m5jhenk33wm4j4.onion:8333
+Validate and untaint a socks5 host.
 
-
-
-foreach my $node ('66.43.209.193','174.31.94.104','184.107.155.82',
-	'81.61.174.113','104.143.51.43','207.255.174.192',
-	'98.127.236.49','68.83.248.43','97.124.176.136'
-){
-	$spv->add_peer_to_db(pack('Q',1),$node,'8333');		
-}
 =cut
 
-
-$spv->activate_peer();
-
-
-$spv->loop($loopsub,$connectsub);
-
-warn "no more connections, add peers and try again\n";
-
-print "Bail out!";
+sub add_socks5 {
+	my ($address,$port) = @_;
+	#warn "add socks not done";
+	return undef unless defined $address && $address =~ m/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/;
+	#warn "add socks done";
+	my $ref;
+	$ref->{'address'} = $1;
+	if(defined $port && $port =~ m/^(\d+)$/){
+		$ref->{'port'} = $1;
+	}
+	elsif(!defined $port){
+		$ref->{'port'} = 9050;
+	}
+	else{
+		$ref->{'port'} = 9050;
+	}
+	return $ref;
+}
 
 __END__
 

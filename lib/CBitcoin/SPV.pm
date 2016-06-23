@@ -73,11 +73,15 @@ Overload this subroutine.
 sub init {
 	my ($this,$options) = @_;
 	
-	die "no mark write sub" unless defined $options->{'mark write sub'} 
-		&& ref($options->{'mark write sub'}) eq 'CODE';
-	die "no connect sub" unless defined $options->{'connect sub'} 
-		&& ref($options->{'connect sub'}) eq 'CODE';
-	
+	my $el = $options->{'event loop'};
+	if(defined $el && $el ){
+		# assign relevant anonymous subs
+		$options->{'mark write sub'} = $el->mark_write();
+		$options->{'connect sub'} = $el->connect();
+	}
+	else{
+		die "there is no event loop code";
+	}
 	
 	
 	$options->{'version'} = 70001 unless defined $options->{'version'};
@@ -108,11 +112,7 @@ sub init {
 		$this->{$key} = $options->{$key};
 	}
 	
-	
 	$this->add_bloom_filter($options->{'bloom filter'});
-	
-	
-	$this->add_socks5($options->{'socks5 address'},$options->{'socks5 port'});
 	
 }
 
@@ -709,6 +709,16 @@ sub db_path {
 
 =pod
 
+---++ event_loop
+
+=cut
+
+sub event_loop{
+	return shift->{'event loop'};
+}
+
+=pod
+
 ---++ version
 
 =cut
@@ -892,33 +902,6 @@ sub add_bloom_filter {
 	
 	$this->{'bloom filter'} = $bf;
 }
-
-
-=pod
-
----++ add_socks5
-
-Allow tor connections via a socks5 proxy. Only allowing ipv4 addresses.  The default port is 9050.
-
-=cut
-
-sub add_socks5 {
-	my ($this,$address,$port) = @_;
-	#warn "add socks not done";
-	return undef unless defined $address && $address =~ m/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/;
-	#warn "add socks done";
-	$this->{'socks5'}->{'address'} = $1;
-	if(defined $port && $port =~ m/^(\d+)$/){
-		$this->{'socks5'}->{'port'} = $1;
-	}
-	elsif(!defined $port){
-		$this->{'socks5'}->{'port'} = 9050;
-	}
-	else{
-		$this->{'socks5'}->{'port'} = 9050;
-	}
-}
-
 
 
 =pod
@@ -1116,7 +1099,9 @@ Overload this.
 =cut
 
 sub client_name {
-	return '/BitcoinJ:0.2(iPad; U; CPU OS 3_2_1)/AndroidBuild:0.8/';
+	my ($this) = @_;
+	$this->{'client name'} = '/BitcoinJ:0.2(iPad; U; CPU OS 3_2_1)/AndroidBuild:0.8/' unless defined $this->{'client name'};
+	return $this->{'client name'};
 }
 
 
@@ -1488,9 +1473,11 @@ Run an infinite loop
 =cut
 
 sub loop {
-	my ($this,$loopsub,$connectsub) = (shift,shift,shift);
-	die "no loop sub" unless defined $loopsub && ref($loopsub) eq 'CODE';
-	die "no connect sub" unless defined $connectsub && ref($connectsub) eq 'CODE';
+	my ($this) = @_;
+	
+	my ($loopsub,$connectsub) = (
+		$this->event_loop->loop(),$this->event_loop->connect()
+	);
 	
 	warn "Starting loop";
 	$loopsub->($this,$connectsub);
