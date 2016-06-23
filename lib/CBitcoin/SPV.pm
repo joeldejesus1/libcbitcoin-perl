@@ -314,6 +314,7 @@ sub initialize_chain_scan_files {
 			my $header = CBitcoin::Block->deserialize(substr($leftover,$m,80).pack('C',0));
 			$m += 80;
 			next if defined $this->{'header by hash'}->{$header->hash()};
+			$this->{'header by hash'}->{$header->hash()} = $header;
 			$hchain->{'latest'} = $header->hash();
 			push(@{$this->{'headers'}},$header->hash());
 			$hchain->{'current target'} = $header->target_bigint();
@@ -1911,13 +1912,7 @@ sub callback_gotblock {
 	warn "Got block=[".$block->hash_hex().
 		";".$block->transactionNum.
 		";".length($msg->payload())."]\n";
-	warn "Cummulative Difficulty:".$peer->chain()->{'cummulative difficulty'}->as_hex()."\n";
-	if(defined $this->{'header by hash'}->{$block->hash()}){
-		warn "already stored....................\n";
-	}
-	else{
-		warn "new block....................\n";
-	}
+	#warn "Cummulative Difficulty:".$peer->chain()->{'cummulative difficulty'}->as_hex()."\n";
 	my $count = $block->transactionNum;
 		#die "let us finish early\n";
 		

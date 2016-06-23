@@ -8,9 +8,17 @@ use IO::Socket::Socks;
 use IO::Epoll;
 use EV;
 
+
 =pod
 
----++ set_up_event_loop
+---+ constructor
+
+=cut
+
+
+=pod
+
+---++ new
 
 This subroutine creates all of the closures (anonymous subs) needed to make the event loop work.  The author of this module finds himself using multiple event loops over time.  Therefore, he wanted to separate the SPV code from the event loop code by as much as possible.  The unfortunate side effect is having an ugly setup sub.
 
@@ -25,7 +33,7 @@ This subroutine creates all of the closures (anonymous subs) needed to make the 
 =cut
 
 
-sub set_up_event_loop {
+sub new {
 	my ($package,$config) = @_;
 
 	
@@ -285,7 +293,8 @@ sub set_up_event_loop {
 		,'reset timeout' => $resettimeout
 		,'connect' => $connectsub
 		,'mark write' => $markwritesub 
-		,'loop' => $loopsub 
+		,'loop' => $loopsub
+		,'config' => $config
 	};
 	bless($this,$package);
 	
