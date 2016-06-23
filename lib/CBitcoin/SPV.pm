@@ -320,8 +320,11 @@ sub initialize_chain_scan_files {
 			
 			if(!defined $hchain->{'genesis block'}){
 				$hchain->{'genesis block'} = $header->hash();
-				$hchain->{'cummulative difficulty'} = $header->hash_bigint();
+				$hchain->{'cummulative difficulty'} = Math::BigInt->bzero()->badd(
+					$hchain->{'maximum target'}->copy()->bsub($header->hash_bigint())
+				);
 				$hchain->{'header hash to hash'}->{$header->hash} = ['',''];
+				#$header->cummulative_difficulty($header->hash_bigint());
 			}
 			else{
 				warn "Adding block[".$header->hash_hex.";".$i."]\n" if $i % $this->{'chain'}->{'checkpoint frequency'} == 0;
@@ -331,6 +334,8 @@ sub initialize_chain_scan_files {
 				$hchain->{'header hash to hash'}->{$header->hash} = [$header->prevBlockHash,''];
 				$hchain->{'header hash to hash'}->{$header->prevBlockHash}->[1] = $header->hash;
 			}
+			$header->cummulative_difficulty($hchain->{'cummulative difficulty'});
+			
 			$i += 1;
 		}
 		$leftover = substr($leftover,$m);
@@ -437,12 +442,15 @@ sub add_header_to_inmemory_chain {
 	
 	
 	##### modify peer chain ########
-	if($pchain->{'latest'} ne $header->prevBlockHash){
+	if($pchain->{'latest'} ne $header->prevBlockHash && !defined $pchain->{'header hash to hash'}->{$header->prevBlockHash}){
 		# got out of order block, either an orphan or chain reorganization
 		# TODO: set up chain reorg subroutine
+		warn "got an orphan\n";
 		$pchain->{'orphans'}->{$header->hash} = $header;
+		
 	}
-	else{
+	elsif(defined $pchain->{'header hash to hash'}->{$header->prevBlockHash}){
+		warn "adding new block\n";
 		# calculate the cummulative difficulty
 		my $prevBlock = $this->{'header by hash'}->{$header->prevBlockHash};
 		my $cd = $prevBlock->cummulative_difficulty()->copy();
@@ -462,6 +470,10 @@ sub add_header_to_inmemory_chain {
 		
 		#print "Bail out!";
 		#die "main chain block";
+	}
+	else{
+		warn "got a complete orphan???";
+		return undef;
 	}
 	
 	# this section handles relationships between blocks
@@ -623,8 +635,9 @@ Go through the in-memory chain, and create the block_locator hash array.  Return
 =cut
 
 sub calculate_block_locator {
-	my $this = shift;
-	my $hash_stop = shift;
+	my ($this,$peer,$hash_stop) = @_;
+	
+	
 	
 	# 32 bytes of null
 	unless(defined $hash_stop){
@@ -635,10 +648,20 @@ sub calculate_block_locator {
 	}
 	
 	#$hash_stop = pack('H*','0000000000000000000000000000000000000000000000000000000000000000') unless defined $hash_stop;
+	my $block_height;
+	if(defined $peer){
+		my $pchain = $peer->chain();
+		$block_height = scalar(@{$pchain->{'headers'}}) - 1;
+		
+	}
+	else{
+		$block_height = $this->block_height();
+	}
+	
 	
 	my @ans;
-	foreach my $i (CBitcoin::Utilities::block_locator_indicies($this->block_height())){
-		warn "need block=$i\n";
+	foreach my $i (   CBitcoin::Utilities::block_locator_indicies($block_height)  ){
+		#warn "need block=$i\n";
 		my $hash = $this->block($i);
 		die "bad index, rebuild block header database" unless defined $hash;
 		push(@ans,$hash);

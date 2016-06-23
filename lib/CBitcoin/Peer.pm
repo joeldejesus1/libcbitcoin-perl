@@ -809,7 +809,7 @@ The timeout on this command is 10 minutes.
 sub send_getheaders {
 	my $this = shift;
 	return CBitcoin::Message::serialize(
-			$this->spv->calculate_block_locator(),
+			$this->spv->calculate_block_locator($this),
 			'getheaders',
 			CBitcoin::Message::net_magic($this->magic)  # defaults as MAINNET
 	);
@@ -888,7 +888,7 @@ sub send_getblocks{
 	$this->{'command timeout'}->{'send_getblocks'} = time();
 
 	return $this->write(CBitcoin::Message::serialize(
-		$this->spv->calculate_block_locator(),
+		$this->spv->calculate_block_locator($this),
 		'getblocks',
 		$this->magic
 	));
