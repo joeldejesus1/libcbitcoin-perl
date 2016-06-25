@@ -60,7 +60,7 @@ sub new {
 	
 	my $fn_to_watcher = {};
 	
-	
+	my $evloop = EV::Loop->new();
 	
 	my $mode = 0;
 	my $mode_setting = sub{
@@ -85,6 +85,7 @@ sub new {
 		my ($spv,$sck1) = @_;
 		return undef unless defined $sck1 && 0 < fileno($sck1);
 		
+		my $evloop2 = $evloop;
 		my $internal_fn_watcher = $fn_to_watcher;
 		my $c1 = $config;
 		
@@ -95,7 +96,7 @@ sub new {
 		my $cbhash = {'x' => 1};
 		$cbhash->{'x'} = sub {
 			warn "is called after ".$config->{'timeout'}."s";
-			
+			my $evloop3 = $evloop2;
 			my $c2 = $c1;
 			my $spv_in = $spv;
 			my $sck2 = $sck1;	
@@ -109,7 +110,7 @@ sub new {
 				$ms->(0);
 				$spv_in->peer_by_fileno(fileno($sck2))->send_ping();
 				delete $ifw->{fileno($sck2).'timer'};
-				$ifw->{fileno($sck2).'timer'} = EV::timer 30, 0, $cb2;
+				$ifw->{fileno($sck2).'timer'} = $evloop3->timer(30, 0, $cb2);
 			}
 			else{
 				warn "connection timed out\n";
@@ -121,7 +122,7 @@ sub new {
 		};
 		my $callback = $cbhash->{'x'};
 		delete $internal_fn_watcher->{fileno($sck1).'timer'};
-		$internal_fn_watcher->{fileno($sck1).'timer'} = EV::timer $c1->{'timeout'}, 0, $callback;
+		$internal_fn_watcher->{fileno($sck1).'timer'} = $evloop2->timer($c1->{'timeout'}, 0, $callback);
 	
 	};
 	
@@ -138,14 +139,16 @@ sub new {
 		
 		my $internal_fn_watcher = $fn_to_watcher;
 		my $rst1 = $resettimeout;
-		
+		my $evloop2 = $evloop;
 		
 		
 		
 		eval{
 			local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
-			alarm 5;
-
+			alarm 15;
+			chomp($ipaddress);
+			chomp($port);
+			
 			if(defined $socks5_2){
 				warn "connection to $ipaddress via socks5\n";
 				$sck1 = IO::Socket::Socks->new(
@@ -156,7 +159,7 @@ sub new {
 				) || (alarm 0 && die $SOCKS_ERROR);
 			}
 			else{
-				warn "connection using normal INET\n";
+				warn "connection using normal INET to ($ipaddress:$port)\n";
 				$sck1 = new IO::Socket::INET (
 					PeerHost => $ipaddress,
 					PeerPort => $port,
@@ -213,12 +216,12 @@ sub new {
 					}				
 				}
 			};
-			$internal_fn_watcher->{fileno($sck1)} = EV::io $sck1, EV::READ | EV::WRITE, $readwritesub;
+			$internal_fn_watcher->{fileno($sck1)} = $evloop2->io($sck1, EV::READ | EV::WRITE, $readwritesub);
 			
 			# the sub is $sub->($timeout)
 			$spv->peer_set_sleepsub($sck1,sub{
 				my ($peer2,$timeout) = @_;
-				
+				my $evloop3 = $evloop2;
 				my $spv2 = $spv;
 				my $sck2 = $sck1;
 				my $rws2 = $readwritesub;
@@ -233,7 +236,7 @@ sub new {
 				
 				$ifw2->{fileno($sck2)}->events(EV::READ);
 				
-				$ifw2->{fileno($sck2).'ratelimiter'} = EV::timer $timeout, 0, sub {
+				$ifw2->{fileno($sck2).'ratelimiter'} = $evloop3->timer($timeout, 0, sub {
 					my $sck3 = $sck2;
 					my $spv3 = $spv2;
 	     			my $ifw3 = $ifw2;
@@ -242,7 +245,7 @@ sub new {
 	     			warn "Adding peer socket back in\n";
 	     			$ifw3->{fileno($sck3)}->events(EV::READ | EV::WRITE);
 	     			
-				};
+				});
 			});
 		};
 		my $error = $@;
@@ -271,7 +274,7 @@ sub new {
 	
 	my $loopsub = sub{
 		my ($spv,$connectsub) = (shift,shift);
-		
+		my $evloop2 = $evloop;
 		#my $w = EV::idle(sub{
 			#warn "activating peer\n";
 			#$spv->activate_peer($connectsub);
@@ -284,7 +287,7 @@ sub new {
 		};
 		
 		warn "entering loop";
-		EV::run;
+		$evloop2->run();
 	};
 	
 	
@@ -295,6 +298,10 @@ sub new {
 		,'mark write' => $markwritesub 
 		,'loop' => $loopsub
 		,'config' => $config
+		,'event loop socket' => $evloop
+		,'cncspv' => {}
+		,'cnc in' => {}
+		,'cnc out' => {}
 	};
 	bless($this,$package);
 	
@@ -326,6 +333,11 @@ sub mark_write {
 sub loop {
 	return shift->{'loop'};
 }
+
+sub ev_socket {
+	return shift->{'event loop socket'};
+}
+
 
 =pod
 
@@ -360,8 +372,162 @@ sub add_socks5 {
 	return $ref;
 }
 
+=pod
+
+---++ cncspv_add($spv)
+
+Scans for new mqueues and addes new sockets to allow communication with another spv process.
+
+=cut
+
+sub cncspv_add {
+	my ($this,$spv) = @_;
+	
+	my $dirfp = '/dev/mqueue';
+	opendir(my $fh,$dirfp);
+	my @x = readdir($fh);
+	closedir($fh);
+	my ($our_uid,$our_pid) = ($>,$$); #real uid
+	my $loop = $this->ev_socket();
+	
+	foreach my $spv_process (@x){
+		next if $spv_process eq '.' || $spv_process eq '..';
+		if($spv_process =~ m/^spv\.(\d+)\.(\d+)$/){
+			my ($uid,$pid) = ($1,$2);
+			next if $our_uid != $uid || $our_pid == $pid;
+			next if defined $this->{'cncspv'}->{$pid};
+			my $mq = Kgc::MQ->new({
+				'name' => join('.','spv',$uid,$pid)
+				,'handle type' => 'write only'
+				,'no hash' => 1
+			});
+			$this->{'cncspv'}->{$pid}->{'mq'} = $mq;
+			$this->{'cncspv'}->{$pid}->{'fd'} = $this->{'cncspv'}->{$pid}->{'mq'}->file_descriptor();
+			$this->{'cncspv'}->{$pid}->{'callback'} = sub{
+				my ($w, $revents) = @_;
+				my $spv2 = $spv;
+				my $mq2 = $mq;
+				$spv2->cnc_receive_message($mq2->receive());
+			};
+			$this->{'cncspv'}->{$pid}->{'watcher'} = $loop->io(
+				$this->{'cncspv'}->{$pid}->{'fd'}
+				,EV::WRITE
+				,$this->{'cncspv'}->{$pid}->{'callback'}
+			);
+			$this->{'cncspv'}->{$pid}->{'mark off'} = sub{
+				my $t1 = $this;
+				my $pid2 = $pid;
+				delete $t1->{'cncspv'}->{$pid2}->{'watcher'};
+				return 	$t1->{'cncspv'}->{$pid2}->{'mark write'};				
+			};
+			$this->{'cncspv'}->{$pid}->{'mark write'} = sub{
+				my $t1 = $this;
+				my $loop2 = $loop;
+				my $pid2 = $pid;
+				
+				if(defined $t1->{'cncspv'}->{$pid2}->{'watcher'}){
+					$t1->{'cncspv'}->{$pid2}->{'watcher'}->events(EV::WRITE);
+				}
+				else{
+					$t1->{'cncspv'}->{$pid2}->{'watcher'} = $loop2->io(
+						$t1->{'cncspv'}->{$pid2}->{'fd'}
+						,EV::WRITE
+						,$t1->{'cncspv'}->{$pid2}->{'callback'}
+					);
+				}
+			};
+		}
+	}
+	
+}
+
+=pod
+
+---++ cncstdio_add($spv)
+
+Add an command and control socket to allow communication with another spv process.
+
+=cut
+
+sub cncstdio_add {
+	my ($this,$spv) = @_;
+	
+	my $loop = $this->ev_socket();
+	
+	my ($our_uid,$our_pid) = ($>,$$); #real uid
+	my $mqin = Kgc::MQ->new({
+		'name' => join('.','spv',$our_uid,'in')
+		,'handle type' => 'read only'
+		,'no hash' => 1
+	});
+	$this->{'cnc in'}->{'fd'} = $mqin->file_descriptor();
+	$this->{'cnc in'}->{'mq'} = $mqin;
+	$this->{'cnc in'}->{'watcher'} = $loop->io(
+		$this->{'cnc in'}->{'fd'}
+		,EV::READ
+		,sub{
+			my ($w, $revents) = @_;
+			my $spv2 = $spv;
+			my $mqin2 = $mqin;
+			$spv2->cnc_receive_message($mqin2->receive());
+		}
+	);
+	
+	
+	
+	my $mqout = Kgc::MQ->new({
+		'name' => join('.','spv',$our_uid,'out')
+		,'handle type' => 'write only'
+		,'no hash' => 1
+	});
+	$this->{'cnc out'}->{'fd'} = $mqout->file_descriptor();
+	$this->{'cnc out'}->{'mq'} = $mqout;
+	$this->{'cnc out'}->{'callback'} = sub{
+		my ($w, $revents) = @_;
+		my $spv2 = $spv;
+		my $mqout2 = $mqout;
+		my $t1 = $this;
+		my $msg = $spv2->cnc_send_message('cnc out',$t1->{'cnc out'}->{'mark off'});
+		return undef unless defined $msg && 0 < length($msg);
+		$mqout2->send($msg);
+		#$spv2->receive_message($mqout2->receive());
+	};
+	$this->{'cnc out'}->{'watcher'} = $loop->io(
+		$this->{'cnc out'}->{'fd'}
+		,EV::WRITE
+		,$this->{'cnc out'}->{'callback'}
+	);
+	# for mark off, return the sub to reactivate the watcher
+	$this->{'cnc out'}->{'mark off'} = sub{
+		my $t1 = $this;
+		delete $t1->{'cnc out'}->{'watcher'};
+		return 	$t1->{'cnc out'}->{'mark write'};
+	};
+	# this is called only after calling mark off
+	$this->{'cnc out'}->{'mark write'} = sub{
+		my $t1 = $this;
+		my $loop2 = $loop;
+		if(defined $t1->{'cnc out'}->{'watcher'}){
+			$t1->{'cnc out'}->{'watcher'}->events(EV::WRITE);
+			return undef;
+		}
+		else{
+			$t1->{'cnc out'}->{'watcher'} = $loop2->io(
+				$t1->{'cnc out'}->{'fd'}
+				,EV::WRITE
+				,$t1->{'cnc out'}->{'callback'}
+			);
+		}
+	};
+	
+}
 
 
+=pod
+
+---++ cncspv_markoff($name)
+
+=cut
 
 
 1;

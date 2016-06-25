@@ -363,7 +363,8 @@ sub version_deserialize {
 	}
 	
 	# version, should be in this range
-	unless(70000 < unpack('l',$version->{'version'}) && unpack('l',$version->{'version'}) < 80000 ){
+	#  && unpack('l',$version->{'version'}) < 90000 
+	unless(70000 < unpack('l',$version->{'version'})){
 		warn "peer supplied bad version number\n";
 		return undef;
 	}
@@ -493,7 +494,7 @@ sub read_data {
 		$this->{'read buffer size'},
 		length($this->{'bytes'})
 	);
-	warn "Read N=$n bytes";
+	#warn "Read N=$n bytes";
 	
 	if(defined $n && $n == 0){
 		#warn "Closing peer, socket was closed from the other end.\n";

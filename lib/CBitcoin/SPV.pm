@@ -8,7 +8,7 @@ use CBitcoin::Utilities;
 use CBitcoin::Peer;
 use CBitcoin::Block;
 use Net::IP;
-
+use Fcntl ':flock'; # Import LOCK_* constants
 
 =pod
 
@@ -53,6 +53,8 @@ sub new {
 	$this->{'inv search'} = [{},{},{},{}];
 	$this->{'inv next getdata'} = [ [], [], [], []];	
 	$this->initialize_peers();
+	
+	$this->initialize_command();
 	
 	
 	
@@ -158,6 +160,83 @@ sub make_directories{
 	
 	
 }
+
+=pod
+
+---++ initialize_command
+
+The command and control file is /tmp/spv/cnc.
+
+# current checkpoint height
+
+=cut
+
+sub initialize_command {
+	my ($this) = @_;
+	return undef;
+	my $fp = $this->db_path().'/cnc';
+	
+	open(my $fhwrite,'>>',$fp) || die "cannot open command and control file";
+	binmode($fhwrite);
+	# seek to the beginning
+	seek($fhwrite,0,0);
+	
+	open(my $fhread,'<',$fp) ||  die "cannot open command and control file";
+	binmode($fhread);
+	
+	
+	$this->{'cnc'} = {
+		'read handle' => $fhread,
+		'write handle' => $fhwrite
+	};
+	
+	my $tries = 0;
+	my $sec = $$ % 10;
+	while(!$this->cnc_lock()){
+		# sleep for a random number of seconds in order to prevent clobbering by multiple processes
+		sleep $sec;
+	}
+	# if the file is empty after locking, then see how big it is
+	my $size = $this->cnc_filestat('size');
+	
+	my $fixed_size = 100;
+	
+	# pad area with zeros
+	#if($size != $fixed_size){
+	#	my ($m,$n) = (0,0);
+	#	while(0 < $n - $m){
+	#		$m += syswrite($fhwrite,pack('Q',0),8);
+	#	}
+	#}
+	
+}
+our $cncfilestat = {
+	'dev' => 0,'ino' => 1,'mode' => 2,'nlink' => 3,'uid' => 4
+	,'gid' => 5,'rdev' => 6,'size' => 7,'atime' => 8,'mtime' => 9,'ctime' => 10,'blksize' => 11,'blocks' => 12
+};
+sub cnc_filestat{
+	my ($this,$x) = @_;
+	return undef unless defined $x;
+	my @alpha = stat($this->db_path().'/cnc');	
+	return $alpha[$cncfilestat->{$x}];
+}
+
+
+sub cnc_fhread {
+	return shift->{'cnc'}->{'read handle'};
+}
+
+sub cnc_fhwrite {
+	return shift->{'cnc'}->{'write handle'};
+}
+
+sub cnc_lock {
+	my ($this) = @_;
+	my $fp = $this->db_path.'/cnc';
+	
+	return flock($this->cnc_fhwrite(), LOCK_EX);
+}
+
 
 =pod
 
@@ -1516,8 +1595,33 @@ sub loop {
 		$this->event_loop->loop(),$this->event_loop->connect()
 	);
 	
+#	$this->preloop_set_up_mqueues();
+		
 	warn "Starting loop";
 	$loopsub->($this,$connectsub);
+}
+
+
+=pod
+
+---+ Command and Control
+
+=cut
+
+=pod
+
+---++ cnc_send_message($target,$mark_off_sub)
+
+Send a message via one of the cnc mqueues.  The $mark_off_sub turns off the callback if there is nothing to write.
+
+=cut
+
+sub cnc_send_message {
+	my ($this,$target,$mark_off_sub) = @_;
+	
+	# check the queue for $target
+	
+	# my $mark_write_sub = $mark_off_sub->();
 }
 
 
