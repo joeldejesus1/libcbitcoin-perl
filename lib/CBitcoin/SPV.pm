@@ -116,6 +116,9 @@ sub init {
 	
 	$this->add_bloom_filter($options->{'bloom filter'});
 	
+	
+	# allow outside processes to send and receive messages with this spv process
+	$this->event_loop->cncstdio_add($this);
 }
 
 
@@ -173,8 +176,15 @@ The command and control file is /tmp/spv/cnc.
 
 sub initialize_command {
 	my ($this) = @_;
+	
+	$this->{'cnc queues'} = {
+		
+	};
+	
+	
 	return undef;
 	my $fp = $this->db_path().'/cnc';
+	
 	
 	open(my $fhwrite,'>>',$fp) || die "cannot open command and control file";
 	binmode($fhwrite);
@@ -282,13 +292,19 @@ sub initialize_chain{
 	my $base = $this->db_path();
 
 	warn "initialize chain\n";
+	
+	# max target implies lowest difficulty (use this number to figure out "work done")
+	$this->{'chain'}->{'maximum target'} = Math::BigInt->from_hex('00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF');
+	
 	# must get genesis block
 	$this->{'genesis block'} = CBitcoin::Block->genesis_block();
 	
 	$this->{'genesis block'}->height(1);
-	$this->{'genesis block'}->cummulative_difficulty( $this->{'genesis block'}->hash_bigint());
+	$this->{'genesis block'}->cummulative_difficulty( 
+		$this->{'chain'}->{'maximum target'}->copy()->bsub($this->{'genesis block'}->hash_bigint())
+	);
 	
-	$this->{'header hash to hash'}->{$this->{'genesis block'}->hash()} = 
+	$this->{'chain'}->{'header hash to hash'}->{$this->{'genesis block'}->hash()} = 
 		[$this->{'genesis block'}->prevBlockHash(),''];
 		
 		
@@ -298,8 +314,7 @@ sub initialize_chain{
 	$this->{'chain'}->{'cummulative difficulty'} = $this->{'genesis block'}->cummulative_difficulty();
 	$this->{'chain'}->{'orphans'} = {};
 	$this->{'chain'}->{'current target'} = $this->{'genesis block'}->target_bigint();
-	# max target implies lowest difficulty (use this number to figure out "work done")
-	$this->{'chain'}->{'maximum target'} = Math::BigInt->from_hex('00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF');
+
 	$this->{'headers'}->[0] = $this->{'genesis block'}->hash();
 	$this->{'header by hash'}->{$this->{'genesis block'}->hash()} = $this->{'genesis block'};
 	$this->{'header changed'} = 1;
@@ -553,6 +568,10 @@ sub add_header_to_inmemory_chain {
 	}
 	else{
 		warn "got a complete orphan???";
+		warn "PrevHash=".$header->prevBlockHash_hex()."\n";
+		warn "Genesis Block=".$this->{'genesis block'}->hash_hex()."\n";
+		warn "they match!" if $header->prevBlockHash() eq $this->{'genesis block'}->hash();
+		warn "matches genesis" if $this->{'chain'}->{'latest'} eq $header->prevBlockHash(); 
 		return undef;
 	}
 	
@@ -609,7 +628,19 @@ sub sort_chain {
 		$this->{'header changed'} = 0;
 	
 		my $pchain = $peer_with_longest_chain->chain();
-		$this->{'headers'} = $pchain->{'headers'};
+		# make sure to do a copy, not just copy the references because branches can deviate over time
+		@{$this->{'headers'}} = @{$pchain->{'headers'}};
+		
+		# copy the references linking blocks both forward and backwards
+		my $ph2h = {};
+		foreach my $h2h (keys %{$pchain->{'header hash to hash'}}){
+			my $ref3 = $pchain->{'header hash to hash'}->{$h2h};
+			next unless defined $ref3->[0] && defined $ref3->[1];
+			# make sure we only copy the relevant links that are in the main chain, skip orphans.
+			next unless 0 < length($ref3->[0]) && 0 < length($ref3->[1]);
+			$ph2h->{$h2h} = [$ref3->[0],$ref3->[1]];
+		}
+		$this->{'chain'}->{'header hash to hash'} = $ph2h;
 		
 		if( 
 			$this->{'chain'}->{'checkpoint frequency'} * 2 <
@@ -635,9 +666,17 @@ sub sort_chain_by_peer{
 	
 	my $mainref = $pchain->{'header hash to hash'};
 	my $curr_hash = $this->{'headers'}->[$last_checkpoint_i];
+	
+	if(!defined $curr_hash){
+		warn "going for last element in peer chain, not main chain\n";
+		$last_checkpoint_i = scalar(@{$pchain->{'headers'}})- 1;
+		$curr_hash = $pchain->{'headers'}->[-1];
+	}
+	
+	
 	my $header = $this->{'header by hash'}->{$curr_hash};
 	my $loopcheck = {}; # to see if the chain is actually a loop, prevent infinite loops
-	my $index = 0;
+	my $index = $last_checkpoint_i;
 	my $orig_height = scalar(@{$pchain->{'headers'}}) - 1;
 	my $maxtarget = $this->{'chain'}->{'maximum target'}->copy();
 	my $cummulative_difficulty = $maxtarget->copy()->bsub($header->hash_bigint());
@@ -1367,7 +1406,7 @@ sub hook_inv {
 	}
 	
 	
-	warn "Got inv [$type;".unpack('H*',$hash)."]";
+	#warn "Got inv [$type;".unpack('H*',$hash)."]\n";
 	unless(defined $this->{'inv search'}->[$type]->{$hash}){
 		$this->{'inv search'}->[$type]->{$hash} = [0];
 		push(@{$this->{'inv next getdata'}->[$type]},$hash);
@@ -1403,18 +1442,18 @@ sub hook_peer_onreadidle {
 	#	$this->{'getblocks timeout'} = time();
 	#}
 	
-	warn "Num of Headers=".scalar(@{$this->{'headers'}});
+	warn "Peer=".$peer->address().";Num of Headers=".scalar(@{$this->{'headers'}})."\n";
 	
 	if(0 < $this->hook_getdata_blocks_preview()){
-		warn "Need to fetch more inv";
+		warn "Need to fetch more inv\n";
 		$peer->send_getdata($this->hook_getdata());
 	}
 	else{
-		warn "Need to fetch more blocks";
+		warn "Need to fetch more blocks\n";
 		if($this->block_height() < $peer->block_height()){
-			warn "alpha; block height diff=".( $peer->block_height() - $this->block_height() );
-			$peer->send_getblocks();
-			#$peer->send_getheaders();
+			warn "alpha; block height diff=".( $peer->block_height() - $this->block_height() )."\n";
+			#$peer->send_getblocks();
+			$peer->send_getheaders();
 			#print "Bail out!";
 			#exit 0;
 		}
@@ -1430,7 +1469,7 @@ sub hook_peer_onreadidle {
 
 ---++ hook_getdata($peer,$max)
 
-This is called by a peer when it is ready to write.  Max count= 500 per peer.  The timeout is 60 seconds.
+This is called by a peer when it is ready to write.  Max count= 100 per peer rather than 500 in order to encourage the spreading of the getdata burden to more peers.  The timeout is 60 seconds.
 
 =cut
 
@@ -1594,10 +1633,9 @@ sub loop {
 	my ($loopsub,$connectsub) = (
 		$this->event_loop->loop(),$this->event_loop->connect()
 	);
+
 	
-#	$this->preloop_set_up_mqueues();
-		
-	warn "Starting loop";
+	warn "Starting loop\n";
 	$loopsub->($this,$connectsub);
 }
 
@@ -1610,9 +1648,38 @@ sub loop {
 
 =pod
 
+---++ cnc_receive_message($target,$msg)
+
+Receive a message via one of the cnc mqueues.  The $mark_off_sub turns off the callback if there is nothing to write.
+
+Check DefaultEventLoop module to see how this subroutine gets called.
+
+=cut
+
+sub cnc_receive_message {
+	my ($this,$target,$msg) = @_;
+	
+	if($target eq 'cnc own'){
+		# run callback?
+		warn "got message from another process\n";
+	}
+	elsif($target eq 'cnc in'){
+		# got a command
+		warn "got command message\n";
+	}
+	else{
+		warn "Got weird message from $target\n";
+	}
+}
+
+
+=pod
+
 ---++ cnc_send_message($target,$mark_off_sub)
 
 Send a message via one of the cnc mqueues.  The $mark_off_sub turns off the callback if there is nothing to write.
+
+Check DefaultEventLoop module to see how this subroutine gets called.
 
 =cut
 
@@ -1620,8 +1687,15 @@ sub cnc_send_message {
 	my ($this,$target,$mark_off_sub) = @_;
 	
 	# check the queue for $target
-	
-	# my $mark_write_sub = $mark_off_sub->();
+	$this->{'cnc queues'}->{$target} = [] unless defined $this->{'cnc queues'}->{$target};
+	my $num = scalar(@{$this->{'cnc queues'}->{$target}});
+	if($num == 0){
+		$this->{'cnc callbacks'}->{$target}->{'mark write'} = $mark_off_sub->();
+		return undef;
+	}
+	else{
+		return shift(@{$this->{'cnc queues'}->{$target}});
+	}
 }
 
 
@@ -1732,7 +1806,7 @@ sub callback_run {
 		&& ref($cm->{'command'}->{$command}->{'subroutine'}) eq 'CODE'
 	){
 		# run the default callback
-		warn "Running callback with command=$command";
+		warn "Running callback with command=$command\n";
 		$cm->{'command'}->{$command}->{'subroutine'}->($this,$msg,$peer);
 	}
 
@@ -2066,5 +2140,56 @@ sub callback_gotblock_withtx{
 	close($fh);
 }
 
+
+=pod
+
+---++ callback_gotheaders
+
+Got headers, so put them into the database.
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'headers'} = {
+		'subroutine' => \&callback_gotheaders
+	}
+};
+
+sub callback_gotheaders {
+	my ($this,$msg,$peer) = @_;
+	my $payload = $msg->payload();
+	open(my $fh,'<',\$payload);
+	
+	my $num_of_headers = CBitcoin::Utilities::deserialize_varint($fh);
+	return undef unless 0 < $num_of_headers;
+	my $x = CBitcoin::Utilities::serialize_varint($num_of_headers);
+	$x = length($x);
+	
+	
+	for(my $i=0;$i<$num_of_headers;$i++){
+		my $block = CBitcoin::Block->deserialize(substr($payload, $x+ 81*$i, 81));
+		if(!$block->{'success'}){
+			warn "got bad header\n";
+			next;
+		}
+		warn "($i/$num_of_headers)Got header=[".$block->hash_hex().
+			";".$block->transactionNum.
+			";".length($msg->payload())."]\n";
+			
+		$this->add_header_to_chain($peer,$block);
+		
+		#delete $this->{'inv search'}->[2]->{$block->hash()};
+		if(defined  $this->{'inv search'}->[2]->{$block->hash()}){
+			#warn "deleting inv with hash=".$block->hash_hex()."\n";
+			delete $this->{'inv search'}->[2]->{$block->hash()};# = undef;
+		}
+		else{
+			#warn "missing inv with hash=".$block->hash_hex()."\n";
+		}
+
+	}
+	
+	$this->hook_peer_onreadidle($peer);
+}
 
 1;

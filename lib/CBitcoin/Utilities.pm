@@ -239,6 +239,7 @@ sub deserialize_varstr {
 
 sub deserialize_varint {
 	my $fh = shift;
+	
 	my ($n,$buf,$total,$prefix);
 
 	$n = read($fh,$buf,1);

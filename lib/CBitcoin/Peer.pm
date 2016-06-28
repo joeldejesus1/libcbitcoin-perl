@@ -796,6 +796,32 @@ The logic used to figure out what needs to be uploaded and downloaded is stored 
 
 =cut
 
+=pod
+
+---++ send_getblocks()
+
+Calculate the block locator based on the block headers we have, then send a message out.
+
+This can only be run every 5 minutes per peer.
+
+=cut
+
+sub send_getblocks{
+	my ($this) = @_;
+	#warn "Checking get_blocks timeout\n";
+	
+	return undef if defined $this->{'command timeout'}->{'send_getblocks'}
+		&& time() - $this->{'command timeout'}->{'send_getblocks'} < 5;
+	warn "Sending get_blocks\n";
+	$this->{'command timeout'}->{'send_getblocks'} = time();
+
+	return $this->write(CBitcoin::Message::serialize(
+		$this->spv->calculate_block_locator($this),
+		'getblocks',
+		$this->magic
+	));
+}
+
 
 =pod
 
@@ -809,12 +835,16 @@ The timeout on this command is 10 minutes.
 
 sub send_getheaders {
 	my $this = shift;
-	return CBitcoin::Message::serialize(
-			$this->spv->calculate_block_locator($this),
-			'getheaders',
-			CBitcoin::Message::net_magic($this->magic)  # defaults as MAINNET
-	);
-	
+	return undef if defined $this->{'command timeout'}->{'send_getblocks'}
+		&& time() - $this->{'command timeout'}->{'send_getblocks'} < 5;
+	warn "Sending get_headers\n";
+	$this->{'command timeout'}->{'send_getblocks'} = time();
+
+	return $this->write(CBitcoin::Message::serialize(
+		$this->spv->calculate_block_locator($this),
+		'getheaders',
+		$this->magic
+	));	
 }
 
 =pod
@@ -869,31 +899,6 @@ sub send_pong {
 	return $this->write(CBitcoin::Message::serialize($nonce,'pong',$this->magic));
 }
 
-=pod
-
----++ send_getblocks()
-
-Calculate the block locator based on the block headers we have, then send a message out.
-
-This can only be run every 5 minutes per peer.
-
-=cut
-
-sub send_getblocks{
-	my ($this) = @_;
-	#warn "Checking get_blocks timeout\n";
-	
-	return undef if defined $this->{'command timeout'}->{'send_getblocks'}
-		&& time() - $this->{'command timeout'}->{'send_getblocks'} < 5;
-	warn "Sending get_blocks\n";
-	$this->{'command timeout'}->{'send_getblocks'} = time();
-
-	return $this->write(CBitcoin::Message::serialize(
-		$this->spv->calculate_block_locator($this),
-		'getblocks',
-		$this->magic
-	));
-}
 
 
 

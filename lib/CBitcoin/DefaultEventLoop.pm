@@ -7,7 +7,7 @@ use IO::Socket::INET;
 use IO::Socket::Socks;
 use IO::Epoll;
 use EV;
-
+use Kgc::MQ;
 
 =pod
 
@@ -396,6 +396,7 @@ sub cncspv_add {
 			my ($uid,$pid) = ($1,$2);
 			next if $our_uid != $uid || $our_pid == $pid;
 			next if defined $this->{'cncspv'}->{$pid};
+			
 			my $mq = Kgc::MQ->new({
 				'name' => join('.','spv',$uid,$pid)
 				,'handle type' => 'write only'
@@ -405,9 +406,14 @@ sub cncspv_add {
 			$this->{'cncspv'}->{$pid}->{'fd'} = $this->{'cncspv'}->{$pid}->{'mq'}->file_descriptor();
 			$this->{'cncspv'}->{$pid}->{'callback'} = sub{
 				my ($w, $revents) = @_;
+				my $t1 = $this;
 				my $spv2 = $spv;
 				my $mq2 = $mq;
-				$spv2->cnc_receive_message($mq2->receive());
+				my $pid2 = $pid;
+				my $msg = $spv2->cnc_send_message($pid2,$t1->{'cncspv'}->{$pid2}->{'mark off'});
+				return undef unless defined $msg && 0 < length($msg);
+				$mq2->send($msg);
+				#$spv2->cnc_receive_message($mq2->receive());
 			};
 			$this->{'cncspv'}->{$pid}->{'watcher'} = $loop->io(
 				$this->{'cncspv'}->{$pid}->{'fd'}
@@ -453,7 +459,7 @@ sub cncstdio_add {
 	my ($this,$spv) = @_;
 	
 	my $loop = $this->ev_socket();
-	
+	warn "Hello - 1\n";
 	my ($our_uid,$our_pid) = ($>,$$); #real uid
 	my $mqin = Kgc::MQ->new({
 		'name' => join('.','spv',$our_uid,'in')
@@ -469,11 +475,11 @@ sub cncstdio_add {
 			my ($w, $revents) = @_;
 			my $spv2 = $spv;
 			my $mqin2 = $mqin;
-			$spv2->cnc_receive_message($mqin2->receive());
+			$spv2->cnc_receive_message('cnc in',$mqin2->receive());
 		}
 	);
 	
-	
+	warn "Hello - 2\n";
 	
 	my $mqout = Kgc::MQ->new({
 		'name' => join('.','spv',$our_uid,'out')
@@ -487,6 +493,7 @@ sub cncstdio_add {
 		my $spv2 = $spv;
 		my $mqout2 = $mqout;
 		my $t1 = $this;
+		warn "running callback on out\n";
 		my $msg = $spv2->cnc_send_message('cnc out',$t1->{'cnc out'}->{'mark off'});
 		return undef unless defined $msg && 0 < length($msg);
 		$mqout2->send($msg);
@@ -499,6 +506,7 @@ sub cncstdio_add {
 	);
 	# for mark off, return the sub to reactivate the watcher
 	$this->{'cnc out'}->{'mark off'} = sub{
+		warn "marking off on cnc out\n";
 		my $t1 = $this;
 		delete $t1->{'cnc out'}->{'watcher'};
 		return 	$t1->{'cnc out'}->{'mark write'};
@@ -507,9 +515,9 @@ sub cncstdio_add {
 	$this->{'cnc out'}->{'mark write'} = sub{
 		my $t1 = $this;
 		my $loop2 = $loop;
+		warn "marking write on cnc out\n";
 		if(defined $t1->{'cnc out'}->{'watcher'}){
 			$t1->{'cnc out'}->{'watcher'}->events(EV::WRITE);
-			return undef;
 		}
 		else{
 			$t1->{'cnc out'}->{'watcher'} = $loop2->io(
@@ -519,15 +527,46 @@ sub cncstdio_add {
 			);
 		}
 	};
-	
+	warn "Hello - 3\n";
 }
 
 
 =pod
 
----++ cncspv_markoff($name)
+---++ cncspv_own($spv)
+
+Set up the mqueue so that this process can listen for messages from other spv processes.
+
+Run this subroutine just before starting the loop in an SPV process.
 
 =cut
 
+sub cncspv_own{
+	my ($this,$spv) = @_;
+	return undef unless defined $this->{'cnc own'};
+
+	my ($our_uid,$our_pid) = ($>,$$); #real uid
+	my $mqin = Kgc::MQ->new({
+		'name' => join('.','spv',$our_uid,$our_pid)
+		,'handle type' => 'read only'
+		,'no hash' => 1
+	});
+	
+	my $loop = $this->ev_socket();
+	
+	$this->{'cnc own'}->{'fd'} = $mqin->file_descriptor();
+	$this->{'cnc own'}->{'mq'} = $mqin;
+	$this->{'cnc own'}->{'watcher'} = $loop->io(
+		$this->{'cnc own'}->{'fd'}
+		,EV::READ
+		,sub{
+			my ($w, $revents) = @_;
+			my $spv2 = $spv;
+			my $mqin2 = $mqin;
+			$spv2->cnc_receive_message('cnc own',$mqin2->receive());
+		}
+	);
+	
+}
 
 1;

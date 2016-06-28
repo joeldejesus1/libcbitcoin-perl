@@ -134,9 +134,11 @@ sub deserialize{
 	if(length($payload) == 81 ){
 		$headBool = 1;
 	}
+	my $this;
 	
-	my $this = picocoin_block_des($payload,$headBool);
+	$this = picocoin_block_des($payload,$headBool);
 	die "failed to parse" unless $this->{'success'};
+	$this->{'tx'} = [] unless defined $this->{'tx'};
 	bless($this,$package);
 	
 	$this->{'tx by hash'} = {};
@@ -287,6 +289,7 @@ sub version {
 
 sub transactionNum {
 	my $this = shift;
+	
 	return scalar(@{$this->{'tx'}});
 }
 # bloom filtered transactions
