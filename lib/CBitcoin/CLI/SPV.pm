@@ -187,7 +187,7 @@ sub read_cmd_sendcmd{
 		# addr format: time, services, ipaddress, port
 		my @out;
 		$out[2] = $node->[0];
-		$out[3] = pack
+		$out[3] = 
 		
 		#$payload .= $node->[0].','.$node->[1]."\n";
 		if(defined $node->[2] && $node->[2] =~ m/^([0-9a-fA-F]{16})$/){
