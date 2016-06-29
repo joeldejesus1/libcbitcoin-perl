@@ -28,7 +28,7 @@ WriteMakefile(
 		'Test::More' => 0,
 	}
 	,'EXE_FILES' => [
-		'scripts/spv'	
+		'scripts/cbitcoin'	
 	]
 	#,'LDDLFLAGS' => ' -fstack-protector '
 	#,'LDFLAGS' => ' -fstack-protector '

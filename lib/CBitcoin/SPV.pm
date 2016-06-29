@@ -1389,7 +1389,7 @@ When done, set result=1???
 =cut
 
 sub hook_inv {
-	my ($this,$type,$hash) = @_;
+	my ($this,$peer,$type,$hash) = @_;
 	#
 	
 	
@@ -1405,10 +1405,11 @@ sub hook_inv {
 		
 	}
 	
+	#my $pchain = $peer->chain();
 	
 	#warn "Got inv [$type;".unpack('H*',$hash)."]\n";
 	unless(defined $this->{'inv search'}->[$type]->{$hash}){
-		$this->{'inv search'}->[$type]->{$hash} = [0];
+		$this->{'inv search'}->[$type]->{$hash} = [0,$peer];
 		push(@{$this->{'inv next getdata'}->[$type]},$hash);
 	}
 	
@@ -1661,17 +1662,20 @@ sub cnc_receive_message {
 	
 	if($target eq 'cnc own'){
 		# run callback?
-		warn "got message from another process\n";
+		die "got message from another process\n";
 	}
 	elsif($target eq 'cnc in'){
 		# got a command
-		warn "got command message\n";
+		die "got command message\n";
+		# custaddnode
+		
+		# custaddwatch
+		
 	}
 	else{
 		warn "Got weird message from $target\n";
 	}
 }
-
 
 =pod
 
@@ -2039,7 +2043,7 @@ sub callback_gotinv {
 	#warn "gotinv: count=$count\n";
 	for(my $i=0;$i < $count;$i++){
 		# in hook_inv, mark send_blocks clean
-		$this->hook_inv(@{CBitcoin::Utilities::deserialize_inv($fh)});
+		$this->hook_inv($peer,@{CBitcoin::Utilities::deserialize_inv($fh)});
 	}
 	close($fh);
 	
@@ -2094,16 +2098,24 @@ sub callback_gotblock {
 	my $count = $block->transactionNum;
 		#die "let us finish early\n";
 		
-	$this->add_header_to_chain($peer,$block);
+	
 	
 	#delete $this->{'inv search'}->[2]->{$block->hash()};
-	if(defined  $this->{'inv search'}->[2]->{$block->hash()}){
-		#warn "deleting inv with hash=".$block->hash_hex()."\n";
-		delete $this->{'inv search'}->[2]->{$block->hash()};# = undef;
+	if(
+		defined  $this->{'inv search'}->[2]->{$block->hash()}->[1]
+		&& $this->{'inv search'}->[2]->{$block->hash()}->[1] ne $peer
+	){
+		my $peer_original = $this->{'inv search'}->[2]->{$block->hash()}->[1];
+		
+		$this->add_header_to_chain($peer_original,$block);		
+		
 	}
 	else{
 		#warn "missing inv with hash=".$block->hash_hex()."\n";
+		$this->add_header_to_chain($peer,$block);
 	}
+	delete $this->{'inv search'}->[2]->{$block->hash()};
+
 
 
 	if($block->transactionNum_bf()){
@@ -2180,16 +2192,20 @@ sub callback_gotheaders {
 		
 		#delete $this->{'inv search'}->[2]->{$block->hash()};
 		if(defined  $this->{'inv search'}->[2]->{$block->hash()}){
-			#warn "deleting inv with hash=".$block->hash_hex()."\n";
+			warn "deleting inv with hash=".$block->hash_hex()."\n";
 			delete $this->{'inv search'}->[2]->{$block->hash()};# = undef;
 		}
 		else{
 			#warn "missing inv with hash=".$block->hash_hex()."\n";
 		}
-
+		
 	}
 	
 	$this->hook_peer_onreadidle($peer);
 }
+
+
+
+
 
 1;

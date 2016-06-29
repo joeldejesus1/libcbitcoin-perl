@@ -392,6 +392,24 @@ sub serialize_getheaders {
 
 =pod
 
+---++ serialize_addr($network_addr1,$network_addr2,...)
+
+=cut
+
+sub serialize_addr{
+	my $buffer = '';
+	my $i = 0;
+	foreach my $addr  (@_){
+		die "bad address" unless defined $addr && ref($addr) eq 'ARRAY' && scalar(@{$addr}) == 4;
+		$buffer .= network_address_serialize(@{$addr});
+		$i++;
+	}
+	die "no addresses to send" unless 0 < $i;
+	return serialize_varint($i).$buffer;
+}
+
+=pod
+
 ---++ HashToFilepath
 
 1,3,the rest

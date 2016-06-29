@@ -14,7 +14,7 @@
 #     AUTHOR => [q[Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>]]
 #     BUILD_REQUIRES => {  }
 #     CONFIGURE_REQUIRES => {  }
-#     EXE_FILES => [q[scripts/spv]]
+#     EXE_FILES => [q[scripts/cbitcoin]]
 #     LIBS => [q[-lcrypto -lccoin -lgmp]]
 #     LICENSE => q[gpl_2]
 #     MAKEFILE_OLD => q[]
@@ -187,12 +187,13 @@ O_FILES  = Block.o \
 	TransactionInput.o \
 	TransactionOutput.o
 H_FILES  = 
-MAN1PODS = scripts/spv
+MAN1PODS = scripts/cbitcoin
 MAN3PODS = lib/CBitcoin.pm \
 	lib/CBitcoin/Base58.pm \
 	lib/CBitcoin/Block.pm \
 	lib/CBitcoin/BloomFilter.pm \
 	lib/CBitcoin/CBHD.pm \
+	lib/CBitcoin/CLI/SPV.pm \
 	lib/CBitcoin/DefaultEventLoop.pm \
 	lib/CBitcoin/Message.pm \
 	lib/CBitcoin/Peer.pm \
@@ -229,6 +230,7 @@ TO_INST_PM = lib/CBitcoin.pm \
 	lib/CBitcoin/Block.pm \
 	lib/CBitcoin/BloomFilter.pm \
 	lib/CBitcoin/CBHD.pm \
+	lib/CBitcoin/CLI/SPV.pm \
 	lib/CBitcoin/DefaultEventLoop.pm \
 	lib/CBitcoin/Message.pm \
 	lib/CBitcoin/Message/Version.pm \
@@ -250,6 +252,8 @@ PM_TO_BLIB = lib/CBitcoin.pm \
 	blib/lib/CBitcoin/BloomFilter.pm \
 	lib/CBitcoin/CBHD.pm \
 	blib/lib/CBitcoin/CBHD.pm \
+	lib/CBitcoin/CLI/SPV.pm \
+	blib/lib/CBitcoin/CLI/SPV.pm \
 	lib/CBitcoin/DefaultEventLoop.pm \
 	blib/lib/CBitcoin/DefaultEventLoop.pm \
 	lib/CBitcoin/Message.pm \
@@ -586,6 +590,7 @@ manifypods : pure_all  \
 	lib/CBitcoin/Block.pm \
 	lib/CBitcoin/BloomFilter.pm \
 	lib/CBitcoin/CBHD.pm \
+	lib/CBitcoin/CLI/SPV.pm \
 	lib/CBitcoin/DefaultEventLoop.pm \
 	lib/CBitcoin/Message.pm \
 	lib/CBitcoin/Peer.pm \
@@ -595,15 +600,16 @@ manifypods : pure_all  \
 	lib/CBitcoin/TransactionInput.pm \
 	lib/CBitcoin/TransactionOutput.pm \
 	lib/CBitcoin/Utilities.pm \
-	scripts/spv
+	scripts/cbitcoin
 	$(NOECHO) $(POD2MAN) --section=1 --perm_rw=$(PERM_RW) -u \
-	  scripts/spv $(INST_MAN1DIR)/spv.$(MAN1EXT) 
+	  scripts/cbitcoin $(INST_MAN1DIR)/cbitcoin.$(MAN1EXT) 
 	$(NOECHO) $(POD2MAN) --section=3 --perm_rw=$(PERM_RW) -u \
 	  lib/CBitcoin.pm $(INST_MAN3DIR)/CBitcoin.$(MAN3EXT) \
 	  lib/CBitcoin/Base58.pm $(INST_MAN3DIR)/CBitcoin::Base58.$(MAN3EXT) \
 	  lib/CBitcoin/Block.pm $(INST_MAN3DIR)/CBitcoin::Block.$(MAN3EXT) \
 	  lib/CBitcoin/BloomFilter.pm $(INST_MAN3DIR)/CBitcoin::BloomFilter.$(MAN3EXT) \
 	  lib/CBitcoin/CBHD.pm $(INST_MAN3DIR)/CBitcoin::CBHD.$(MAN3EXT) \
+	  lib/CBitcoin/CLI/SPV.pm $(INST_MAN3DIR)/CBitcoin::CLI::SPV.$(MAN3EXT) \
 	  lib/CBitcoin/DefaultEventLoop.pm $(INST_MAN3DIR)/CBitcoin::DefaultEventLoop.$(MAN3EXT) \
 	  lib/CBitcoin/Message.pm $(INST_MAN3DIR)/CBitcoin::Message.$(MAN3EXT) \
 	  lib/CBitcoin/Peer.pm $(INST_MAN3DIR)/CBitcoin::Peer.$(MAN3EXT) \
@@ -622,20 +628,20 @@ manifypods : pure_all  \
 
 # --- MakeMaker installbin section:
 
-EXE_FILES = scripts/spv
+EXE_FILES = scripts/cbitcoin
 
-pure_all :: $(INST_SCRIPT)/spv
+pure_all :: $(INST_SCRIPT)/cbitcoin
 	$(NOECHO) $(NOOP)
 
 realclean ::
 	$(RM_F) \
-	  $(INST_SCRIPT)/spv 
+	  $(INST_SCRIPT)/cbitcoin 
 
-$(INST_SCRIPT)/spv : scripts/spv $(FIRST_MAKEFILE) $(INST_SCRIPT)$(DFSEP).exists $(INST_BIN)$(DFSEP).exists
-	$(NOECHO) $(RM_F) $(INST_SCRIPT)/spv
-	$(CP) scripts/spv $(INST_SCRIPT)/spv
-	$(FIXIN) $(INST_SCRIPT)/spv
-	-$(NOECHO) $(CHMOD) $(PERM_RWX) $(INST_SCRIPT)/spv
+$(INST_SCRIPT)/cbitcoin : scripts/cbitcoin $(FIRST_MAKEFILE) $(INST_SCRIPT)$(DFSEP).exists $(INST_BIN)$(DFSEP).exists
+	$(NOECHO) $(RM_F) $(INST_SCRIPT)/cbitcoin
+	$(CP) scripts/cbitcoin $(INST_SCRIPT)/cbitcoin
+	$(FIXIN) $(INST_SCRIPT)/cbitcoin
+	-$(NOECHO) $(CHMOD) $(PERM_RWX) $(INST_SCRIPT)/cbitcoin
 
 
 
@@ -689,8 +695,8 @@ realclean_subdirs :
 # Delete temporary files (via clean) and also delete dist files
 realclean purge ::  clean realclean_subdirs
 	- $(RM_F) \
-	  $(MAKEFILE_OLD) $(FIRST_MAKEFILE) \
-	  $(OBJECT) 
+	  $(FIRST_MAKEFILE) $(OBJECT) \
+	  $(MAKEFILE_OLD) 
 	- $(RM_RF) \
 	  $(DISTVNAME) 
 
@@ -1159,6 +1165,7 @@ pm_to_blib : $(FIRST_MAKEFILE) $(TO_INST_PM)
 	  lib/CBitcoin/Block.pm blib/lib/CBitcoin/Block.pm \
 	  lib/CBitcoin/BloomFilter.pm blib/lib/CBitcoin/BloomFilter.pm \
 	  lib/CBitcoin/CBHD.pm blib/lib/CBitcoin/CBHD.pm \
+	  lib/CBitcoin/CLI/SPV.pm blib/lib/CBitcoin/CLI/SPV.pm \
 	  lib/CBitcoin/DefaultEventLoop.pm blib/lib/CBitcoin/DefaultEventLoop.pm \
 	  lib/CBitcoin/Message.pm blib/lib/CBitcoin/Message.pm \
 	  lib/CBitcoin/Message/Version.pm blib/lib/CBitcoin/Message/Version.pm \
