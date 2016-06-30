@@ -4,8 +4,12 @@ use strict;
 use warnings;
 use CBitcoin::Message; 
 use CBitcoin::Utilities;
+use  Log::Log4perl;
+
 use constant BUFFSIZE => 8192*4;
 
+
+my $logger = Log::Log4perl->get_logger();
 our $callback_mapper;
 
 
@@ -92,7 +96,8 @@ sub init {
 	bless($this,$ref);
 	
 	
-	# to have some human readable stuff for later 
+	# to have some human readable stuff for later
+	chomp($options->{'address'}); 
 	$this->{'address'} = $options->{'address'};
 	$this->{'port'} = $options->{'port'};
 	
@@ -186,7 +191,8 @@ sub handshake_finished{
 	
 	if($this->sent_version && $this->sent_verack && $this->received_version && $this->received_verack){
 		$this->{'handshake finished'} = 1;
-		warn "handshake is finished, ready to run hooks\n";
+		#warn "\n";
+		$logger->info("handshake is finished, ready to run hooks");
 		$this->spv->peer_hook_handshake_finished($this);
 		return 1;
 	}
@@ -347,16 +353,18 @@ sub version_deserialize {
 		if($size == -2){
 			# need to read var_str
 			$version->{$key} = CBitcoin::Utilities::deserialize_varstr($fh);
-			warn "Reading var string with result=".$version->{$key}."\n";
+			#warn ."\n";
+			$logger->debug("Reading var string with result=".$version->{$key});
 			next;
 		}
 		
 		$n = read($fh,$buf,$vers_size->{$key});
 		$version->{$key} = $buf;
-		warn "For $key, got n=$n and value=".unpack('H*',$buf)."\n";
+		#warn ."\n";
+		$logger->debug("For $key, got n=$n and value=".unpack('H*',$buf));
 		
 		unless($n == $vers_size->{$key}){
-			warn "bad bytes, size does not match";
+			$logger->error("bad bytes, size does not match");
 			return undef;
 		}
 		
@@ -365,23 +373,25 @@ sub version_deserialize {
 	# version, should be in this range
 	#  && unpack('l',$version->{'version'}) < 90000 
 	unless(70000 < unpack('l',$version->{'version'})){
-		warn "peer supplied bad version number\n";
+		$logger->error("peer supplied bad version number");
 		return undef;
 	}
 	# services
 	if($version->{'services'} & pack('Q',1)){
-		warn "NODE_NETWORK \n";
+		#warn "NODE_NETWORK \n";
+		$logger->debug("NODE_NETWORK");
 	}
 	else{
-		warn "Just provides headers\n";
+		$logger->debug("Just provides headers");
 	}
 	# timestamp, should not be more than 5 minutes old
 	my $timediff = time () - unpack('q',$version->{'timestamp'});
 	if(abs($timediff) < 1*60 ){
-		warn "peer time is within error bound, diff=$timediff seconds\n";
+		$logger->debug("peer time is within error bound, diff=$timediff seconds");
 	}
 	else{
-		warn "peer time is too far off, diff=$timediff seconds\n";
+		#warn "\n";
+		$logger->debug("peer time is too far off, diff=$timediff seconds");
 	}
 	# addr_recv
 	$version->{'addr_recv'} = CBitcoin::Utilities::network_address_deserialize_forversion($version->{'addr_recv'});
@@ -393,13 +403,14 @@ sub version_deserialize {
 	# blockheight (do sanity check)
 	$version->{'block_height'} = unpack('l',$version->{'block_height'});
 	unless(0 <= $version->{'block_height'}){
-		warn "bad block height of ".$version->{'block_height'}."\n";
+		$logger->error("bad block height of ".$version->{'block_height'});
 		return undef;
 	}
 	$this->block_height($version->{'block_height'});
 	
 	# bool for relaying, should we relay
-	warn "Relay=".unpack('C',$version->{'relay'})."\n";
+	#warn "."\n";
+	$logger->debug("Relay=".unpack('C',$version->{'relay'}));
 	close($fh);
 	
 	$this->{'version'} = $version;
@@ -812,7 +823,8 @@ sub send_getblocks{
 	
 	return undef if defined $this->{'command timeout'}->{'send_getblocks'}
 		&& time() - $this->{'command timeout'}->{'send_getblocks'} < 5;
-	warn "Sending get_blocks\n";
+	
+	$logger->debug("sending get_blocks");
 	$this->{'command timeout'}->{'send_getblocks'} = time();
 
 	return $this->write(CBitcoin::Message::serialize(
@@ -837,7 +849,8 @@ sub send_getheaders {
 	my $this = shift;
 	return undef if defined $this->{'command timeout'}->{'send_getblocks'}
 		&& time() - $this->{'command timeout'}->{'send_getblocks'} < 5;
-	warn "Sending get_headers\n";
+	
+	$logger->debug("sending get_headers");
 	$this->{'command timeout'}->{'send_getblocks'} = time();
 
 	return $this->write(CBitcoin::Message::serialize(
@@ -879,7 +892,7 @@ sub send_verack {
 
 sub send_ping {
 	my $this = shift;
-	warn "Sending ping\n";
+	$logger->debug("sending ping");
 	$this->{'sent ping nonce'} = CBitcoin::Utilities::generate_random(8);
 	
 	return $this->write(CBitcoin::Message::serialize($this->{'sent ping nonce'},'ping',$this->magic));
@@ -1060,7 +1073,7 @@ sub callback_gotpong {
 	my $msg = shift;
 	
 	if($this->{'sent ping nonce'} eq $msg->payload() ){
-		warn "got pong and it matches";
+		$logger->debug("got pong and it matches");
 		$this->{'sent ping nonce'} = undef;
 		$this->{'last pinged'} = time();
 		return 1;

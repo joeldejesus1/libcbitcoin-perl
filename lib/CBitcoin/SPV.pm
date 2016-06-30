@@ -9,6 +9,7 @@ use CBitcoin::Peer;
 use CBitcoin::Block;
 use Net::IP;
 use Fcntl ':flock'; # Import LOCK_* constants
+use  Log::Log4perl;
 
 =pod
 
@@ -16,6 +17,8 @@ use Fcntl ':flock'; # Import LOCK_* constants
 
 =cut
 
+
+my $logger = Log::Log4perl->get_logger();
 our $callback_mapper;
 
 
@@ -291,7 +294,7 @@ sub initialize_chain{
 	my $this = shift;
 	my $base = $this->db_path();
 
-	warn "initialize chain\n";
+	$logger->info("initialize chain");
 	
 	# max target implies lowest difficulty (use this number to figure out "work done")
 	$this->{'chain'}->{'maximum target'} = Math::BigInt->from_hex('00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF');
@@ -422,7 +425,8 @@ sub initialize_chain_scan_files {
 				#$header->cummulative_difficulty($header->hash_bigint());
 			}
 			else{
-				warn "Adding block[".$header->hash_hex.";".$i."]\n" if $i % $this->{'chain'}->{'checkpoint frequency'} == 0;
+				$logger->debug("Adding block[".$header->hash_hex.";".$i."]\n") if $i % $this->{'chain'}->{'checkpoint frequency'} == 0;
+				
 				$hchain->{'cummulative difficulty'}->badd(
 					$hchain->{'maximum target'}->copy()->bsub($header->hash_bigint())
 				);
@@ -464,7 +468,8 @@ sub checkpoint_save {
 		$buf .= $this->{'header by hash'}->{$this->{'headers'}->[$j]}->header();
 	}
 	$len = length($buf);
-	warn "Adding header checkpoints of size=$len\n";
+	
+	$logger->debug("Adding header checkpoints of size=$len");
 	$m = 0;
 	while(0 < $len - $m){
 		$m += syswrite($fh,$buf,8192,$m);
@@ -545,7 +550,7 @@ sub add_header_to_inmemory_chain {
 		
 	}
 	elsif(defined $pchain->{'header hash to hash'}->{$header->prevBlockHash}){
-		warn "adding new block\n";
+		$logger->info("adding new block");
 		# calculate the cummulative difficulty
 		my $prevBlock = $this->{'header by hash'}->{$header->prevBlockHash};
 		my $cd = $prevBlock->cummulative_difficulty()->copy();
@@ -567,11 +572,7 @@ sub add_header_to_inmemory_chain {
 		#die "main chain block";
 	}
 	else{
-		warn "got a complete orphan???";
-		warn "PrevHash=".$header->prevBlockHash_hex()."\n";
-		warn "Genesis Block=".$this->{'genesis block'}->hash_hex()."\n";
-		warn "they match!" if $header->prevBlockHash() eq $this->{'genesis block'}->hash();
-		warn "matches genesis" if $this->{'chain'}->{'latest'} eq $header->prevBlockHash(); 
+		$logger->debug("got a complete orphan???"); 
 		return undef;
 	}
 	
@@ -668,7 +669,7 @@ sub sort_chain_by_peer{
 	my $curr_hash = $this->{'headers'}->[$last_checkpoint_i];
 	
 	if(!defined $curr_hash){
-		warn "going for last element in peer chain, not main chain\n";
+		$logger->debug("going for last element in peer chain, not main chain");
 		$last_checkpoint_i = scalar(@{$pchain->{'headers'}})- 1;
 		$curr_hash = $pchain->{'headers'}->[-1];
 	}
@@ -813,7 +814,7 @@ sub calculate_block_locator {
 sub add_header_to_db {
 	my ($this, $header) = @_;
 	
-	warn "New header with hash=".unpack('H*',$header->hash)."\n";
+	$logger->debug("New header with hash=".unpack('H*',$header->hash));
 }
 
 =pod
@@ -829,6 +830,7 @@ sub add_tx_to_db {
 
 	warn "Tx with inputs=".scalar(@{$tx->{'inputs'}})." and outputs=".
 		scalar(@{$tx->{'outputs'}})."\n";
+
 }
 
 =pod
@@ -1147,7 +1149,7 @@ sub activate_peer {
 		};
 		my $error = $@;
 		if($error){
-			warn "have to try another peer. Error=$error\n";
+			$logger->error("have to try another peer. Error=$error");
 		}
 		else{
 			#warn "finished looping to find a new peer\n";
@@ -1450,9 +1452,11 @@ sub hook_peer_onreadidle {
 		$peer->send_getdata($this->hook_getdata());
 	}
 	else{
-		warn "Need to fetch more blocks\n";
+		#warn "\n";
+		$logger->debug("Need to fetch more blocks");
 		if($this->block_height() < $peer->block_height()){
-			warn "alpha; block height diff=".( $peer->block_height() - $this->block_height() )."\n";
+			#warn ."\n";
+			$logger->debug("alpha; block height diff=".( $peer->block_height() - $this->block_height() ));
 			#$peer->send_getblocks();
 			$peer->send_getheaders();
 			#print "Bail out!";
@@ -1667,9 +1671,29 @@ sub cnc_receive_message {
 	elsif($target eq 'cnc in'){
 		# got a command
 		die "got command message\n";
-		# custaddnode
-		
-		# custaddwatch
+		my $command = $msg->command();
+		my $sub;
+		if(
+			defined $callback_mapper->{'command'}->{$command}
+			&& ref($callback_mapper->{'command'}->{$command}) eq 'CODE'
+		){
+			$sub = $callback_mapper->{'command'}->{$command};
+		}
+		elsif(
+			defined $callback_mapper->{'custom command'}->{$command}
+			&& ref($callback_mapper->{'custom command'}->{$command}) eq 'CODE'		
+		){
+			$sub = $callback_mapper->{'custom command'}->{$command};
+		}
+		else{
+			$sub = sub{
+				my $cmd = \$command;
+				warn "incorrect command(".$$cmd.")\n";
+			};
+		}
+		# my ($this,$msg,$peer) = @_;
+		# but there is no peer
+		$sub->($this,$msg,undef);
 		
 	}
 	else{

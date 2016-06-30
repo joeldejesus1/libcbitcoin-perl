@@ -8,6 +8,10 @@ use IO::Socket::Socks;
 use IO::Epoll;
 use EV;
 use Kgc::MQ;
+use  Log::Log4perl;
+
+
+my $logger = Log::Log4perl->get_logger();
 
 =pod
 
@@ -95,7 +99,7 @@ sub new {
 		# callback sub
 		my $cbhash = {'x' => 1};
 		$cbhash->{'x'} = sub {
-			warn "is called after ".$config->{'timeout'}."s";
+			$logger->warn("is called after ".$config->{'timeout'}."s");
 			my $evloop3 = $evloop2;
 			my $c2 = $c1;
 			my $spv_in = $spv;
@@ -113,7 +117,7 @@ sub new {
 				$ifw->{fileno($sck2).'timer'} = $evloop3->timer(30, 0, $cb2);
 			}
 			else{
-				warn "connection timed out\n";
+				$logger->warn("connection timed out");
 				$spv_in->close_peer(fileno($sck2));
 				
 			}
@@ -150,7 +154,7 @@ sub new {
 			chomp($port);
 			
 			if(defined $socks5_2){
-				warn "connection to $ipaddress via socks5\n";
+				$logger->info("connection to $ipaddress via socks5");
 				$sck1 = IO::Socket::Socks->new(
 					ProxyAddr   => $socks5_2->{'address'},
 					ProxyPort   => $socks5_2->{'port'},
@@ -159,7 +163,7 @@ sub new {
 				) || (alarm 0 && die $SOCKS_ERROR);
 			}
 			else{
-				warn "connection using normal INET to ($ipaddress:$port)\n";
+				$logger->info("connection using normal INET to ($ipaddress:$port)");
 				$sck1 = new IO::Socket::INET (
 					PeerHost => $ipaddress,
 					PeerPort => $port,
@@ -184,7 +188,7 @@ sub new {
 				my $rst2 = $rst1;
 				#warn "in callback with socket=$sfn\n";
 				if(!defined $sfn || $sfn < 1){
-					warn "socket has closed\n";
+					$logger->info("socket has closed");
 					my $ifw2 = $internal_fn_watcher;
 					delete $ifw2->{fileno($sck1)};
 					return undef;
@@ -197,7 +201,7 @@ sub new {
 				if($revents & EV::READ){
 					$spv2->peer_by_fileno($sfn)->read_data();
 					if(defined $spv2->peer_by_fileno($sfn) && $spv2->peer_by_fileno($sfn)->write() > 0){
-						warn "setting eventmask to read/write\n";
+						$logger->debug("setting eventmask to read/write");
 						$w->events(EV::READ | EV::WRITE);
 					}
 					
@@ -229,7 +233,7 @@ sub new {
 				#return undef if $spv2->{'peer rate limiter'}->{fileno($sck2)};
 				
 				# set watcher to read only
-				warn "Peer is writing too much data.\n";
+				$logger->debug("Peer is writing too much data.");
 				
 				return undef if $peer2->{'sleeping'};
 				$peer2->{'sleeping'} = 1;
@@ -242,7 +246,7 @@ sub new {
 	     			my $ifw3 = $ifw2;
 	     			delete $ifw3->{fileno($sck3).'ratelimiter'};
 	     			$peer2->{'sleeping'} = 0;
-	     			warn "Adding peer socket back in\n";
+	     			$logger->debug("Adding peer socket back in");
 	     			$ifw3->{fileno($sck3)}->events(EV::READ | EV::WRITE);
 	     			
 				});
@@ -251,7 +255,7 @@ sub new {
 		my $error = $@;
 		if($error){
 			alarm 0;
-			warn "bad connection, error=$error";
+			$logger->error("bad connection, error=$error");
 			delete $internal_fn_watcher->{fileno($sck1)} if defined $sck1;
 			return undef;
 		}
@@ -286,7 +290,7 @@ sub new {
 			die "failed. error=$error\n";
 		};
 		
-		warn "entering loop";
+		$logger->info("entering loop");
 		$evloop2->run();
 	};
 	

@@ -7,6 +7,7 @@ use CBitcoin;
 use CBitcoin::SPV;
 use CBitcoin::DefaultEventLoop;
 use CBitcoin::Utilities;
+use Log::Log4perl;
 
 use constant {
         ADDNODE   => 1
@@ -19,11 +20,81 @@ use Encode;
 use Data::Dumper;
 
 
+my $logger;
+
 =pod
 
 ---+ Utilities
 
 =cut
+
+=pod
+
+---++ logging_conf
+
+Return a reference?
+
+=cut
+
+sub logging_conf {
+	my $fp = shift;
+	if(defined $fp){
+		Log::Log4perl::init( $fp );
+	}
+	else{
+		my $conf = q(
+log4perl.rootLogger = DEBUG, screen
+
+log4perl.appender.screen = Log::Log4perl::Appender::Screen
+log4perl.appender.screen.stderr = 1
+log4perl.appender.screen.layout = PatternLayout
+log4perl.appender.screen.layout.ConversionPattern = %d %p> %F{1}:%L %M - %m%n
+		);
+		Log::Log4perl::init( \$conf );
+		$logger = Log::Log4perl->get_logger();
+		$logger->debug("debugging!");
+	}
+
+}
+
+
+=pod
+
+---++ validate_filepath($file_path,$prefix)
+
+Strip the prefix and run a regex to validate the file path
+
+=cut
+
+sub validate_filepath {
+	my $fp = shift;
+	my $prefix = shift;
+	$prefix = '' unless defined $prefix;
+	return undef unless defined $fp && 0 < length($fp);
+	
+	$fp = substr($fp,length($prefix));
+	
+	my $leading_slash = 0;
+	my @untainted;
+	foreach my $dir (split('/',$fp)){
+		if($dir eq '' && !$leading_slash){
+			$leading_slash = 1;
+			push(@untainted,'');
+			next;
+		}
+		elsif($dir eq ''){
+			return undef;
+		}
+		
+		if($dir =~ m/^([^*&%\s]+)$/){
+			push(@untainted,$1);
+		}
+		else{
+			return undef;
+		}
+	}
+	return join('/',@untainted);
+}
 
 =pod
 
@@ -80,11 +151,23 @@ sub parser {
 		elsif($arg =~ m/^\-\-clientname\=(.*)$/){
 			die "bad formatting for clientname, did you forget quotes? \"\"\n";
 		}
+		
+		elsif(validate_filepath($arg,'--logconf=')){
+			$options->{'logconf'} = validate_filepath($arg);
+		}
+		elsif($arg =~ m/^\-\-logconf\=(.*)$/){
+			die "bad formatting for log conf file\n";
+		}
 	}
+	
+	
+	
 	return $options;
 }
 
 =pod
+
+
 
 ---+ CLI
 
@@ -119,6 +202,7 @@ sub read_cmd_spv{
 	};
 
 	$options = parser($options,@_);
+	logging_conf($options->{'logconf'});
 	
 	# set up the bloom filter
 	my $bloomfilter = CBitcoin::BloomFilter->new({
@@ -176,6 +260,7 @@ BEGIN{
 
 sub read_cmd_sendcmd{
 	my $options = parser(undef,@_);
+	logging_conf($options->{'logconf'});
 	
 	my @messages;
 	
@@ -183,30 +268,18 @@ sub read_cmd_sendcmd{
 	my @addr;
 	foreach my $node (@{$options->{'node'}}){
 		# node format: address, port, services
-		
+		$node->[2] = 0 unless defined $node->[2];
 		# addr format: time, services, ipaddress, port
-		my @out;
-		$out[2] = $node->[0];
-		$out[3] = 
+		my @out = (time(),$node->[2],$node->[0],$node->[1]);		
 		
-		#$payload .= $node->[0].','.$node->[1]."\n";
-		if(defined $node->[2] && $node->[2] =~ m/^([0-9a-fA-F]{16})$/){
-			$out[1] = pack('H*',$1);
-		}
-		elsif(defined $node->[2]){
-			die "services in bad format";
-		}
-		else{
-			$out[1] = pack('Q',0);
-		}
 		#unshift(@{$node},time(),);
-		push(@addr,$node);
+		push(@addr,\@out);
 	}
 	if(0 < scalar(@addr)){
 		push(@messages,CBitcoin::Message::serialize(
 			CBitcoin::Utilities::serialize_addr(@addr),
 			'addr',
-			CBitcoin::Message::MAINNET
+			$CBitcoin::network_bytes
 		));		
 	}
 	
@@ -214,7 +287,7 @@ sub read_cmd_sendcmd{
 		push(@messages,CBitcoin::Message::serialize(
 			Encode::encode('UTF-8', join("\n",@{$options->{'watch'}}), Encode::FB_CROAK),
 			'custaddwatch',
-			CBitcoin::Message::MAINNET
+			$CBitcoin::network_bytes
 		));		
 	}	
 
