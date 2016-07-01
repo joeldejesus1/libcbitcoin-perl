@@ -378,7 +378,7 @@ sub add_socks5 {
 
 =pod
 
----++ cncspv_add($spv)
+---++ cncspv_add($spv)->[$pid1,$pid2,...]
 
 Scans for new mqueues and addes new sockets to allow communication with another spv process.
 
@@ -393,14 +393,16 @@ sub cncspv_add {
 	closedir($fh);
 	my ($our_uid,$our_pid) = ($>,$$); #real uid
 	my $loop = $this->ev_socket();
-	
+	my @targets;
 	foreach my $spv_process (@x){
 		next if $spv_process eq '.' || $spv_process eq '..';
 		if($spv_process =~ m/^spv\.(\d+)\.(\d+)$/){
 			my ($uid,$pid) = ($1,$2);
+			$logger->debug("Got ($uid,$pid)");
 			next if $our_uid != $uid || $our_pid == $pid;
 			next if defined $this->{'cncspv'}->{$pid};
-			
+			$logger->debug("adding pid=$pid");
+			push(@targets,$pid);
 			my $mq = Kgc::MQ->new({
 				'name' => join('.','spv',$uid,$pid)
 				,'handle type' => 'write only'
@@ -414,7 +416,8 @@ sub cncspv_add {
 				my $spv2 = $spv;
 				my $mq2 = $mq;
 				my $pid2 = $pid;
-				my $msg = $spv2->cnc_send_message($pid2,$t1->{'cncspv'}->{$pid2}->{'mark off'});
+				my $msg = $spv2->cnc_send_message_data($pid2,$t1->{'cncspv'}->{$pid2}->{'mark off'});
+				$logger->debug("sending message for pid=$pid2");
 				return undef unless defined $msg && 0 < length($msg);
 				$mq2->send($msg);
 				#$spv2->cnc_receive_message($mq2->receive());
@@ -427,6 +430,7 @@ sub cncspv_add {
 			$this->{'cncspv'}->{$pid}->{'mark off'} = sub{
 				my $t1 = $this;
 				my $pid2 = $pid;
+				$logger->debug("pid=$pid2 marking off");
 				delete $t1->{'cncspv'}->{$pid2}->{'watcher'};
 				return 	$t1->{'cncspv'}->{$pid2}->{'mark write'};				
 			};
@@ -434,7 +438,7 @@ sub cncspv_add {
 				my $t1 = $this;
 				my $loop2 = $loop;
 				my $pid2 = $pid;
-				
+				$logger->debug("pid=$pid2 marking write");
 				if(defined $t1->{'cncspv'}->{$pid2}->{'watcher'}){
 					$t1->{'cncspv'}->{$pid2}->{'watcher'}->events(EV::WRITE);
 				}
@@ -448,7 +452,7 @@ sub cncspv_add {
 			};
 		}
 	}
-	
+	return \@targets;
 }
 
 =pod
@@ -498,7 +502,7 @@ sub cncstdio_add {
 		my $mqout2 = $mqout;
 		my $t1 = $this;
 		warn "running callback on out\n";
-		my $msg = $spv2->cnc_send_message('cnc out',$t1->{'cnc out'}->{'mark off'});
+		my $msg = $spv2->cnc_send_message_data('cnc out',$t1->{'cnc out'}->{'mark off'});
 		return undef unless defined $msg && 0 < length($msg);
 		$mqout2->send($msg);
 		#$spv2->receive_message($mqout2->receive());
@@ -547,7 +551,7 @@ Run this subroutine just before starting the loop in an SPV process.
 
 sub cncspv_own{
 	my ($this,$spv) = @_;
-	return undef unless defined $this->{'cnc own'};
+	return undef if defined $this->{'cnc own'};
 
 	my ($our_uid,$our_pid) = ($>,$$); #real uid
 	my $mqin = Kgc::MQ->new({

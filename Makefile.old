@@ -187,7 +187,7 @@ O_FILES  = Block.o \
 	TransactionInput.o \
 	TransactionOutput.o
 H_FILES  = 
-MAN1PODS = scripts/cbitcoin
+MAN1PODS = 
 MAN3PODS = lib/CBitcoin.pm \
 	lib/CBitcoin/Base58.pm \
 	lib/CBitcoin/Block.pm \
@@ -599,10 +599,7 @@ manifypods : pure_all  \
 	lib/CBitcoin/Transaction.pm \
 	lib/CBitcoin/TransactionInput.pm \
 	lib/CBitcoin/TransactionOutput.pm \
-	lib/CBitcoin/Utilities.pm \
-	scripts/cbitcoin
-	$(NOECHO) $(POD2MAN) --section=1 --perm_rw=$(PERM_RW) -u \
-	  scripts/cbitcoin $(INST_MAN1DIR)/cbitcoin.$(MAN1EXT) 
+	lib/CBitcoin/Utilities.pm
 	$(NOECHO) $(POD2MAN) --section=3 --perm_rw=$(PERM_RW) -u \
 	  lib/CBitcoin.pm $(INST_MAN3DIR)/CBitcoin.$(MAN3EXT) \
 	  lib/CBitcoin/Base58.pm $(INST_MAN3DIR)/CBitcoin::Base58.$(MAN3EXT) \
@@ -695,8 +692,8 @@ realclean_subdirs :
 # Delete temporary files (via clean) and also delete dist files
 realclean purge ::  clean realclean_subdirs
 	- $(RM_F) \
-	  $(MAKEFILE_OLD) $(FIRST_MAKEFILE) \
-	  $(OBJECT) 
+	  $(OBJECT) $(FIRST_MAKEFILE) \
+	  $(MAKEFILE_OLD) 
 	- $(RM_RF) \
 	  $(DISTVNAME) 
 

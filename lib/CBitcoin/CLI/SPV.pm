@@ -254,6 +254,7 @@ sub read_cmd_spv{
 This starts an spv process.
 
 =cut
+
 BEGIN{
 	$cli_mapper->{'cmd'}->{'cmd'} = \&read_cmd_sendcmd;
 }
@@ -310,6 +311,33 @@ sub read_cmd_sendcmd{
 }
 
 
+=pod
+
+---++ read_cmd_readdata
+
+Read data coming off the message queue and print it to stdout.
+
+<verbatim>cbitcoin read</verbatim>
+
+=cut
+
+BEGIN{
+	$cli_mapper->{'cmd'}->{'read'} = \&read_cmd_readdata;
+}
+
+sub read_cmd_readdata{
+	my ($our_uid,$our_pid) = ($>,$$); #real uid
+	my $mqout = Kgc::MQ->new({
+		'name' => join('.','spv',$our_uid,'out')
+		,'handle type' => 'read only'
+		,'no hash' => 1
+	});
+	
+	while(my $msg_data = $mqout->receive()){
+		print STDERR "$msg_data\n++++++++++++\n";
+	}
+	
+}
 =pod
 
 ---+ run_cli_args

@@ -57,7 +57,8 @@ sub new {
 	$this->{'inv next getdata'} = [ [], [], [], []];	
 	$this->initialize_peers();
 	
-	$this->initialize_command();
+	# allow outside processes to send and receive messages with this spv process
+	$this->initialize_cnc();
 	
 	
 	
@@ -118,10 +119,8 @@ sub init {
 	}
 	
 	$this->add_bloom_filter($options->{'bloom filter'});
+
 	
-	
-	# allow outside processes to send and receive messages with this spv process
-	$this->event_loop->cncstdio_add($this);
 }
 
 
@@ -169,7 +168,7 @@ sub make_directories{
 
 =pod
 
----++ initialize_command
+---++ initialize_cnc
 
 The command and control file is /tmp/spv/cnc.
 
@@ -177,77 +176,25 @@ The command and control file is /tmp/spv/cnc.
 
 =cut
 
-sub initialize_command {
+sub initialize_cnc {
 	my ($this) = @_;
 	
 	$this->{'cnc queues'} = {
 		
 	};
 	
-	
-	return undef;
-	my $fp = $this->db_path().'/cnc';
-	
-	
-	open(my $fhwrite,'>>',$fp) || die "cannot open command and control file";
-	binmode($fhwrite);
-	# seek to the beginning
-	seek($fhwrite,0,0);
-	
-	open(my $fhread,'<',$fp) ||  die "cannot open command and control file";
-	binmode($fhread);
-	
-	
-	$this->{'cnc'} = {
-		'read handle' => $fhread,
-		'write handle' => $fhwrite
-	};
-	
-	my $tries = 0;
-	my $sec = $$ % 10;
-	while(!$this->cnc_lock()){
-		# sleep for a random number of seconds in order to prevent clobbering by multiple processes
-		sleep $sec;
+	$this->event_loop->cncstdio_add($this);
+	$this->event_loop->cncspv_own($this);
+	# look for other spv processes
+	foreach my $pid (@{$this->event_loop->cncspv_add($this)}){
+		$this->{'cnc queues'}->{$pid} = [];
 	}
-	# if the file is empty after locking, then see how big it is
-	my $size = $this->cnc_filestat('size');
 	
-	my $fixed_size = 100;
 	
-	# pad area with zeros
-	#if($size != $fixed_size){
-	#	my ($m,$n) = (0,0);
-	#	while(0 < $n - $m){
-	#		$m += syswrite($fhwrite,pack('Q',0),8);
-	#	}
-	#}
+	# broadcast to other spv processes that we exist
+	$this->cnc_broadcast_message(CBitcoin::Message::serialize($$,'custaddspv',$CBitcoin::network_bytes));
 	
-}
-our $cncfilestat = {
-	'dev' => 0,'ino' => 1,'mode' => 2,'nlink' => 3,'uid' => 4
-	,'gid' => 5,'rdev' => 6,'size' => 7,'atime' => 8,'mtime' => 9,'ctime' => 10,'blksize' => 11,'blocks' => 12
-};
-sub cnc_filestat{
-	my ($this,$x) = @_;
-	return undef unless defined $x;
-	my @alpha = stat($this->db_path().'/cnc');	
-	return $alpha[$cncfilestat->{$x}];
-}
-
-
-sub cnc_fhread {
-	return shift->{'cnc'}->{'read handle'};
-}
-
-sub cnc_fhwrite {
-	return shift->{'cnc'}->{'write handle'};
-}
-
-sub cnc_lock {
-	my ($this) = @_;
-	my $fp = $this->db_path.'/cnc';
-	
-	return flock($this->cnc_fhwrite(), LOCK_EX);
+	return undef;	
 }
 
 
@@ -1068,6 +1015,8 @@ Find a peer in a pool, and turn it on
 
 sub activate_peer {
 	my $this = shift;
+	
+	
 	my $connect_sub = $this->{'connect sub'};
 	#warn "activating peer - 1\n";
 	# if we are maxed out on connections, then exit
@@ -1075,7 +1024,7 @@ sub activate_peer {
 	#warn "activating peer - 1.1\n";
 	die "not given connection sub" unless defined $connect_sub && ref($connect_sub) eq 'CODE';
 	#warn "activating peer - 2\n";
-
+	
 	my $dir_pool = $this->db_path().'/peers/pool';
 	my $dir_active = $this->db_path().'/peers/active';
 	my $dir_pending = $this->db_path().'/peers/pending';
@@ -1236,6 +1185,9 @@ sub add_peer{
 	});
 	# basically, this gets overloaded by an inheriting class
 	$this->add_peer_to_db($peer);
+
+
+	$this->cnc_send_message('cnc out','new peer:'.$peer->address);
 
 	# go by fileno, it is friendly to IO::Epoll
 	$this->{'peers'}->{fileno($socket)} = $peer;
@@ -1662,33 +1614,43 @@ Check DefaultEventLoop module to see how this subroutine gets called.
 =cut
 
 sub cnc_receive_message {
-	my ($this,$target,$msg) = @_;
+	my ($this,$target,$msg_data) = @_;
+	open(my $fh,'<',\$msg_data);
+	my $msg;
+	eval{
+		$msg = CBitcoin::Message->deserialize($fh);
+	} || do{
+		my $error = $@;
+		$logger->error("Got error=$error");
+		return undef;
+	};
 	
-	if($target eq 'cnc own'){
-		# run callback?
-		die "got message from another process\n";
-	}
-	elsif($target eq 'cnc in'){
+	# TODO: limit what messages can be received on cnc
+	
+	if($target eq 'cnc in' || $target eq 'cnc own'){
 		# got a command
-		die "got command message\n";
 		my $command = $msg->command();
+		$logger->debug("Got command=$command");
 		my $sub;
 		if(
 			defined $callback_mapper->{'command'}->{$command}
-			&& ref($callback_mapper->{'command'}->{$command}) eq 'CODE'
+			&& defined $callback_mapper->{'command'}->{$command}->{'subroutine'}
+			&& ref($callback_mapper->{'command'}->{$command}->{'subroutine'}) eq 'CODE'
 		){
-			$sub = $callback_mapper->{'command'}->{$command};
+			$sub = $callback_mapper->{'command'}->{$command}->{'subroutine'};
 		}
 		elsif(
 			defined $callback_mapper->{'custom command'}->{$command}
-			&& ref($callback_mapper->{'custom command'}->{$command}) eq 'CODE'		
+			&& defined $callback_mapper->{'custom command'}->{$command}->{'subroutine'}
+			&& ref($callback_mapper->{'custom command'}->{$command}->{'subroutine'}) eq 'CODE'
 		){
-			$sub = $callback_mapper->{'custom command'}->{$command};
+			$sub = $callback_mapper->{'custom command'}->{$command}->{'subroutine'};
+			$logger->error( "custom command=$command");
 		}
 		else{
 			$sub = sub{
 				my $cmd = \$command;
-				warn "incorrect command(".$$cmd.")\n";
+				$logger->debug("Got incorrect command=".$$cmd);
 			};
 		}
 		# my ($this,$msg,$peer) = @_;
@@ -1697,13 +1659,13 @@ sub cnc_receive_message {
 		
 	}
 	else{
-		warn "Got weird message from $target\n";
+		$logger->error("Got weird message from $target");
 	}
 }
 
 =pod
 
----++ cnc_send_message($target,$mark_off_sub)
+---++ cnc_send_message_data($target,$mark_off_sub)
 
 Send a message via one of the cnc mqueues.  The $mark_off_sub turns off the callback if there is nothing to write.
 
@@ -1711,7 +1673,7 @@ Check DefaultEventLoop module to see how this subroutine gets called.
 
 =cut
 
-sub cnc_send_message {
+sub cnc_send_message_data {
 	my ($this,$target,$mark_off_sub) = @_;
 	
 	# check the queue for $target
@@ -1722,8 +1684,55 @@ sub cnc_send_message {
 		return undef;
 	}
 	else{
+		$logger->debug("pid=$target sending data");
 		return shift(@{$this->{'cnc queues'}->{$target}});
 	}
+}
+
+
+
+=pod
+
+---++ cnc_send_message($target,$data)
+
+Put some data on the write queue.
+
+Check DefaultEventLoop module to see how this subroutine gets called.
+
+=cut
+
+sub cnc_send_message {
+	my ($this,$target,$data) = @_;
+	$this->{'cnc queues'}->{$target} = [] unless defined $this->{'cnc queues'}->{$target};
+	push(@{$this->{'cnc queues'}->{$target}},$data);
+	
+	if(defined $this->{'cnc callbacks'}->{$target}->{'mark write'}){
+		$this->{'cnc callbacks'}->{$target}->{'mark write'}->();
+		delete $this->{'cnc callbacks'}->{$target}->{'mark write'};
+	}
+	
+	return scalar(@{$this->{'cnc queues'}->{$target}});
+}
+
+
+=pod
+
+---++ cnc_broadcast_message($data)
+
+Send data to all other spv processes.
+
+=cut
+
+sub cnc_broadcast_message {
+	my ($this,$data) = @_;
+	$logger->debug("doing cnc broadcast");
+	foreach my $pid (keys %{$this->{'cnc queues'}}){
+		$logger->debug("Got pid=$pid and our pid=".$$);
+		next unless $pid =~ m/^(\d+)$/ && $pid != $$;
+		$logger->debug("broadcast to pid=$pid ");
+		$this->cnc_send_message($pid,$data);
+	}
+
 }
 
 
@@ -2228,7 +2237,35 @@ sub callback_gotheaders {
 	$this->hook_peer_onreadidle($peer);
 }
 
+=pod
 
+---+ custom callbacks
+
+=cut
+
+=pod
+
+---++ callback_gotaddspv
+
+Store the new addr in the peer database.
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'custom command'}->{'custaddspv'} = {
+		'subroutine' => \&callback_gotaddspv
+	}
+};
+
+sub callback_gotaddspv {
+	my ($this,$msg) = @_;
+	
+	# check for new spv
+	foreach my $pid (@{$this->event_loop->cncspv_add($this)}){
+		$logger->debug("Adding spv pid=$pid");
+		$this->{'cnc queues'}->{$pid} = [];
+	}	
+}
 
 
 
