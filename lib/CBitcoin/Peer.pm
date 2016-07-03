@@ -347,6 +347,7 @@ sub version_deserialize {
 		'nonce' => 8,'user_agent' => -2, 'block_height' => 4, 'relay' => 1
 	};
 	my ($n,$buf);
+	my $errmsg = '';
 	foreach my $key (@ver_order){
 		my $size = $vers_size->{$key};
 		
@@ -361,7 +362,8 @@ sub version_deserialize {
 		$n = read($fh,$buf,$vers_size->{$key});
 		$version->{$key} = $buf;
 		#warn ."\n";
-		$logger->debug("For $key, got n=$n and value=".unpack('H*',$buf));
+		$errmsg .= "For $key, got n=$n and value=".unpack('H*',$buf)."\n";
+		
 		
 		unless($n == $vers_size->{$key}){
 			$logger->error("bad bytes, size does not match");
@@ -369,6 +371,7 @@ sub version_deserialize {
 		}
 		
 	}
+	$logger->debug($errmsg);
 	
 	# version, should be in this range
 	#  && unpack('l',$version->{'version'}) < 90000 

@@ -306,6 +306,7 @@ sub new {
 		,'cncspv' => {}
 		,'cnc in' => {}
 		,'cnc out' => {}
+		,'spv pids' => []
 	};
 	bless($this,$package);
 	
@@ -340,6 +341,10 @@ sub loop {
 
 sub ev_socket {
 	return shift->{'event loop socket'};
+}
+
+sub spv_pids {
+	return shift->{'spv pids'};
 }
 
 
@@ -385,6 +390,20 @@ Scans for new mqueues and addes new sockets to allow communication with another 
 =cut
 
 sub cncspv_add {
+	my ($this,$spv) = @_;
+	
+	return undef if defined $this->{'cncspv_add done'};
+	$this->{'cncspv_add done'} = 1;
+	
+	$this->ev_socket()->stat ('/dev/mqueue', 0, sub{
+		my $t1 = $this;
+		my $spv2 = $spv;
+		$t1->cncspv_add_callback($spv2);
+	});
+}
+
+
+sub cncspv_add_callback {
 	my ($this,$spv) = @_;
 	
 	my $dirfp = '/dev/mqueue';
@@ -452,7 +471,8 @@ sub cncspv_add {
 			};
 		}
 	}
-	return \@targets;
+	
+	$this->{'spv pids'} = \@targets;
 }
 
 =pod

@@ -153,10 +153,17 @@ sub parser {
 		}
 		
 		elsif(validate_filepath($arg,'--logconf=')){
-			$options->{'logconf'} = validate_filepath($arg);
+			$options->{'logconf'} = validate_filepath($arg,'--logconf=');
 		}
 		elsif($arg =~ m/^\-\-logconf\=(.*)$/){
 			die "bad formatting for log conf file\n";
+		}
+		
+		elsif(validate_filepath($arg,'--dbpath=')){
+			$options->{'db path'} = validate_filepath($arg,'--dbpath=');
+		}
+		elsif($arg =~ m/^\-\-dbpath\=(.*)$/){
+			die "bad formatting for dbpath\n";
 		}
 	}
 	

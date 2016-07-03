@@ -68,6 +68,25 @@ sub new {
 	
 }
 
+
+=pod
+
+---++ finish()
+
+=cut
+
+sub finish {
+	my ($this) = @_;
+	my ($our_uid,$our_pid) = ($>,$$); #real uid
+	$logger->info("Removing SPV object of pid=$our_pid and uid=$our_uid");
+	unlink('/dev/mqueue/'.join('.','spv',$our_uid,$our_pid));
+}
+
+sub DESTROY {
+	shift->finish();
+}
+
+
 =pod
 
 ---++ init($options)
@@ -185,8 +204,11 @@ sub initialize_cnc {
 	
 	$this->event_loop->cncstdio_add($this);
 	$this->event_loop->cncspv_own($this);
+	$this->event_loop->cncspv_add($this);
+	
 	# look for other spv processes
-	foreach my $pid (@{$this->event_loop->cncspv_add($this)}){
+	foreach my $pid (@{$this->event_loop->spv_pids()}){
+		$logger->debug("Got pid=$pid");
 		$this->{'cnc queues'}->{$pid} = [];
 	}
 	
@@ -2253,11 +2275,11 @@ Store the new addr in the peer database.
 
 BEGIN{
 	$callback_mapper->{'custom command'}->{'custaddspv'} = {
-		'subroutine' => \&callback_gotaddspv
+		'subroutine' => \&callback_custom_gotaddspv
 	}
 };
 
-sub callback_gotaddspv {
+sub callback_custom_gotaddspv {
 	my ($this,$msg) = @_;
 	
 	# check for new spv

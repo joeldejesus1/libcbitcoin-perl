@@ -59,11 +59,11 @@ CBitcoin::CLI::SPV::run_cli_args('cmd',
 	'--node=q6m5jhenk33wm4j4.onion:8333','--node=l4xfmcziytzeehcz.onion:8333'
 );
 
-sleep 5;
+sleep 10;
 
 warn "Finished testing";
 while(my $pid = shift(@spvpids)){
-	kill('KILL',$pid);
+	kill('INT',$pid);
 	waitpid($pid,0);
 }
 
