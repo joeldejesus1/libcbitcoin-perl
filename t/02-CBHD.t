@@ -147,8 +147,23 @@ The purpose here is to be able to encrypt/decrypt data using key pairs derived f
 	my $root_0_1 = $root->deriveChild(0,1);
 	my @recepient_keys = ($root_0_1->privatekey,$root_0_1->publickey);
 	
-	my $shared_secret = CBitcoin::CBHD::picocoin_ecdh_encrypt($root_0_1->publickey);
-	warn "Shared=[".length($shared_secret)."]=".unpack('H*',$shared_secret)."\n"; 
+	my $shared_secret = CBitcoin::CBHD::picocoin_ecdh_encrypt($sender_keys[1]);
+	my $eph_pub = substr($shared_secret,32);
+	$shared_secret = substr($shared_secret,0,32);
+	warn "ephpub=[".length($eph_pub)."]=".unpack('H*',$eph_pub)."\n";
+	warn "sendpub=[".length($sender_keys[1])."]=".unpack('H*',$sender_keys[1])."\n";
+	warn "receivepub=[".length($recepient_keys[1])."]=".unpack('H*',$recepient_keys[1])."\n";
+	warn "Shared1=[".length($shared_secret)."]=".unpack('H*',$shared_secret)."\n";
+	
+	my $ssec2 = CBitcoin::CBHD::picocoin_ecdh_decrypt($eph_pub,$recepient_keys[0]);
+	warn "Shared2=[".length($ssec2)."]=".unpack('H*',$ssec2)."\n";
+	
+	if($shared_secret eq $ssec2){
+		warn "success!\n";
+	}
+	else{
+		warn "fail!\n";
+	}
 	#my $privkey =
 	#warn "PrivKey=[".length($sender_keys[0])."]=".unpack('H*',$sender_keys[0])."\n"; 
 	#warn "PubKey =[".length($sender_keys[1])."]=".unpack('H*',$sender_keys[1])."\n";
