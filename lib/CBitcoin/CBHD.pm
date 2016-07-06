@@ -376,6 +376,19 @@ sub publickey {
 
 =pod
 
+---++ privatekey()
+
+Provide the private key in raw binary form.
+
+=cut
+
+sub privatekey {
+	return shift->{'private key'};
+}
+
+
+=pod
+
 ---++ index
 
 =cut

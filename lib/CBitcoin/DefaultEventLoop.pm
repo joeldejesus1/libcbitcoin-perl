@@ -152,6 +152,14 @@ sub new {
 			alarm 15;
 			chomp($ipaddress);
 			chomp($port);
+
+			if($ipaddress =~ m/^([0-9a-zA-Z\.]+)$/){
+				$ipaddress = $1;
+			}
+			
+			if($port =~ m/^(\d+)$/){
+				$port = $1;
+			}
 			
 			if(defined $socks5_2){
 				$logger->info("connection to $ipaddress via socks5");
@@ -164,6 +172,9 @@ sub new {
 			}
 			else{
 				$logger->info("connection using normal INET to ($ipaddress:$port)");
+				
+
+				
 				$sck1 = new IO::Socket::INET (
 					PeerHost => $ipaddress,
 					PeerPort => $port,

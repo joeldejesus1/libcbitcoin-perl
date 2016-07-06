@@ -132,6 +132,28 @@ ok(
 	);
 }
 
+##################### Test ECDH ##########################
+=pod
+
+---+ ECDH
+
+The purpose here is to be able to encrypt/decrypt data using key pairs derived from secp256k1.
+
+=cut
+
+{
+	my $root = CBitcoin::CBHD->generate("my magic seed! 123456789012345678901234567890");
+	my @sender_keys = ($root->privatekey,$root->publickey);
+	my $root_0_1 = $root->deriveChild(0,1);
+	my @recepient_keys = ($root_0_1->privatekey,$root_0_1->publickey);
+	
+	my $shared_secret = CBitcoin::CBHD::picocoin_ecdh_encrypt($root_0_1->publickey);
+	warn "Shared=[".length($shared_secret)."]=".unpack('H*',$shared_secret)."\n"; 
+	#my $privkey =
+	#warn "PrivKey=[".length($sender_keys[0])."]=".unpack('H*',$sender_keys[0])."\n"; 
+	#warn "PubKey =[".length($sender_keys[1])."]=".unpack('H*',$sender_keys[1])."\n";
+		
+}
 
 
 

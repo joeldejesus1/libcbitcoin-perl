@@ -5,14 +5,15 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <errno.h>
-#include <ccoin/hdkeys.h>
 
 #include <assert.h>
-#include <ccoin/base58.h>
 #include <openssl/ripemd.h>
+#include <openssl/sha.h>
 #include <openssl/err.h>
 #include <ccoin/cstr.h>
 #include <ccoin/util.h>
+#include <ccoin/hdkeys.h>
+#include <ccoin/base58.h>
 
 #define MAIN_PUBLIC 0x1EB28804
 #define MAIN_PRIVATE 0xE4AD8804
@@ -54,10 +55,80 @@ static bool read_ek_ser_from_base58(const char *base58,
 	return false;
 }
 
+void *KDF1_SHA256(const void *in, size_t inlen, void *out, size_t *outlen)
+{
+    if (*outlen < SHA256_DIGEST_LENGTH)
+        return NULL;
+    else
+        *outlen = SHA256_DIGEST_LENGTH;
+    return SHA256(in, inlen, out);
+}
+
 
 /*
  *   Return success=0 hash (typically indicates failure to deserialize)
  */
+
+// get counter party's publickey, create ephemeral key, and 
+SV* picocoin_ecdh_encrypt(SV* publickey){
+	STRLEN len; //calculated via SvPV
+	uint8_t * pubkey = (uint8_t*) SvPV(publickey,len);
+	size_t pk_len = (size_t) len;
+
+	if(pk_len <= 0){
+		return &PL_sv_undef;
+	}
+
+	struct bp_key *bp_pubkey = malloc(sizeof(struct bp_key));
+	if(!bp_key_init(bp_pubkey)){
+		bp_key_free(bp_pubkey);
+		return &PL_sv_undef;
+	}
+
+	if(!bp_pubkey_set(bp_pubkey, pubkey, pk_len)){
+		bp_key_free(bp_pubkey);
+		return &PL_sv_undef;
+	}
+	//fprintf(stderr,"part 1\n");
+	// create ephemeral key
+	EC_KEY *ephemeral_key = NULL;
+	const EC_GROUP *group = NULL;
+	group = EC_KEY_get0_group(bp_pubkey->k);
+	ephemeral_key = EC_KEY_new();
+	EC_KEY_set_group(ephemeral_key, group);
+	EC_KEY_generate_key(ephemeral_key);  
+	//fprintf(stderr,"part 2\n");
+	
+	
+	// make an array big enough to handle both uncompressed and compressed public keys 
+	uint8_t ephbuf[100];
+	
+	// POINT_CONVERSION_COMPRESSED, to get 33 bytes instead of the uncompressed 65 bytes
+	size_t ephpub_len = EC_POINT_point2oct(group,EC_KEY_get0_public_key(ephemeral_key)
+		,POINT_CONVERSION_COMPRESSED, ephbuf, 100, NULL
+	);
+	if(ephpub_len <= 0){
+		bp_key_free(bp_pubkey);
+		EC_KEY_free(ephemeral_key);
+		return &PL_sv_undef;
+	}
+	
+	
+	// create buffer to hold the shared secret and the public part of the ephemeral key
+	uint8_t *buf = malloc((SHA256_DIGEST_LENGTH + ephpub_len) * sizeof(uint8_t));
+	memcpy(&buf[SHA256_DIGEST_LENGTH],ephbuf,ephpub_len);
+	
+	// calculate the shared secret with the ephemeral private key and recepient public key
+	ECDH_compute_key(&buf[0], SHA256_DIGEST_LENGTH, EC_KEY_get0_public_key(bp_pubkey->k), ephemeral_key, KDF1_SHA256);
+	
+	bp_key_free(bp_pubkey);
+	EC_KEY_free(ephemeral_key);
+	
+	return (SV* ) newSVpv(buf,SHA256_DIGEST_LENGTH + ephpub_len);
+}
+
+
+
 HV* picocoin_returnblankhdkey(HV * rh){
 	hv_store(rh, "success", 7, newSViv((int) 0), 0);
 	return rh;
@@ -97,6 +168,16 @@ HV* picocoin_returnhdkey(HV * rh, const struct hd_extended_key hdkey){
 		bu_Hash160(md160, pk2, pk_len);
 		free(pk2);
 		hv_store(rh, "ripemdHASH160", 13, newSVpv(md160,RIPEMD160_DIGEST_LENGTH), 0);
+	}
+	
+	uint8_t *privkey = malloc(33 * sizeof(uint8_t));
+	if(bp_key_secret_get(privkey, 32, &hdkey.key)){
+		privkey[32] = 0x01;
+		hv_store(rh, "private key", 11, newSVpv(privkey,33), 0);
+		//fprintf(stderr,"pk length=%d\n",prk_len);
+	}
+	else{
+		free(privkey);
 	}
 	
 	//hd_extended_key_free(&hdkey);
@@ -202,3 +283,7 @@ HV*
 picocoin_generatehdkeychild(xpriv,child_index)
 	SV* xpriv
 	int child_index
+	
+SV*
+picocoin_ecdh_encrypt(publickey)
+	SV* publickey

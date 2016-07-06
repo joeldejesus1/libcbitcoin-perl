@@ -239,7 +239,13 @@ sub initialize_peers {
 	my @files = readdir($fh);
 	closedir($fh);
 	foreach my $f1 (@files){
-		next if $f1 eq '.' || $f1 eq '..';
+		if($f1 =~ m/^([0-9a-zA-Z]+)$/){
+			$f1 = $1;
+		}
+		else{
+			next;
+		}
+		
 		rename("$fp_active/$f1", "$fp_pool/$f1") 
 			|| die "Move $fp_active/$f1 -> $fp_pool/$f1 failed: $!";
 	}
