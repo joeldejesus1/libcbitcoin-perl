@@ -135,16 +135,16 @@ SV* picocoin_ecdh_decrypt(SV* publickey,SV* privatekey){
 	STRLEN len; //calculated via SvPV
 	uint8_t * pubkey = (uint8_t*) SvPV(publickey,len);
 	size_t pubkey_len = (size_t) len;
-	fprintf(stderr,"part 1\n");
+	//fprintf(stderr,"part 1\n");
 	if(pubkey_len != 33){
-		fprintf(stderr,"part 1.1\n");
+		//fprintf(stderr,"part 1.1\n");
 		return &PL_sv_undef;
 	}
 	uint8_t * privkey = (uint8_t*) SvPV(privatekey,len);
 	size_t privk_len = (size_t) len;
-	fprintf(stderr,"part 2\n");
+	//fprintf(stderr,"part 2\n");
 	if(privk_len != 33){
-		fprintf(stderr,"part 2.1\n");
+		//fprintf(stderr,"part 2.1\n");
 		return &PL_sv_undef;
 	}
 	
@@ -152,32 +152,32 @@ SV* picocoin_ecdh_decrypt(SV* publickey,SV* privatekey){
 	// load in the ephemeral public key
 	struct bp_key *bp_pubkey = malloc(sizeof(struct bp_key));
 	if(!bp_key_init(bp_pubkey)){
-		fprintf(stderr,"part 3.1\n");
+		//fprintf(stderr,"part 3.1\n");
 		bp_key_free(bp_pubkey);
 		return &PL_sv_undef;
 	}
 	if(!bp_pubkey_set(bp_pubkey, pubkey, pubkey_len)){
-		fprintf(stderr,"part 4.1\n");
+		//fprintf(stderr,"part 4.1\n");
 		bp_key_free(bp_pubkey);
 		return &PL_sv_undef;
 	}
 	
 	// load in the recepient private key
-	fprintf(stderr,"part 5\n");
+	//fprintf(stderr,"part 5\n");
 	struct bp_key *bp_privkey = malloc(sizeof(struct bp_key));
 	if(!bp_key_init(bp_privkey)){
 		bp_key_free(bp_pubkey);
 		bp_key_free(bp_privkey);
 		return &PL_sv_undef;
 	}
-	fprintf(stderr,"part 6,%d\n",privk_len);
+	//fprintf(stderr,"part 6,%d\n",privk_len);
 	if(!bp_key_secret_set(bp_privkey, privkey, 32)){
 		bp_key_free(bp_pubkey);
 		bp_key_free(bp_privkey);
 		return &PL_sv_undef;
 	}
 
-	fprintf(stderr,"part 7\n");
+	//fprintf(stderr,"part 7\n");
 	// create buffer to hold the shared secret and the public part of the ephemeral key
 	uint8_t *buf = malloc((SHA256_DIGEST_LENGTH) * sizeof(uint8_t));
 	

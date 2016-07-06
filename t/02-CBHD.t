@@ -3,7 +3,9 @@ use strict;
 use warnings;
 
 use CBitcoin;
-use Test::More tests => 15;
+use Crypt::CBC;
+use Digest::SHA;
+use Test::More tests => 18;
 
 
 require CBitcoin::CBHD;
@@ -143,31 +145,37 @@ The purpose here is to be able to encrypt/decrypt data using key pairs derived f
 
 {
 	my $root = CBitcoin::CBHD->generate("my magic seed! 123456789012345678901234567890");
-	my @sender_keys = ($root->privatekey,$root->publickey);
+	#my @sender_keys = ($root->privatekey,$root->publickey);
 	my $root_0_1 = $root->deriveChild(0,1);
 	my @recepient_keys = ($root_0_1->privatekey,$root_0_1->publickey);
 	
-	my $shared_secret = CBitcoin::CBHD::picocoin_ecdh_encrypt($sender_keys[1]);
+	my $shared_secret = CBitcoin::CBHD::picocoin_ecdh_encrypt($recepient_keys[1]);
 	my $eph_pub = substr($shared_secret,32);
 	$shared_secret = substr($shared_secret,0,32);
-	warn "ephpub=[".length($eph_pub)."]=".unpack('H*',$eph_pub)."\n";
-	warn "sendpub=[".length($sender_keys[1])."]=".unpack('H*',$sender_keys[1])."\n";
-	warn "receivepub=[".length($recepient_keys[1])."]=".unpack('H*',$recepient_keys[1])."\n";
-	warn "Shared1=[".length($shared_secret)."]=".unpack('H*',$shared_secret)."\n";
 	
 	my $ssec2 = CBitcoin::CBHD::picocoin_ecdh_decrypt($eph_pub,$recepient_keys[0]);
-	warn "Shared2=[".length($ssec2)."]=".unpack('H*',$ssec2)."\n";
+
 	
-	if($shared_secret eq $ssec2){
-		warn "success!\n";
-	}
-	else{
-		warn "fail!\n";
-	}
-	#my $privkey =
-	#warn "PrivKey=[".length($sender_keys[0])."]=".unpack('H*',$sender_keys[0])."\n"; 
-	#warn "PubKey =[".length($sender_keys[1])."]=".unpack('H*',$sender_keys[1])."\n";
-		
+	ok($shared_secret eq $ssec2,'can we recalculate shared secret?');
+	
+	my $cipher = Crypt::CBC->new(-key    => $shared_secret, -cipher => "Crypt::OpenSSL::AES" );
+	my $plaintext = 'I would like to have an audience with your queen.';
+	my $ciphertext = $cipher->encrypt($plaintext);
+	my $data = pack('C',length($eph_pub)).$eph_pub.$ciphertext;
+	my $hmac = Digest::SHA::hmac_sha256($data,$shared_secret);
+	$data = $hmac.$data;
+
+	$cipher = Crypt::CBC->new(-key    => $ssec2, -cipher => "Crypt::OpenSSL::AES" );
+	my ($hmac2,$l2,$ephpub2);
+	$hmac2 = substr($data,0,32);
+	$data = substr($data,32);
+	ok($hmac2 eq Digest::SHA::hmac_sha256($data,$ssec2),'matching hmac?');
+	
+	$l2 = unpack('C',substr($data,0,1));
+	$ephpub2 = substr($data,1,$l2);
+	$ciphertext = substr($data,1 + $l2);
+	my $plaintext2 = $cipher->decrypt($ciphertext);	
+	ok($plaintext eq $plaintext2,'Can we encrypt and decrypt data?');
 }
 
 
@@ -175,50 +183,3 @@ The purpose here is to be able to encrypt/decrypt data using key pairs derived f
 
 __END__
 
-warn "Starting\n";
-
-my ($address,$h1,$s1,$s1s2);
-
-my $root = CBitcoin::CBHD->new();
-$root->generate();
-$address = $root->address();
-warn "Address:".$address."\n";
-
-# root->(hard,1)
-$h1 = $root->deriveChild(1,1);
-#warn "Root->(hard,1):".$h1->address()."\n... and public key=".$h1->publickey()."\n";
-
-# root->(soft,1)
-$s1 = $root->deriveChild(1,1);
-#warn "Root->(soft,1):".$s1->address()."\n... and public key=".$s1->publickey()."\n";
-#warn "...serialized data=".$s1->serialized_data()."\n";
-$s1s2 = $s1->deriveChild(0,323);
-warn "network=".$s1s2->network_bytes()." and type=".$s1s2->cbhd_type()."\n";
-warn "Root->(hard,1)->(soft,323):".$s1s2->address()."\n... and public key=".$s1s2->publickey()."\n";
-warn "...serialized data=".$s1s2->serialized_data()."\n";
-
-$s1s2 = $s1->deriveChild(1,323);
-warn "network=".$s1s2->network_bytes()." and type=".$s1s2->cbhd_type()."\n";
-warn "Root->(hard,1)->(hard,323):".$s1s2->address()."\n... and public key=".$s1s2->publickey()."\n";
-warn "...serialized data=".$s1s2->serialized_data()."\n";
-
-
-
-#$s1s2 = $s1s2->exportPublicExtendedCBHD($s1s2->serialized_data());
-warn "Root->(soft,1)->(soft,323):".$s1s2->address()."\n... and public key=".$s1s2->publickey()."\n";
-warn "...serialized data=".$s1s2->serialized_data()."\n";
-
-
-# strip private parts from soft child
-
-# root->(soft,1)
-$s1 = $root->deriveChildPubExt(1);
-#warn "Root->(soft,1) with no private parts:".$s1->address()."\n... and public key=".$s1->publickey()."\n";
-#warn "...serialized data=".$s1->serialized_data()."\n";
-
-$s1s2 = $s1->deriveChildPubExt(323);
-warn "Root->(soft,1)->(soft,323) with no private parts:".$s1s2->address()."\n... and public key=".$s1s2->publickey()."\n";
-warn "...serialized data=".$s1s2->serialized_data()."\n";
-warn "network=".$s1s2->network_bytes()." and type=".$s1s2->cbhd_type()."\n";
-
-ok ($address, 'get address');
