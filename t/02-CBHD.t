@@ -5,7 +5,7 @@ use warnings;
 use CBitcoin;
 use Crypt::CBC;
 use Digest::SHA;
-use Test::More tests => 18;
+use Test::More tests => 17;
 
 
 require CBitcoin::CBHD;
@@ -145,37 +145,42 @@ The purpose here is to be able to encrypt/decrypt data using key pairs derived f
 
 {
 	my $root = CBitcoin::CBHD->generate("my magic seed! 123456789012345678901234567890");
-	#my @sender_keys = ($root->privatekey,$root->publickey);
-	my $root_0_1 = $root->deriveChild(0,1);
-	my @recepient_keys = ($root_0_1->privatekey,$root_0_1->publickey);
 	
-	my $shared_secret = CBitcoin::CBHD::picocoin_ecdh_encrypt($recepient_keys[1]);
-	my $eph_pub = substr($shared_secret,32);
-	$shared_secret = substr($shared_secret,0,32);
+	my $plaintext1 = 'Please encrypt me!';
+	open(my $fh1,'<',\$plaintext1);
+	my $readsub1 = sub{
+		my ($xref,$n) = @_;
+		return read($fh1,$$xref,$n);
+	};
+	my $ciphertext1 = ''; 
+	my $writesub1 = sub{
+		my ($xref) = @_;
+		$ciphertext1 .= $$xref;
+		return length($$xref);
+	};	
+	my $header = CBitcoin::CBHD::encrypt($root->publickey,$readsub1,$writesub1);
 	
-	my $ssec2 = CBitcoin::CBHD::picocoin_ecdh_decrypt($eph_pub,$recepient_keys[0]);
+	########### decrypt##############
+	
+	my $ciphertext2 = $ciphertext1;
+	open(my $fh2,'<',\$ciphertext2);
+	my $readsub2 = sub{
+		my ($xref,$n) = @_;
+		return read($fh2,$$xref,$n);
+	};
+	my $plaintext2 = '';
+	my $writesub2 = sub{
+		my ($xref) = @_;
+		$plaintext2 .= $$xref;
+		return length($$xref);
+	};
+	
+	my $success = CBitcoin::CBHD::decrypt($root->privatekey,$header,$readsub2,$writesub2);
+	
+	ok($success,'did decryption work?');
+	
+	ok($plaintext1 eq $plaintext2, 'did we get back the plain text?');
 
-	
-	ok($shared_secret eq $ssec2,'can we recalculate shared secret?');
-	
-	my $cipher = Crypt::CBC->new(-key    => $shared_secret, -cipher => "Crypt::OpenSSL::AES" );
-	my $plaintext = 'I would like to have an audience with your queen.';
-	my $ciphertext = $cipher->encrypt($plaintext);
-	my $data = pack('C',length($eph_pub)).$eph_pub.$ciphertext;
-	my $hmac = Digest::SHA::hmac_sha256($data,$shared_secret);
-	$data = $hmac.$data;
-
-	$cipher = Crypt::CBC->new(-key    => $ssec2, -cipher => "Crypt::OpenSSL::AES" );
-	my ($hmac2,$l2,$ephpub2);
-	$hmac2 = substr($data,0,32);
-	$data = substr($data,32);
-	ok($hmac2 eq Digest::SHA::hmac_sha256($data,$ssec2),'matching hmac?');
-	
-	$l2 = unpack('C',substr($data,0,1));
-	$ephpub2 = substr($data,1,$l2);
-	$ciphertext = substr($data,1 + $l2);
-	my $plaintext2 = $cipher->decrypt($ciphertext);	
-	ok($plaintext eq $plaintext2,'Can we encrypt and decrypt data?');
 }
 
 

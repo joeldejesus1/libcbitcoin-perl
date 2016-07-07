@@ -443,6 +443,119 @@ sub print_to_stderr {
 
 }
 
+=pod
+
+---+ encryption
+
+These are just subroutines, not object methods.
+
+=cut
+
+=pod
+
+---++ encrypt($recepient_pub,$readsub,$writesub)->$cipher_data
+
+$cipher_data = $hmac.$ephemeral_pubkey.$ciphertext
+
+$hmac = hmac_sha256(sha256(data),shared_secret);
+
+=cut
+
+sub encrypt {
+	my ($recepient_pub,$readsub,$writesub) = @_;
+
+	my $shared_secret = CBitcoin::CBHD::picocoin_ecdh_encrypt($recepient_pub);
+	die "no shared secret calculated" unless defined $shared_secret && 32 < length($shared_secret);
+	
+	my $ephemeral_pubkey = substr($shared_secret,32);
+	$shared_secret = substr($shared_secret,0,32);
+
+	my $cipher = Crypt::CBC->new(-key    => $shared_secret, -cipher => "Crypt::OpenSSL::AES" );
+	$cipher->start('encrypting');
+
+	my $sha = Digest::SHA->new(256);
+
+	my $buf = '';
+	
+	while($readsub->(\$buf,8192)){
+		my $cipherbuf = $cipher->crypt($buf);
+		$sha->add($cipherbuf);
+		
+		my ($m,$n) = (0,length($cipherbuf));
+		
+		while(0 < $n - $m){
+			$m += $writesub->(\$cipherbuf,8192);
+		}
+	}
+	{
+		# need to do one more loop
+		my $cipherbuf = $cipher->finish();
+		$sha->add($cipherbuf);
+		my ($m,$n) = (0,length($cipherbuf));
+		
+		while(0 < $n - $m){
+			$m += $writesub->(\$cipherbuf,8192);
+		}
+	}
+	
+	
+	
+	my $hmac = Digest::SHA::hmac_sha256($ephemeral_pubkey.$sha->digest,$shared_secret);
+	
+	return $hmac.$ephemeral_pubkey;
+}
+
+=pod
+
+---++ decrypt($recepient_priv,$header,$readsub,$writesub)->0/1
+
+$cipher_data = $hmac.$ephemeral_pubkey.$ciphertext
+
+=cut
+
+sub decrypt {
+	my ($recepient_priv,$header,$readsub,$writesub) = @_;
+	
+	my $hmac2 = substr($header,0,32);
+	my $ephemeral_pubkey = substr($header,32);
+	
+	my $sha = Digest::SHA->new(256);
+	
+	my $shared_secret = CBitcoin::CBHD::picocoin_ecdh_decrypt($ephemeral_pubkey,$recepient_priv);
+	die "no shared secret calculated" unless defined $shared_secret && length($shared_secret) == 32;
+	my $cipher = Crypt::CBC->new(-key    => $shared_secret, -cipher => "Crypt::OpenSSL::AES" );
+	$cipher->start('decrypting');
+	my $buf = '';
+	while($readsub->(\$buf,8192)){
+		$sha->add($buf);
+		my $plainbuf = $cipher->crypt($buf);
+		
+		my ($m,$n) = (0,length($plainbuf));
+		while(0 < $n - $m){
+			$m += $writesub->(\$plainbuf,8192);
+		}		
+	}
+	{
+		# need to do one more loop
+		my $plainbuf = $cipher->finish();
+		#$sha->add($plainbuf);
+		my ($m,$n) = (0,length($plainbuf));
+		
+		while(0 < $n - $m){
+			$m += $writesub->(\$plainbuf,8192);
+		}
+	}
+	
+	my $hmac = Digest::SHA::hmac_sha256($ephemeral_pubkey.$sha->digest,$shared_secret);
+	
+	if($hmac eq $hmac2){
+		return 1;
+	}
+	else{
+		return 0;
+	}
+}
+
 
 =head1 AUTHOR
 
