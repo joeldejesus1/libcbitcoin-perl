@@ -146,6 +146,18 @@ The purpose here is to be able to encrypt/decrypt data using key pairs derived f
 {
 	my $root = CBitcoin::CBHD->generate("my magic seed! 123456789012345678901234567890");
 	
+	
+#	my ($private_key,$public_key) = (
+#		CBitcoin::CBHD::picocoin_offset_private_key($root->privatekey,"hello mother.")	
+#		,CBitcoin::CBHD::picocoin_offset_public_key($root->publickey,"hello mother.")
+#	);
+	
+	my ($private_key,$public_key) = (
+		$root->privatekey
+		,$root->publickey
+	);
+	
+	
 	my $plaintext1 = 'Please encrypt me!';
 	open(my $fh1,'<',\$plaintext1);
 	my $readsub1 = sub{
@@ -158,7 +170,7 @@ The purpose here is to be able to encrypt/decrypt data using key pairs derived f
 		$ciphertext1 .= $$xref;
 		return length($$xref);
 	};	
-	my $header = CBitcoin::CBHD::encrypt($root->publickey,$readsub1,$writesub1);
+	my $header = CBitcoin::CBHD::encrypt($public_key,$readsub1,$writesub1);
 	
 	########### decrypt##############
 	
@@ -175,12 +187,19 @@ The purpose here is to be able to encrypt/decrypt data using key pairs derived f
 		return length($$xref);
 	};
 	
-	my $success = CBitcoin::CBHD::decrypt($root->privatekey,$header,$readsub2,$writesub2);
+	my $success = CBitcoin::CBHD::decrypt($private_key,$header,$readsub2,$writesub2);
 	
 	ok($success,'did decryption work?');
 	
-	ok($plaintext1 eq $plaintext2, 'did we get back the plain text?');
+	
+	
 
+	
+	
+	
+	
+	
+	ok($plaintext1 eq $plaintext2, 'did we get back the plain text?');
 }
 
 

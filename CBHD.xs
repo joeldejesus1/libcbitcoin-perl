@@ -66,6 +66,169 @@ void *KDF1_SHA256(const void *in, size_t inlen, void *out, size_t *outlen)
 
 
 /*
+ * Given a string/offset, create a new private key and public key
+ */
+SV* picocoin_offset_private_key(SV* privatekey,SV* offset) {
+	SV* returnSV = (SV*)&PL_sv_undef;
+	
+	STRLEN len; //calculated via SvPV
+	uint8_t * privkey = (uint8_t*) SvPV(privatekey,len);
+	if(len < 32){
+		return returnSV;
+	}
+	// load in the private key
+	struct bp_key *bp_privkey = malloc(sizeof(struct bp_key));
+	if(!bp_key_init(bp_privkey)){
+		bp_key_free(bp_privkey);
+		return returnSV;
+	}
+	if(!bp_key_secret_set(bp_privkey, privkey, 32)){
+		bp_key_free(bp_privkey);
+		return returnSV;
+	}
+	
+	BIGNUM *privkey_bn = EC_KEY_get0_private_key(bp_privkey->k);
+	//BN_free(privkey_bn);
+	
+	// now we have bp_privkey, get a 256 bit number for the offset?
+	uint8_t * offset_privkey = (uint8_t*) SvPV(offset,len);
+	if(len <= 0){
+		bp_key_free(bp_privkey);
+		return returnSV;
+	}
+	uint8_t offset_hash[SHA256_DIGEST_LENGTH];
+	SHA256_CTX sha256;
+	SHA256_Init(&sha256);
+	SHA256_Update(&sha256, offset_privkey, len);
+	SHA256_Final(offset_hash, &sha256);
+	
+	BIGNUM *offsetbn = BN_bin2bn(offset_hash, 32, BN_new());
+	
+	BIGNUM *newprivbn = BN_new();
+	
+	BN_CTX *ctx = BN_CTX_new();
+	
+	
+	
+	EC_GROUP *group = EC_KEY_get0_group(bp_privkey->k);
+	
+	
+	BIGNUM * order = BN_new();
+	EC_GROUP_get_order(group, order, ctx);
+	
+	// calculate the new private key
+	if(!BN_mod_add(newprivbn, privkey_bn, offsetbn, order, ctx)){
+		goto err;
+	}
+	
+	uint8_t to[200];
+	int x = BN_bn2bin(newprivbn, to);
+	
+	if(x <= 0){
+		goto err;		
+	}
+	
+	uint8_t * to2 = malloc(x * sizeof(uint8_t));
+	memcpy(to2,to,x);
+	
+	returnSV = (SV *) newSVpv(to2,x);
+	
+err:
+	bp_key_free(bp_privkey);
+	BN_free(offsetbn);
+	BN_free(newprivbn);
+	BN_CTX_free(ctx);
+	BN_free(order);
+	//EC_GROUP_free(group);
+	return returnSV;
+}
+
+/*
+ * Given a string/offset, create a new public key
+ */
+SV* picocoin_offset_public_key(SV* publickey,SV* offset) {
+	SV* returnSV = (SV*)&PL_sv_undef;
+	
+	STRLEN len; //calculated via SvPV
+	
+	uint8_t * pubkey = (uint8_t*) SvPV(publickey,len);
+	size_t pubkey_len = len;
+	if(pubkey_len < 32){
+		return returnSV;
+	}
+	// load in the private key
+	struct bp_key *bp_pubkey = malloc(sizeof(struct bp_key));
+	if(!bp_key_init(bp_pubkey)){
+		bp_key_free(bp_pubkey);
+		return returnSV;
+	}
+
+	
+	if(!bp_pubkey_set(bp_pubkey, pubkey, pubkey_len)){
+		bp_key_free(bp_pubkey);
+		return returnSV;
+	}
+
+
+	const EC_POINT *pubkey_point = EC_KEY_get0_public_key(bp_pubkey->k);
+	
+	// now we have bp_privkey, get a 256 bit number for the offset?
+	uint8_t * offset_privkey = (uint8_t*) SvPV(offset,len);
+	if(len <= 0){
+		bp_key_free(bp_pubkey);
+		return returnSV;
+	}
+	uint8_t offset_hash[SHA256_DIGEST_LENGTH];
+	SHA256_CTX sha256;
+	SHA256_Init(&sha256);
+	SHA256_Update(&sha256, offset_privkey, len);
+	SHA256_Final(offset_hash, &sha256);
+	
+	BIGNUM *offsetbn = BN_bin2bn(offset_hash, 32, BN_new());
+
+	
+	
+	BN_CTX *ctx = BN_CTX_new();	
+	EC_GROUP *group = EC_KEY_get0_group(bp_pubkey->k);
+	
+	EC_POINT *offsetpub = EC_POINT_new(group);
+	EC_POINT *newpub = EC_POINT_new(group);
+	
+
+	
+	// with the offsetbn as a private key, get the public key.
+	if (!EC_POINT_mul(group, offsetpub, offsetbn, NULL, NULL, ctx)){
+		goto err;
+	}
+	
+	if(!EC_POINT_add(group, newpub, pubkey_point, offsetpub, ctx)){
+		goto err;
+	}
+	
+	uint8_t ephbuf[500];
+	size_t ephpub_len = EC_POINT_point2oct(group,newpub
+		,POINT_CONVERSION_COMPRESSED, ephbuf, 500, NULL
+	);
+	
+	
+	uint8_t * newpubout = malloc(ephpub_len * sizeof(uint8_t));
+	memcpy(newpubout,ephbuf,ephpub_len);
+	
+	returnSV = (SV *) newSVpv(newpubout,ephpub_len);
+
+err:
+
+	EC_POINT_free(offsetpub);
+	EC_POINT_free(newpub);
+	BN_CTX_free(ctx);
+	bp_key_free(bp_pubkey);
+	//EC_GROUP_free(group);
+	return returnSV;
+}
+
+
+
+/*
  *   Return success=0 hash (typically indicates failure to deserialize)
  */
 
@@ -127,6 +290,7 @@ SV* picocoin_ecdh_encrypt(SV* publickey){
 	
 	return (SV* ) newSVpv(buf,SHA256_DIGEST_LENGTH + ephpub_len);
 }
+
 
 /*
  * have ephemeral public key and recepient private key 
@@ -359,3 +523,13 @@ SV*
 picocoin_ecdh_decrypt(publickey, privatekey)
 	SV* publickey
 	SV* privatekey
+	
+SV*
+picocoin_offset_private_key(privatekey,offset)
+	SV* privatekey
+	SV* offset
+	
+SV*
+picocoin_offset_public_key(publickey,offset)
+	SV* publickey
+	SV* offset

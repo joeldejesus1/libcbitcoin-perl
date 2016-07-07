@@ -557,6 +557,25 @@ sub decrypt {
 }
 
 
+=pod
+
+---++ offset_keypair_private
+
+Given a private key and an offset, create a new private/public keypair.
+
+=cut
+
+sub offset_keypair_private {
+	my ($private_key,$offset) = @_;
+	die "no offset given" unless defined $offset && 0 < length($offset);
+	
+	# make sure it is 256bits, which is the size of the secp256k1 field.
+	$offset = Digest::SHA::sha256($offset);
+	
+	
+}
+
+
 =head1 AUTHOR
 
 Joel De Jesus, C<< <dejesus.joel at e-flamingo.jp> >>
