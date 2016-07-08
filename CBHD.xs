@@ -116,28 +116,51 @@ SV* picocoin_offset_private_key(SV* privatekey,SV* offset) {
 	BIGNUM * order = BN_new();
 	EC_GROUP_get_order(group, order, ctx);
 	
+	
+	struct bp_key *bp_newprivkey = malloc(sizeof(struct bp_key));
+	EC_POINT * pub_key = EC_POINT_new(group);
+	
 	// calculate the new private key
 	if(!BN_mod_add(newprivbn, privkey_bn, offsetbn, order, ctx)){
 		goto err;
 	}
 	
 	uint8_t to[200];
-	int x = BN_bn2bin(newprivbn, to);
-	
-	if(x <= 0){
+	int to_len = BN_bn2bin(newprivbn, to);
+	if(to_len <= 0){
 		goto err;		
 	}
 	
-	uint8_t * to2 = malloc(x * sizeof(uint8_t));
-	memcpy(to2,to,x);
+	// bp_key_generate
+	if(!bp_key_init(bp_newprivkey)){
+		goto err;
+	}
+	if(!bp_key_secret_set(bp_newprivkey, to, to_len)){
+		goto err;
+	}
 	
-	returnSV = (SV *) newSVpv(to2,x);
+	
+	if (!EC_POINT_mul(group, pub_key, newprivbn, NULL, NULL, ctx)){
+		goto err;
+	}
+		
+	uint8_t ephbuf[500];
+	size_t ephpub_len = EC_POINT_point2oct(group,pub_key
+		,POINT_CONVERSION_COMPRESSED, ephbuf, 500, NULL
+	);
+
+	uint8_t * to2 = malloc((to_len + ephpub_len) * sizeof(uint8_t));
+	memcpy(&to2[0],to,to_len);
+	memcpy(&to2[to_len],ephbuf,ephpub_len);
+	
+	returnSV = (SV *) newSVpv(to2,(to_len + ephpub_len));
 	
 err:
 	bp_key_free(bp_privkey);
 	BN_free(offsetbn);
 	BN_free(newprivbn);
 	BN_CTX_free(ctx);
+	EC_POINT_free(pub_key);
 	BN_free(order);
 	//EC_GROUP_free(group);
 	return returnSV;
@@ -179,6 +202,7 @@ SV* picocoin_offset_public_key(SV* publickey,SV* offset) {
 		return returnSV;
 	}
 	uint8_t offset_hash[SHA256_DIGEST_LENGTH];
+	memset(offset_hash, 0, SHA256_DIGEST_LENGTH);
 	SHA256_CTX sha256;
 	SHA256_Init(&sha256);
 	SHA256_Update(&sha256, offset_privkey, len);
@@ -206,6 +230,7 @@ SV* picocoin_offset_public_key(SV* publickey,SV* offset) {
 	}
 	
 	uint8_t ephbuf[500];
+	memset(ephbuf, 0, 500);
 	size_t ephpub_len = EC_POINT_point2oct(group,newpub
 		,POINT_CONVERSION_COMPRESSED, ephbuf, 500, NULL
 	);
@@ -299,16 +324,13 @@ SV* picocoin_ecdh_decrypt(SV* publickey,SV* privatekey){
 	STRLEN len; //calculated via SvPV
 	uint8_t * pubkey = (uint8_t*) SvPV(publickey,len);
 	size_t pubkey_len = (size_t) len;
-	//fprintf(stderr,"part 1\n");
 	if(pubkey_len != 33){
 		//fprintf(stderr,"part 1.1\n");
 		return &PL_sv_undef;
 	}
 	uint8_t * privkey = (uint8_t*) SvPV(privatekey,len);
 	size_t privk_len = (size_t) len;
-	//fprintf(stderr,"part 2\n");
-	if(privk_len != 33){
-		//fprintf(stderr,"part 2.1\n");
+	if(privk_len != 33 && privk_len != 32){
 		return &PL_sv_undef;
 	}
 	
@@ -327,14 +349,12 @@ SV* picocoin_ecdh_decrypt(SV* publickey,SV* privatekey){
 	}
 	
 	// load in the recepient private key
-	//fprintf(stderr,"part 5\n");
 	struct bp_key *bp_privkey = malloc(sizeof(struct bp_key));
 	if(!bp_key_init(bp_privkey)){
 		bp_key_free(bp_pubkey);
 		bp_key_free(bp_privkey);
 		return &PL_sv_undef;
 	}
-	//fprintf(stderr,"part 6,%d\n",privk_len);
 	if(!bp_key_secret_set(bp_privkey, privkey, 32)){
 		bp_key_free(bp_pubkey);
 		bp_key_free(bp_privkey);

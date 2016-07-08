@@ -5,7 +5,7 @@ use warnings;
 use CBitcoin;
 use Crypt::CBC;
 use Digest::SHA;
-use Test::More tests => 17;
+use Test::More tests => 18;
 
 
 require CBitcoin::CBHD;
@@ -192,14 +192,14 @@ The purpose here is to be able to encrypt/decrypt data using key pairs derived f
 	ok($success,'did decryption work?');
 	
 	
-	
-
-	
-	
-	
-	
-	
 	ok($plaintext1 eq $plaintext2, 'did we get back the plain text?');
+
+	my $newstuff = CBitcoin::CBHD::picocoin_offset_private_key($root->privatekey,"hello mother.");
+	my ($priv,$pub) = (substr($newstuff,0,32),substr($newstuff,32));
+	my $pub2 = CBitcoin::CBHD::picocoin_offset_public_key($root->publickey,"hello mother.");
+	
+	
+	ok($pub eq $pub2, 'Is it possible to make a new private/public EC_Key using an arbitrary string as an offset?');
 }
 
 
