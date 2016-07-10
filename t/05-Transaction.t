@@ -25,7 +25,7 @@ my @outputs;
 			'hash' => '60163bdd79e0b67b33eb07dd941af5dfd9ca79b85866c9d69993d95488e71f2d'
 			,'index' => 3
 			,'script' => 'OP_DUP OP_HASH160 0x'.
-				unpack('H*',$root->deriveChild(1,1)->{'ripemdHASH160'})
+				unpack('H*',$root->deriveChild(1,1)->ripemdHASH160)
 				.' OP_EQUALVERIFY OP_CHECKSIG'
 			,'value' => 0.01032173*100000000
 		}
@@ -33,7 +33,7 @@ my @outputs;
 			'hash' => '353082e37e57d2006517db8b6a75d905c49ae528cfff523a959a4fbf44203860'
 			,'index' => 0
 			,'script' => 'OP_DUP OP_HASH160 0x'.
-				unpack('H*',$root->deriveChild(1,2)->{'ripemdHASH160'})
+				unpack('H*',$root->deriveChild(1,2)->ripemdHASH160)
 				.' OP_EQUALVERIFY OP_CHECKSIG'
 			,'value' => 0.00119999*100000000		
 		}

@@ -303,6 +303,31 @@ sub deserialize_script {
 }
 
 
+=pod
+
+---++ multisig_p2sh_script($m,$n,@pubksy)
+
+=cut
+
+sub multisig_p2sh_script {
+	my ($m,$n)= (shift,shift);
+	
+	die "bad n size" unless defined $n && $n =~ m/^\d+$/ && 1 < $n && $n <= 15;
+	die "bad m size" unless defined $m && $m =~ m/^\d+$/ && 0 < $m && $m <= $n;
+	my @ins = sort @_;
+	
+	die "bad number of pubkeys" unless scalar(@ins) == $n;
+	
+	my @pubs;
+	foreach my $pubkey (@ins){
+		die "bad public key" unless defined $pubkey && 32 <= length($pubkey) && length($pubkey) < 34;
+		push(@pubs,'0x'.unpack('H*',$pubkey));
+	}
+	
+	return "OP_$m ".join(' ',@pubs)." OP_$n OP_CHECKMULTISIG";
+}
+
+
 =head1 AUTHOR
 
 Joel De Jesus, C<< <dejesus.joel at e-flamingo.jp> >>

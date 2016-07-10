@@ -386,6 +386,16 @@ sub privatekey {
 	return shift->{'private key'};
 }
 
+=pod
+
+---++ ripemdHASH160
+
+=cut
+
+sub ripemdHASH160 {
+	return shift->{'ripemdHASH160'};
+}
+
 
 =pod
 
