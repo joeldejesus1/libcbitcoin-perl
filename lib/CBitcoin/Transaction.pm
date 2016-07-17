@@ -364,12 +364,12 @@ sub calculate_signature {
 
 =pod
 
----++ assemble_multisig_p2sh($i,$n,@keys)
+---++ assemble_multisig_p2sh($i,$n,@keys,$txraw)
 
 =cut
 
 sub assemble_multisig_p2sh {
-	my ($this,$i,$n,@keys) = @_;
+	my ($this,$i,$n,@keys,$txraw) = @_;
 	# do some testing
 	die "bad index" unless defined $i && 0 <= $i && $i < $this->numOfInputs();
 	
@@ -377,13 +377,36 @@ sub assemble_multisig_p2sh {
 		defined $n && 0 < $n && $n < 15
 		&& 0 < scalar(@keys) && scalar(@keys) <= $n;
 	my $m = scalar(@keys);
+
+
+	my $txdata;
+	if(defined $txraw){
+		$txdata = $txraw;
+	}
+	else{
+		$txdata = $this->serialize();
+	}
+	
+	
+
+	
 	
 	# grab all the sigs
-	my @sigs;
+	#my @sigs;
 	foreach my $key (@keys){
-		push(@sigs,$this->calculate_signature($i,$key));
-		die "bad signature" unless defined $sigs[-1] && 0 < length($sigs[-1]);
+		#push(@sigs,$this->calculate_signature($i,$key));
+		#die "bad signature" unless defined $sigs[-1] && 0 < length($sigs[-1]);
+		$txraw = picocoin_tx_sign_p2pkh(
+			$key->serialized_private(),
+			CBitcoin::Script::serialize_script($this->input($i)->script()),
+			$txdata,
+			$i,
+			SIGHASH_ALL
+		);
+		die "bad signature" unless defined $txraw && 0 < length($txraw);
+		
 	}
+	return $txraw;
 	# OP_PUSHDATA1
 }
 
