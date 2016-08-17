@@ -1,7 +1,7 @@
 package CBitcoin::CBHD;
 
 #use 5.014002;
-use bigint;
+# use bigint; # do not use this, delete on next update
 use strict;
 use warnings;
 

@@ -11,6 +11,9 @@ To create scripts, see CBitcoin::Script. To create transactions, see CBitcoin::T
 
 To see how an spv client works, check out the t/spv.t.no script.  It contains an example of how to implement an spv client in perl.  Though, this section is work in progress.
 
+For more information, please take a look (http://e-flamingo.net/pages/)[at this blog post].
+
+
 ## DEBIAN INSTALLATION
 
 To compile a debian package, first install libccoin0, which is https://github.com/favioflamingo/picocoin.  Once you compile and install the cbitcoin source package, go into the main directory and type:
