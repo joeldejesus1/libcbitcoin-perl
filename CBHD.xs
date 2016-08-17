@@ -308,7 +308,7 @@ SV* picocoin_ecdh_encrypt(SV* publickey){
 	memcpy(&buf[SHA256_DIGEST_LENGTH],ephbuf,ephpub_len);
 	
 	// calculate the shared secret with the ephemeral private key and recepient public key
-	ECDH_compute_key(&buf[0], SHA256_DIGEST_LENGTH, EC_KEY_get0_public_key(bp_pubkey->k), ephemeral_key, KDF1_SHA256);
+	ECDH_compute_key(&buf[0], SHA256_DIGEST_LENGTH, EC_KEY_get0_public_key(bp_pubkey->k), ephemeral_key, NULL);
 	
 	bp_key_free(bp_pubkey);
 	EC_KEY_free(ephemeral_key);

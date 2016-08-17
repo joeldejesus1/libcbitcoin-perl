@@ -3,7 +3,6 @@ package CBitcoin;
 #use 5.014002;
 use strict;
 use warnings;
-use bigint;
 
 use constant {
 	MAINNET => 0xD9B4BEF9,
