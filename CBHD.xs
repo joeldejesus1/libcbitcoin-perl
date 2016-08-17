@@ -65,6 +65,39 @@ void *KDF1_SHA256(const void *in, size_t inlen, void *out, size_t *outlen)
 }
 
 
+uint8_t* sharedsecret(const EC_GROUP* group,const EC_POINT * ep_pub, const BIGNUM *bn_priv, size_t * sec_len){
+	
+	int field_size = EC_GROUP_get_degree(group);
+	
+	BN_CTX *ctx = BN_CTX_new();
+	EC_POINT* sspoint = EC_POINT_new(group);
+	EC_POINT_mul(group,sspoint,NULL,ep_pub,bn_priv,ctx);
+	
+	BIGNUM *x = BN_new();
+	BIGNUM *y = BN_new();
+
+	if(EC_POINT_get_affine_coordinates_GFp(group, sspoint, x, y, NULL)){
+		*sec_len = BN_num_bytes(x);
+		uint8_t * buf = (uint8_t *) OPENSSL_malloc(*sec_len);
+		BN_bn2bin(x,buf);
+		BN_CTX_free(ctx);
+		BN_free(x);
+		BN_free(y);
+		EC_POINT_free(sspoint);
+		
+		return buf;
+	}
+	else{
+		BN_CTX_free(ctx);
+		BN_free(x);
+		BN_free(y);
+		EC_POINT_free(sspoint);
+		sec_len = 0;
+		return NULL;
+	}
+}
+
+
 /*
  * Given a string/offset, create a new private key and public key
  */
@@ -304,16 +337,28 @@ SV* picocoin_ecdh_encrypt(SV* publickey){
 	
 	
 	// create buffer to hold the shared secret and the public part of the ephemeral key
-	uint8_t *buf = malloc((SHA256_DIGEST_LENGTH + ephpub_len) * sizeof(uint8_t));
-	memcpy(&buf[SHA256_DIGEST_LENGTH],ephbuf,ephpub_len);
+	//uint8_t *buf = malloc((SHA256_DIGEST_LENGTH + ephpub_len) * sizeof(uint8_t));
+	///memcpy(&buf[SHA256_DIGEST_LENGTH],ephbuf,ephpub_len);
 	
-	// calculate the shared secret with the ephemeral private key and recepient public key
-	ECDH_compute_key(&buf[0], SHA256_DIGEST_LENGTH, EC_KEY_get0_public_key(bp_pubkey->k), ephemeral_key, NULL);
+	size_t sec_len = 0;
+	uint8_t * ssbuf = sharedsecret(
+		group, EC_KEY_get0_public_key(bp_pubkey->k), EC_KEY_get0_private_key(ephemeral_key), &sec_len
+	);
 	
 	bp_key_free(bp_pubkey);
 	EC_KEY_free(ephemeral_key);
 	
-	return (SV* ) newSVpv(buf,SHA256_DIGEST_LENGTH + ephpub_len);
+	if(ssbuf != NULL){
+		uint8_t * buf = OPENSSL_malloc(sec_len + ephpub_len);
+		memcpy(&buf[0],ssbuf,sec_len);
+		memcpy(&buf[sec_len],ephbuf,ephpub_len);
+		OPENSSL_free(ssbuf);
+		return (SV* ) newSVpv(buf,sec_len + ephpub_len);
+	}
+	else{
+		
+		return &PL_sv_undef;
+	}
 }
 
 
@@ -361,20 +406,26 @@ SV* picocoin_ecdh_decrypt(SV* publickey,SV* privatekey){
 		return &PL_sv_undef;
 	}
 
-	//fprintf(stderr,"part 7\n");
-	// create 	buffer to hold the shared secret and the public part of the ephemeral key
-	uint8_t *buf = malloc((SHA256_DIGEST_LENGTH) * sizeof(uint8_t));
 	
 	// calculate the shared secret with the ephemeral private key and recepient public key
-	ECDH_compute_key(
-		&buf[0], SHA256_DIGEST_LENGTH, EC_KEY_get0_public_key(bp_pubkey->k)
-		, bp_privkey->k, NULL
+	//int field_size = EC_GROUP_get_degree(EC_KEY_get0_group(key));
+
+	const EC_GROUP *group = EC_KEY_get0_group(bp_privkey->k);
+
+	size_t sec_len = 0;
+	uint8_t * ssbuf = sharedsecret(
+		group,  EC_KEY_get0_public_key(bp_pubkey->k), EC_KEY_get0_private_key(bp_privkey->k), &sec_len
 	);
-	
 	bp_key_free(bp_pubkey);
 	bp_key_free(bp_privkey);
 	
-	return (SV* ) newSVpv(buf,SHA256_DIGEST_LENGTH);
+	if(ssbuf != NULL){
+		return (SV* ) newSVpv(ssbuf,sec_len);
+	}
+	else{
+		return &PL_sv_undef;
+	}
+	
 }
 
 

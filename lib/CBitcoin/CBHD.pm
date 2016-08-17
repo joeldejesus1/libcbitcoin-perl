@@ -43,6 +43,8 @@ sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 our $minimum_seed_length = 30;
 
+our $default_kdf_sub = sub{			return Digest::SHA::sha256(shift); 	};
+
 # Preloaded methods go here.
 
 =pod
@@ -475,10 +477,12 @@ sub encrypt {
 	my ($recepient_pub,$readsub,$writesub) = @_;
 
 	my $shared_secret = CBitcoin::CBHD::picocoin_ecdh_encrypt($recepient_pub);
+	
+	
 	die "no shared secret calculated" unless defined $shared_secret && 32 < length($shared_secret);
 	
 	my $ephemeral_pubkey = substr($shared_secret,32);
-	$shared_secret = substr($shared_secret,0,32);
+	$shared_secret = $default_kdf_sub->(substr($shared_secret,0,32));
 
 	my $cipher = Crypt::CBC->new(-key    => $shared_secret, -cipher => "Crypt::OpenSSL::AES" );
 	$cipher->start('encrypting');
@@ -531,7 +535,8 @@ sub decrypt {
 	
 	my $sha = Digest::SHA->new(256);
 	
-	my $shared_secret = CBitcoin::CBHD::picocoin_ecdh_decrypt($ephemeral_pubkey,$recepient_priv);
+	my $shared_secret = shared_secret($ephemeral_pubkey,$recepient_priv,$default_kdf_sub);
+	#my $shared_secret = CBitcoin::CBHD::picocoin_ecdh_decrypt($ephemeral_pubkey,$recepient_priv);
 	die "no shared secret calculated" unless defined $shared_secret && length($shared_secret) == 32;
 	my $cipher = Crypt::CBC->new(-key    => $shared_secret, -cipher => "Crypt::OpenSSL::AES" );
 	$cipher->start('decrypting');
@@ -583,6 +588,32 @@ sub offset_keypair_private {
 	$offset = Digest::SHA::sha256($offset);
 	
 	
+}
+
+
+=pod
+
+---++ shared_secret($pubkey,$privkey,$kdf1_sub)->0/1
+
+=cut
+
+sub shared_secret {
+	my ($pubkey,$privkey,$kdfsub) = @_;
+	
+	die "no pub/priv key[".length($pubkey)."][".length($privkey)."]" unless $pubkey && $privkey;
+	
+	if(defined $kdfsub && ref($kdfsub) ne 'CODE'){
+		die "bad kdf";
+	}
+	elsif(!defined $kdfsub){
+		$kdfsub = $default_kdf_sub;
+	}
+	
+	
+	my $ss = CBitcoin::CBHD::picocoin_ecdh_decrypt($pubkey,$privkey);
+	return undef unless defined $ss && 0 < length($ss);
+	
+	return $kdfsub->($ss);	
 }
 
 
