@@ -2,9 +2,13 @@ package CBitcoin::Utilities;
 
 use strict;
 use warnings;
+
 use Net::IP;
 use Convert::Base32;
 use constant TORPREFIX => 'fd87d87eeb43';
+
+use Log::Log4perl;
+my $logger = Log::Log4perl->get_logger();
 
 =pod
 
@@ -24,6 +28,7 @@ Convert AAA.BBB.CCC.DDD to network byte notation, an onion address to ipv6 local
 =cut
 
 sub ip_convert_to_binary {
+	
 	my($string) = (shift);
 	
 	if($string =~ m/^([0-9A-Za-z]+)\.onion$/){
@@ -207,12 +212,29 @@ sub generate_random {
 	my $bytes = shift;
 	$bytes ||= 8;
 	open(my $fh,'<','/dev/random') || die "cannot open /dev/random";
-	my $buf;
-	sysread($fh,$buf,$bytes);
+	my ($n,$buf) = (0,undef);
+	while(0 < $bytes - $n){
+		$n += sysread($fh,$buf,$bytes-$n,$n); 
+	}
 	close($fh);
+	$logger->debug("$bytes vs ".length($buf));
 	return $buf;
 }
 
+
+sub generate_urandom {
+	my $bytes = shift;
+	$bytes ||= 8;
+	open(my $fh,'<','/dev/urandom') || die "cannot open /dev/urandom";
+
+	my ($n,$buf) = (0,undef);
+	while(0 < $bytes - $n){
+		$n += sysread($fh,$buf,$bytes-$n,$n); 
+	}
+	close($fh);
+	$logger->debug("$bytes vs ".length($buf));
+	return $buf;
+}
 
 
 
@@ -299,7 +321,9 @@ sub deserialize_inv{
 sub serialize_varint {
 	my $integer = shift;
 	die "bad integer" unless defined $integer && $integer =~ m/^(\d+)$/;
+	$logger->debug("Got integer=$integer");
 	if($integer < 0xfd ){
+		$logger->debug("outputting:".unpack('H*',pack('C',$integer)));
 		return pack('C',$integer);
 	}
 	elsif($integer <= 0xffff){
@@ -325,6 +349,7 @@ IE: /Satoshi:5.64/bitcoin-qt:0.4/
 sub serialize_varstr {
 	my $str = shift;
 	$str = '' unless defined $str;
+	$logger->debug("length=".length($str)." for string=$str");
 	return serialize_varint(length($str)).$str;
 }
 

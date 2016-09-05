@@ -3,13 +3,17 @@ package CBitcoin::SPV;
 use strict;
 use warnings;
 
+
 use CBitcoin::Message;
 use CBitcoin::Utilities;
 use CBitcoin::Peer;
 use CBitcoin::Block;
+
 use Net::IP;
 use Fcntl ':flock'; # Import LOCK_* constants
-use  Log::Log4perl;
+use Log::Log4perl;
+
+
 
 =pod
 
@@ -111,7 +115,7 @@ sub init {
 	
 	$options->{'version'} = 70001 unless defined $options->{'version'};
 	
-	$options->{'db path'} = '/tmp/spv' unless defined $options->{'db path'};
+	$options->{'db path'} = '/tmp/spv' unless defined $options->{'db path'} && -e $options->{'db path'};
 	
 
 	$options->{'last getaddr'} = 0;
@@ -136,6 +140,9 @@ sub init {
 	foreach my $key (keys %{$options}){
 		$this->{$key} = $options->{$key};
 	}
+	
+	$logger->debug("Client Name=[".$this->{'client name'}."]");
+	
 	
 	$this->add_bloom_filter($options->{'bloom filter'});
 
@@ -369,7 +376,7 @@ sub initialize_chain_scan_files {
 	my $hchain = $this->{'chain'};
 	# get all the hashes
 	# format=1,3,the rest
-	open(my $fh,'<','/tmp/spv/checkpoints');
+	open(my $fh,'<', $base.'/checkpoints');
 	my ($n,$buf,$leftover);
 #	$leftover = '';
 	my $i = 0;
@@ -459,7 +466,7 @@ sub checkpoint_savefh {
 	my ($this) = @_;
 	return $this->{'chain'}->{'checkpoint filehandle'} if defined $this->{'chain'}->{'checkpoint filehandle'};
 	
-	open(my $cpfh,'>>',$this->db_path().'/checkpoints') || die "cannot open checkpoint file";
+	open(my $cpfh,'>>',$this->db_path().'/checkpoints') || die "cannot open checkpoint file: fp=".$this->db_path().'/checkpoints';
 	$this->{'chain'}->{'checkpoint filehandle'} = $cpfh;
 	
 	
@@ -481,11 +488,13 @@ In the directory:
 sub add_header_to_chain {
 	my ($this,$peer, $header) = @_;
 	die "header is null" unless defined $header;
-
 	
-
 	$this->add_header_to_inmemory_chain($peer, $header);
-	#return $this->block_height(1);
+	
+	
+	
+	$logger->debug("sending block out on cnc");
+	# $this->cnc_send_message('cnc out','new peer:'.$peer->address);
 }
 
 =pod
@@ -520,7 +529,8 @@ sub add_header_to_inmemory_chain {
 	if($pchain->{'latest'} ne $header->prevBlockHash && !defined $pchain->{'header hash to hash'}->{$header->prevBlockHash}){
 		# got out of order block, either an orphan or chain reorganization
 		# TODO: set up chain reorg subroutine
-		warn "got an orphan\n";
+		#warn "got an orphan\n";
+		$logger->debug("got an orphan");
 		$pchain->{'orphans'}->{$header->hash} = $header;
 		
 	}
@@ -540,7 +550,8 @@ sub add_header_to_inmemory_chain {
 		push(@{$pchain->{'headers'}},$header->hash);
 		
 		# what do do with the rest?
-		warn "Adding header to official chain\n";
+		#warn "Adding header to official chain\n";
+		$logger->debug("Adding header to official chain");
 		#push(@{$this->{'headers'}},$header->hash);
 		
 		#print "Bail out!";
@@ -803,8 +814,9 @@ Given a block hash and a transaction, do something.
 sub add_tx_to_db {
 	my ($this,$block_hash,$tx) = @_;
 
-	warn "Tx with inputs=".scalar(@{$tx->{'inputs'}})." and outputs=".
-		scalar(@{$tx->{'outputs'}})."\n";
+	#warn ."\n";
+	$logger->debug("Tx with inputs=".scalar(@{$tx->{'inputs'}})." and outputs=".
+		scalar(@{$tx->{'outputs'}}));
 
 }
 
@@ -817,7 +829,8 @@ sub add_tx_to_db {
 sub add_peer_to_db {
 	my ($this,$peer) = @_;
 	
-	warn "Got Peer in database\n";
+	#warn "Got Peer in database\n";
+	$logger->debug("Got Peer in database")
 }
 
 =pod
@@ -881,7 +894,7 @@ sub peer_set_sleepsub {
 	return undef unless defined $socket && 0 < fileno($socket);
 	return undef unless defined $sub && ref($sub) eq 'CODE';
 	
-	
+	$logger->debug("1");
 	my $peer = $this->peer_by_fileno(fileno($socket));
 	$this->{'peer sleepsub'}->{fileno($socket)} = sub{
 		my $p2 = $peer;
@@ -1097,6 +1110,7 @@ sub activate_peer {
 		
 		eval{
 			#warn "part 1\n";
+			$logger->debug("part 1");
 			rename($dir_pool.'/'.$latest,$dir_pending.'/'.$latest) || die "alpha";
 			
 			# create connection
@@ -1104,6 +1118,7 @@ sub activate_peer {
 			my @guts = <$fh>;
 			close($fh);
 			#warn "part 2\n";
+			$logger->debug("part 2");
 			die "charlie" unless scalar(@guts) == 3;
 			
 			# connect with ip address and port
@@ -1112,6 +1127,7 @@ sub activate_peer {
 			# so, let that logic be elsewhere, just send an anonymous subroutine
 			$socket = $connect_sub->($this,$guts[1],$guts[2]);
 			#warn "part 3 with socket=".fileno($socket)."\n";
+			$logger->debug("part 3 with socket=".fileno($socket));
 			
 			unless(defined $socket && fileno($socket) > 0){
 				rename($dir_pending.'/'.$latest,$dir_banned.'/'.$latest);
@@ -1119,8 +1135,10 @@ sub activate_peer {
 			}
 			
 			# we have a socket, ready to go
+			$logger->debug("part 3.1");
 			$this->add_peer($socket,$guts[1],$guts[2]);
 			#warn "part 4\n";
+			$logger->debug("part 4");
 			rename($dir_pending.'/'.$latest,$dir_active.'/'.$latest);
 			
 		};
@@ -1204,6 +1222,7 @@ sub add_peer{
 	my ($this,$socket, $addr_recv_ip,$addr_recv_port) = @_;
 	
 	my $ref = $this->our_address();
+	$logger->debug("0");
 	my $peer = CBitcoin::Peer->new({
 		'spv' => $this,
 		'socket' => $socket,
@@ -1211,9 +1230,10 @@ sub add_peer{
 		'our address' => $ref->[0], 'our port' => $ref->[1],
 		'read buffer size' => $this->{'read buffer size'}
 	});
+	$logger->debug("1");
 	# basically, this gets overloaded by an inheriting class
 	$this->add_peer_to_db($peer);
-
+	$logger->debug("2");
 
 	$this->cnc_send_message('cnc out','new peer:'.$peer->address);
 
@@ -1307,8 +1327,7 @@ sub close_peer {
 	delete $this->{'peers by address:port'}->{$peer->address};
 	
 	
-	
-	warn "Peer of ".$peer->address." and ".$peer->port." with filename=$filename has been closed and deleted.\n";
+	$logger->debug("Peer of ".$peer->address." and ".$peer->port." with filename=$filename has been closed and deleted.");
 }
 
 
@@ -1425,10 +1444,12 @@ sub hook_peer_onreadidle {
 	#	$this->{'getblocks timeout'} = time();
 	#}
 	
-	warn "Peer=".$peer->address().";Num of Headers=".scalar(@{$this->{'headers'}})."\n";
+	#warn "Peer=".$peer->address().";Num of Headers=".scalar(@{$this->{'headers'}})."\n";
+	$logger->debug("Peer=".$peer->address().";Num of Headers=".scalar(@{$this->{'headers'}}));
 	
 	if(0 < $this->hook_getdata_blocks_preview()){
-		warn "Need to fetch more inv\n";
+		#warn "Need to fetch more inv\n";
+		$logger->debug("Neet to fetch more inv");
 		$peer->send_getdata($this->hook_getdata());
 	}
 	else{
@@ -1437,13 +1458,14 @@ sub hook_peer_onreadidle {
 		if($this->block_height() < $peer->block_height()){
 			#warn ."\n";
 			$logger->debug("alpha; block height diff=".( $peer->block_height() - $this->block_height() ));
-			#$peer->send_getblocks();
-			$peer->send_getheaders();
+			$peer->send_getblocks();
+			#$peer->send_getheaders();
 			#print "Bail out!";
 			#exit 0;
 		}
 		else{
-			warn "we are caught up with peer=$peer";
+			#warn "we are caught up with peer=$peer";
+			$logger->debug("we are caught up with peer=$peer");
 			#$peer->send_getaddr();
 		}		
 	}
@@ -1871,7 +1893,7 @@ sub callback_run {
 		&& ref($cm->{'command'}->{$command}->{'subroutine'}) eq 'CODE'
 	){
 		# run the default callback
-		warn "Running callback with command=$command\n";
+		$logger->debug("Running callback with command=$command");
 		$cm->{'command'}->{$command}->{'subroutine'}->($this,$msg,$peer);
 	}
 
@@ -2152,9 +2174,9 @@ sub callback_gotblock {
 	
 	# TODO: Fix the faulty prevBlockHash (returning bogus hash....)
 	
-	warn "Got block=[".$block->hash_hex().
+	$logger->debug("Got block=[".$block->hash_hex().
 		";".$block->transactionNum.
-		";".length($msg->payload())."]\n";
+		";".length($msg->payload())."]");
 	#warn "Cummulative Difficulty:".$peer->chain()->{'cummulative difficulty'}->as_hex()."\n";
 	my $count = $block->transactionNum;
 		#die "let us finish early\n";

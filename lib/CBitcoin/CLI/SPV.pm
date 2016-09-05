@@ -64,6 +64,8 @@ log4perl.appender.screen.layout.ConversionPattern = %d %p> %F{1}:%L %M - %m%n
 
 Strip the prefix and run a regex to validate the file path
 
+A full path must always be provided.
+
 =cut
 
 sub validate_filepath {
@@ -71,6 +73,9 @@ sub validate_filepath {
 	my $prefix = shift;
 	$prefix = '' unless defined $prefix;
 	return undef unless defined $fp && 0 < length($fp);
+	
+	my $prefix_check = substr($fp,0,length($prefix));
+	return undef unless $prefix_check eq $prefix;
 	
 	$fp = substr($fp,length($prefix));
 	
@@ -85,6 +90,7 @@ sub validate_filepath {
 		elsif($dir eq ''){
 			return undef;
 		}
+		
 		
 		if($dir =~ m/^([^*&%\s]+)$/){
 			push(@untainted,$1);
@@ -146,13 +152,15 @@ sub parser {
 		}
 		
 		elsif($arg =~ m/^\-\-clientname\=\"(.*)\"$/){
-			$options->{'clientname'} = $1;
+			warn "parse client name=[$1][$arg]\n";
+			$options->{'client name'} = $1;
 		}
 		elsif($arg =~ m/^\-\-clientname\=(.*)$/){
 			die "bad formatting for clientname, did you forget quotes? \"\"\n";
 		}
 		
 		elsif(validate_filepath($arg,'--logconf=')){
+			warn "logconf ARG=$arg\n";
 			$options->{'logconf'} = validate_filepath($arg,'--logconf=');
 		}
 		elsif($arg =~ m/^\-\-logconf\=(.*)$/){
@@ -160,11 +168,28 @@ sub parser {
 		}
 		
 		elsif(validate_filepath($arg,'--dbpath=')){
+			warn "dbpath ARG=$arg\n";
 			$options->{'db path'} = validate_filepath($arg,'--dbpath=');
 		}
 		elsif($arg =~ m/^\-\-dbpath\=(.*)$/){
 			die "bad formatting for dbpath\n";
 		}
+		
+		
+		elsif($arg =~ m/^\-\-inputfd\=(\d+)$/){
+			$options->{'inputfd'} = $1;
+		}
+		elsif($arg =~ m/^\-\-inputfd\=(.*)$/){
+			die "bad file descriptor";
+		}
+		
+		elsif($arg =~ m/^\-\-outputfd\=(\d+)$/){
+			$options->{'outputfd'} = $1;
+		}
+		elsif($arg =~ m/^\-\-outputfd\=(.*)$/){
+			die "bad file descriptor";
+		}
+		
 	}
 	
 	
@@ -199,6 +224,9 @@ BEGIN{
 }
 
 sub read_cmd_spv{
+	
+	$0 = 'CBitcoin::SPV';
+	
 	my $options = {
 		'node' => [],'watch' => []
 		,'address' => '127.0.0.1'
@@ -226,17 +254,25 @@ sub read_cmd_spv{
 		#push(@scripts,$script);
 	}
 	
+	my $eventloop_options = {
+		'timeout' => $options->{'timeout'}
+	};
+	if(defined $options->{'inputfd'}){
+		$eventloop_options->{'inputfd'} = $options->{'inputfd'};
+	}
+	if(defined $options->{'outputfd'}){
+		$eventloop_options->{'outputfd'} = $options->{'outputfd'};
+	}	
 	
-	
+	warn "prestart cn=".$options->{'client name'}."\n";
 	my $spv = CBitcoin::SPV->new({
-		'client name' => $options->{'clientname'},
+		'client name' => $options->{'client name'},
 		'address' => $options->{'address'},	'port' => $options->{'port'}, # this line is for the purpose of creating version messages (not related to the event loop)
 		'isLocal' => 1,
 		'read buffer size' => 8192*4, # the spv code does have access to the file handle/socket
 		'bloom filter' => $bloomfilter,
-		'event loop' => CBitcoin::DefaultEventLoop->new({
-			'timeout' => $options->{'timeout'}
-		})
+		'db path' => $options->{'db path'},
+		'event loop' => CBitcoin::DefaultEventLoop->new($eventloop_options),
 	});
 	
 	# load in the addresses

@@ -2,9 +2,11 @@ package CBitcoin::Peer;
 
 use strict;
 use warnings;
+
+
 use CBitcoin::Message; 
 use CBitcoin::Utilities;
-use  Log::Log4perl;
+use Log::Log4perl;
 
 use constant BUFFSIZE => 8192*4;
 
@@ -34,8 +36,11 @@ sub new {
 	my $package = shift;
 	my $this = {};
 	bless($this,$package);
+	$logger->debug("1");
 	$this = $this->init(shift);
+	$logger->debug("2");
 	$this->initialize_chain();
+	$logger->debug("3");
 	return $this;
 }
 
@@ -50,18 +55,19 @@ Overload this subroutine when overloading this class.
 sub init {
 	my $this = shift;
 	my $options = shift;
+	$logger->debug("0");
 	die "no options given" unless defined $options && ref($options) eq 'HASH' && defined $options->{'address'} && defined $options->{'port'} 
 		&& defined $options->{'our address'} && defined $options->{'our port'} && defined $options->{'socket'} && fileno($options->{'socket'}) > 0;
 	
 	die "need spv base" unless defined $options->{'spv'};
-	
+	$logger->debug("1");
 	$options->{'block height'} ||= 0;
-	$options->{'version'} ||= 70002; 
+	$options->{'version'} ||= 70012; 
 	$options->{'magic'} = 'MAINNET' unless defined $options->{'magic'};
 	
 	die "no good ip address given" unless CBitcoin::Utilities::ip_convert_to_binary($options->{'address'})
 		&& CBitcoin::Utilities::ip_convert_to_binary($options->{'our address'});
-	
+	$logger->debug("2");
 	die "no good ports given" unless $options->{'port'} =~ m/^\d+$/ && $options->{'our port'} =~ m/^\d+$/;
 	
 
@@ -101,13 +107,15 @@ sub init {
 	$this->{'address'} = $options->{'address'};
 	$this->{'port'} = $options->{'port'};
 	
+	$logger->debug("3");
 	$this->{'handshake'}->{'our version'} = $this->version_serialize(
 		$options->{'address'},$options->{'port'},
 		$options->{'our address'},$options->{'our port'},
 		time(),$options->{'version'},$options->{'block height'}
 	); 
+	$logger->debug("4");
 	$this->send_version();
-	
+	$logger->debug("5");
 	#die "Socket=".fileno($options->{'socket'})."\n";
 
 	return $this;
@@ -140,6 +148,7 @@ Call this subroutine to disconnect and delete this peer.
 
 sub finish {
 	my $this = shift;
+	$logger->debug("1");
 	$this->spv->close_peer(fileno($this->socket()));
 	return 1;
 }
@@ -405,6 +414,7 @@ sub version_deserialize {
 	
 	# blockheight (do sanity check)
 	$version->{'block_height'} = unpack('l',$version->{'block_height'});
+	$logger->debug("Got peer with blockheight=".$version->{'block_height'});
 	unless(0 <= $version->{'block_height'}){
 		$logger->error("bad block height of ".$version->{'block_height'});
 		return undef;
@@ -431,6 +441,8 @@ sub version_deserialize {
 
 sub version_serialize {
 	my $this = shift;
+
+	
 	my ($addr_recv_ip,$addr_recv_port,$addr_from_ip,$addr_from_port,$lastseen,$version,$blockheight) = @_;
 	
 	my $services = 0;
@@ -454,25 +466,34 @@ sub version_serialize {
 	#warn "addr_recv=".unpack('H*',$x);
 	$data .= $x;
 	# addr_from
+	
 	$x = CBitcoin::Utilities::network_address_serialize_forversion($services,$addr_from_ip,$addr_from_port);
+		
 	#warn "addr_from=".unpack('H*',$x);
 	$data .= $x;
 	# nonce
-	$x = CBitcoin::Utilities::generate_random(8);
+	$x = CBitcoin::Utilities::generate_urandom(8);
+	$logger->debug("nonce:".unpack('H*',$x));
 	#warn "nonce=".unpack('H*',$x);
 	$data .= $x;
 	# user agent (null, no string)
 	$x = CBitcoin::Utilities::serialize_varstr($this->spv->client_name());
+	#$x = CBitcoin::Utilities::serialize_varstr('');
+	
 	#warn "user agent=".unpack('H*',$x);
+	$logger->debug("");
 	$data .= $x;
 	# start height
 	$x = pack('l',$blockheight);
 	#warn "blockheight=".unpack('H*',$x);
 	$data .= $x;
+	
 	# bool for relaying
 	$x = pack('C',0);
 	#warn "bool for relaying=".unpack('H*',$x);
 	$data .= $x;
+
+	
 	return $data;
 }
 
@@ -512,15 +533,18 @@ sub read_data {
 	
 	if(defined $n && $n == 0){
 		#warn "Closing peer, socket was closed from the other end.\n";
+		$logger->debug("Closing peer, socket was closed from the other end.");
 		$this->finish();
 	}
 	elsif(defined $n && 0 < $n){
 		$this->bytes_read($n);
-		#warn "Have ".$this->bytes_read()." bytes read into the buffer\n";
+		#warn "Have ".$this->bytes_read()." bytes read into the buffer";
+		$logger->debug("Have ".$this->bytes_read()." bytes read into the buffer");
 		$this->{'rate limiting'}->{'size'} += $n;
 
 
 		while(my $msg = $this->read_data_parse_msg()){
+			$logger->debug("Got command=".$msg->command());
 			if($msg->command eq 'version'){
 				#warn "Getting Message=".ref($msg)."\n";
 				$this->callback_gotversion($msg);
@@ -537,12 +561,28 @@ sub read_data {
 			elsif($this->handshake_finished()){
 				$this->spv->callback_run($msg,$this);
 			}
+			elsif(!$this->handshake_finished() && $msg->command eq 'reject'){
+				my $payload = $msg->payload();
+				open(my $fh,'<',\$payload);
+				my $message = CBitcoin::Utilities::deserialize_varstr($fh);
+				my ($n,$buf);
+				$n = read($fh,$buf,1);
+				my $ccode = unpack('C',$buf);
+				my $reason = CBitcoin::Utilities::deserialize_varstr($fh);
+				close($fh);
+				
+				$logger->debug("Version rejected:\n.....message=[$message]\n.....ccode=[$ccode]\n.....reason=[$reason]");
+				
+				$this->mark_finished();
+			}
 			else{
+				$logger->debug("marking peer as finished");
 				$this->mark_finished();
 			}
 		}
 		
 		if($this->is_marked_finished()){
+			$logger->debug("marked finished");
 			$this->finish();
 		}
 		else{
@@ -551,7 +591,8 @@ sub read_data {
 	}
 	else{
 		# would block
-		#warn "socket is blocking, so skip, error=".$!."\n";
+		$logger->debug("socket is blocking, so skip, error=".$!);
+		#warn "socket is blocking, so skip, error=".$!."";
 	}
 	
 	return undef;
@@ -872,6 +913,7 @@ sub send_getheaders {
 sub send_version {
 	my $this = shift;
 	$this->{'sent version'} = 1;
+	$logger->debug("sending version:\n".unpack('H*',$this->our_version())."\n");
 	return $this->write(CBitcoin::Message::serialize($this->our_version(),'version'));
 }
 

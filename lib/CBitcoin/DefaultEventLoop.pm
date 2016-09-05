@@ -87,8 +87,8 @@ sub new {
 	# $resettimeout->($spv,$socket)
 	my $resettimeout = sub{
 		my ($spv,$sck1) = @_;
-		return undef unless defined $sck1 && 0 < fileno($sck1);
-		
+		return undef unless $sck1  && 0 < fileno($sck1);
+		$logger->debug("reset timeout 1");
 		my $evloop2 = $evloop;
 		my $internal_fn_watcher = $fn_to_watcher;
 		my $c1 = $config;
@@ -135,6 +135,11 @@ sub new {
 	
 	
 	my $connectsub = sub{
+		
+		# need bigint, but it might conflict with CBitcoin TODO: check
+		use bigint;
+		
+		
 		my ($spv,$ipaddress,$port) = @_;
 		my $sck1;
 		my $c2 = $config;
@@ -172,9 +177,7 @@ sub new {
 			}
 			else{
 				$logger->info("connection using normal INET to ($ipaddress:$port)");
-				
-
-				
+								
 				$sck1 = new IO::Socket::INET (
 					PeerHost => $ipaddress,
 					PeerPort => $port,
@@ -187,8 +190,8 @@ sub new {
 			}
 			
 			
-			#warn "Doing connection now, part 2\n";
-			
+			#warn "Doing connection now, part 2";
+			$logger->debug("Doing connection now, part 2");
 			# I/O watcher
 			 
 			my $readwritesub = sub {
@@ -197,16 +200,20 @@ sub new {
 				my $sfn = fileno($sck2);
 				my $spv2 = $spv;
 				my $rst2 = $rst1;
-				#warn "in callback with socket=$sfn\n";
-				if(!defined $sfn || $sfn < 1){
+				#warn "in callback with socket=$sfn";
+				$logger->debug("in callback with socket=$sfn");
+				if(!defined $sfn || $sfn < 1 || !(defined $spv2->peer_by_fileno($sfn))){
 					$logger->info("socket has closed");
 					my $ifw2 = $internal_fn_watcher;
 					delete $ifw2->{fileno($sck1)};
 					return undef;
 				}
 				else{
-					#warn "socket=$sfn\n";
+					#warn "socket=$sfn";
+					$logger->debug("socket=$sfn");
 				}
+				
+				
 				
 				# on read
 				if($revents & EV::READ){
@@ -232,7 +239,7 @@ sub new {
 				}
 			};
 			$internal_fn_watcher->{fileno($sck1)} = $evloop2->io($sck1, EV::READ | EV::WRITE, $readwritesub);
-			
+			$logger->debug("connection part 3");
 			# the sub is $sub->($timeout)
 			$spv->peer_set_sleepsub($sck1,sub{
 				my ($peer2,$timeout) = @_;
@@ -498,13 +505,26 @@ sub cncstdio_add {
 	my ($this,$spv) = @_;
 	
 	my $loop = $this->ev_socket();
-	warn "Hello - 1\n";
+	#warn "Hello - 1\n";
 	my ($our_uid,$our_pid) = ($>,$$); #real uid
-	my $mqin = Kgc::MQ->new({
-		'name' => join('.','spv',$our_uid,'in')
-		,'handle type' => 'read only'
-		,'no hash' => 1
-	});
+	
+	
+	my $mqin;
+	if(defined $this->{'inputfd'}){
+		$mqin = Kgc::MQ->new({
+			'file descriptor' => $this->{'inputfd'}
+			,'handle type' => 'read only'
+		});
+	}
+	else{
+		$mqin = Kgc::MQ->new({
+			'name' => join('.','spv',$our_uid,'in')
+			,'handle type' => 'read only'
+			,'no hash' => 1
+		});		
+	}
+	
+	
 	$this->{'cnc in'}->{'fd'} = $mqin->file_descriptor();
 	$this->{'cnc in'}->{'mq'} = $mqin;
 	$this->{'cnc in'}->{'watcher'} = $loop->io(
@@ -518,13 +538,25 @@ sub cncstdio_add {
 		}
 	);
 	
-	warn "Hello - 2\n";
+	#warn "Hello - 2\n";
 	
-	my $mqout = Kgc::MQ->new({
-		'name' => join('.','spv',$our_uid,'out')
-		,'handle type' => 'write only'
-		,'no hash' => 1
-	});
+	my $mqout;
+	
+	if(defined $this->{'outputfd'}){
+		$mqout = Kgc::MQ->new({
+			'file descriptor' => $this->{'outputfd'}
+			,'handle type' => 'write only'
+		});		
+	}
+	else{
+		$mqout = Kgc::MQ->new({
+			'name' => join('.','spv',$our_uid,'out')
+			,'handle type' => 'write only'
+			,'no hash' => 1
+		});
+	}
+	
+	
 	$this->{'cnc out'}->{'fd'} = $mqout->file_descriptor();
 	$this->{'cnc out'}->{'mq'} = $mqout;
 	$this->{'cnc out'}->{'callback'} = sub{
@@ -545,7 +577,7 @@ sub cncstdio_add {
 	);
 	# for mark off, return the sub to reactivate the watcher
 	$this->{'cnc out'}->{'mark off'} = sub{
-		warn "marking off on cnc out\n";
+		$logger->debug("marking off on cnc out");
 		my $t1 = $this;
 		delete $t1->{'cnc out'}->{'watcher'};
 		return 	$t1->{'cnc out'}->{'mark write'};
@@ -566,7 +598,7 @@ sub cncstdio_add {
 			);
 		}
 	};
-	warn "Hello - 3\n";
+	#warn "Hello - 3\n";
 }
 
 
