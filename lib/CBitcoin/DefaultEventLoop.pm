@@ -45,6 +45,10 @@ sub new {
 		'timeout' => 60
 	} unless defined $config;
 	
+	
+	$logger->debug("got abc outputfd=".$config->{'outputfd'});
+	
+	
 	local $| = 1;
 	
 	my $gen_block = CBitcoin::Block->genesis_block();
@@ -133,6 +137,7 @@ sub new {
 	# figure out socks 5 stuff
 	my $socks5 = add_socks5($config->{'socks5 address'},$config->{'socks5 port'});
 	
+	$logger->debug("got abc2 outputfd=".$config->{'outputfd'});
 	
 	my $connectsub = sub{
 		
@@ -283,6 +288,8 @@ sub new {
 		}
 	};
 	
+	$logger->debug("got abc3 outputfd=".$config->{'outputfd'});
+	
 	my $markwritesub = sub{
 		my ($sck1) = (shift);
 		
@@ -312,7 +319,7 @@ sub new {
 		$evloop2->run();
 	};
 	
-	
+	$logger->debug("got abc4 outputfd=".$config->{'outputfd'});
 	my $this = {
 		'mode setting' => $mode_setting
 		,'reset timeout' => $resettimeout
@@ -327,6 +334,9 @@ sub new {
 		,'spv pids' => []
 	};
 	bless($this,$package);
+	
+	
+	$logger->debug("got abc5 outputfd=".$this->{'config'}->{'outputfd'});
 	
 	return $this;
 }
@@ -508,11 +518,14 @@ sub cncstdio_add {
 	#warn "Hello - 1\n";
 	my ($our_uid,$our_pid) = ($>,$$); #real uid
 	
+	$logger->debug(sub{
+		return "got ghe:".$this->{'config'}->{'outputfd'};
+	});
 	
 	my $mqin;
-	if(defined $this->{'inputfd'}){
+	if(defined $this->{'config'}->{'inputfd'}){
 		$mqin = Kgc::MQ->new({
-			'file descriptor' => $this->{'inputfd'}
+			'file descriptor' => $this->{'config'}->{'inputfd'}
 			,'handle type' => 'read only'
 		});
 	}
@@ -542,11 +555,13 @@ sub cncstdio_add {
 	
 	my $mqout;
 	
-	if(defined $this->{'outputfd'}){
+	if(defined $this->{'config'}->{'outputfd'}){
+		$logger->debug("Got outputfd=".$this->{'config'}->{'outputfd'});
 		$mqout = Kgc::MQ->new({
-			'file descriptor' => $this->{'outputfd'}
+			'file descriptor' => $this->{'config'}->{'outputfd'}
 			,'handle type' => 'write only'
-		});		
+		});
+		
 	}
 	else{
 		$mqout = Kgc::MQ->new({
@@ -564,9 +579,10 @@ sub cncstdio_add {
 		my $spv2 = $spv;
 		my $mqout2 = $mqout;
 		my $t1 = $this;
-		warn "running callback on out\n";
+		$logger->debug("running callback on out");
 		my $msg = $spv2->cnc_send_message_data('cnc out',$t1->{'cnc out'}->{'mark off'});
 		return undef unless defined $msg && 0 < length($msg);
+		$logger->debug("sending message on callback cnc out:[fd=".$mqout2->file_descriptor()."][$msg]");
 		$mqout2->send($msg);
 		#$spv2->receive_message($mqout2->receive());
 	};
@@ -577,8 +593,9 @@ sub cncstdio_add {
 	);
 	# for mark off, return the sub to reactivate the watcher
 	$this->{'cnc out'}->{'mark off'} = sub{
-		$logger->debug("marking off on cnc out");
 		my $t1 = $this;
+		return undef unless defined $t1->{'cnc out'}->{'watcher'};
+		$logger->debug("marking off on cnc out");
 		delete $t1->{'cnc out'}->{'watcher'};
 		return 	$t1->{'cnc out'}->{'mark write'};
 	};
@@ -586,7 +603,8 @@ sub cncstdio_add {
 	$this->{'cnc out'}->{'mark write'} = sub{
 		my $t1 = $this;
 		my $loop2 = $loop;
-		warn "marking write on cnc out\n";
+		
+		$logger->debug("marking write on cnc out");
 		if(defined $t1->{'cnc out'}->{'watcher'}){
 			$t1->{'cnc out'}->{'watcher'}->events(EV::WRITE);
 		}

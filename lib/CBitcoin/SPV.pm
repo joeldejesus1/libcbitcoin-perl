@@ -494,7 +494,7 @@ sub add_header_to_chain {
 	
 	
 	$logger->debug("sending block out on cnc");
-	# $this->cnc_send_message('cnc out','new peer:'.$peer->address);
+	$this->cnc_send_message('cnc out','new header');
 }
 
 =pod
@@ -1721,6 +1721,8 @@ Send a message via one of the cnc mqueues.  The $mark_off_sub turns off the call
 
 Check DefaultEventLoop module to see how this subroutine gets called.
 
+Do not use this subroutine to send messages out from the spv.  Use cnc_send_message for that purpose.
+
 =cut
 
 sub cnc_send_message_data {
@@ -1760,7 +1762,7 @@ sub cnc_send_message {
 		$this->{'cnc callbacks'}->{$target}->{'mark write'}->();
 		delete $this->{'cnc callbacks'}->{$target}->{'mark write'};
 	}
-	
+	$logger->debug("$target queue size is ".scalar(@{$this->{'cnc queues'}->{$target}}));
 	return scalar(@{$this->{'cnc queues'}->{$target}});
 }
 

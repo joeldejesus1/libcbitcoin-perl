@@ -177,6 +177,7 @@ sub parser {
 		
 		
 		elsif($arg =~ m/^\-\-inputfd\=(\d+)$/){
+			warn "Got xyz inputfd=$1";
 			$options->{'inputfd'} = $1;
 		}
 		elsif($arg =~ m/^\-\-inputfd\=(.*)$/){
@@ -184,6 +185,7 @@ sub parser {
 		}
 		
 		elsif($arg =~ m/^\-\-outputfd\=(\d+)$/){
+			warn "Got xyz outputfd=$1";
 			$options->{'outputfd'} = $1;
 		}
 		elsif($arg =~ m/^\-\-outputfd\=(.*)$/){
@@ -192,7 +194,7 @@ sub parser {
 		
 	}
 	
-	
+	warn "Got xyz Both[".$options->{'inputfd'}."][".$options->{'outputfd'}."]\n";
 	
 	return $options;
 }
@@ -257,14 +259,19 @@ sub read_cmd_spv{
 	my $eventloop_options = {
 		'timeout' => $options->{'timeout'}
 	};
+	
 	if(defined $options->{'inputfd'}){
+		#$logger->debug("setting inputfd=".$options->{'inputfd'});
+		warn "setting inputfd=".$options->{'inputfd'};
 		$eventloop_options->{'inputfd'} = $options->{'inputfd'};
 	}
 	if(defined $options->{'outputfd'}){
+		#$logger->debug("setting outputfd=".$options->{'outputfd'});
+		warn "setting outputfd=".$options->{'outputfd'};
 		$eventloop_options->{'outputfd'} = $options->{'outputfd'};
 	}	
 	
-	warn "prestart cn=".$options->{'client name'}."\n";
+	warn "prestart cn=".$options->{'outputfd'}."\n";
 	my $spv = CBitcoin::SPV->new({
 		'client name' => $options->{'client name'},
 		'address' => $options->{'address'},	'port' => $options->{'port'}, # this line is for the purpose of creating version messages (not related to the event loop)
