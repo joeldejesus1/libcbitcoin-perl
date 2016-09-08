@@ -118,6 +118,19 @@ sub init {
 	$logger->debug("5");
 	#die "Socket=".fileno($options->{'socket'})."\n";
 
+
+
+
+	# set up the speed mechanism
+	# ..updated in bytes_read
+	# we keep track of th last 3 checkpoints only
+	$this->{'stats'}->{'speed'} = {
+		'checkpoints' => [[time(),0],[time(),0],[time(),0]]
+		,'current' => 0
+	};
+
+
+
 	return $this;
 }
 
@@ -714,7 +727,21 @@ sub command_buffer {
 
 =pod
 
+---++ speed
+
+The number of bytes downloaded between to sysread calls divided by the time interval.
+
+=cut
+
+sub speed {
+	return shift->{'stats'}->{'speed'}->{'current'};
+}
+
+=pod
+
 ---++ bytes_read
+
+Updates the current download speed.
 
 =cut
 
@@ -723,6 +750,25 @@ sub bytes_read{
 	my $newbytes = shift;
 	if(defined $newbytes && $newbytes > 0){
 		$this->{'bytes read'} += $newbytes;  #implies undefined means 0
+		
+		#my $t_0 = $this->{'stats'}->{'speed'}->{'lasttime'};
+		#$this->{'stats'}->{'speed'}->{'bytes'} = $newbytes;
+		
+		# take weighted average of the last 3 checkpoints
+		my @w = (10,4,1);
+		# delete the oldest point, prepend the newest checkpoint
+		delete $this->{'stats'}->{'speed'}->{'checkpoints'}->[-1];
+		unshift(@{$this->{'stats'}->{'speed'}->{'checkpoints'}},[time(),$newbytes]);
+		my ($s,$tw) = (0,0);
+		for(my $i=0;$i<3;$i++){
+			$s += 1.0*$w[$i] * $this->{'stats'}->{'speed'}->{'checkpoints'}->[$i];
+			$tw += 1.0*$w[$i]; 
+		}
+		$s = $s / $tw;
+		$this->{'stats'}->{'speed'}->{'current'} = $s;
+		
+		
+		
 		return $this->{'bytes read'};
 	}
 	elsif(!defined $newbytes){
@@ -901,7 +947,7 @@ sub send_getheaders {
 		$this->spv->calculate_block_locator($this),
 		'getheaders',
 		$this->magic
-	));	
+	));
 }
 
 =pod

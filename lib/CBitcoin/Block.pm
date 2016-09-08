@@ -279,6 +279,11 @@ sub target_bigint{
 	return $this->{'bits bigint'};
 }
 
+# was the block successfully deserialized
+sub success {
+	return shift->{'success'};
+}
+
 sub nonce {
 	return unpack('L',shift->{'nonce'});
 }
@@ -393,7 +398,7 @@ Used by the spv to track which chain is the "Longest" (ie in terms of difficulty
 sub cummulative_difficulty{
 	my ($this,$x) = @_;
 	if(!defined $x){
-		$this->{'cummulative difficulty'} = -1 unless defined $this->{'cummulative difficulty'};
+		$this->{'cummulative difficulty'} = Math::BigInt->from_hex(0x00) unless defined $this->{'cummulative difficulty'};
 		return $this->{'cummulative difficulty'};
 	}
 	elsif(ref($x) =~ m/BigInt/){

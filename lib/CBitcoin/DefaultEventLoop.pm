@@ -218,7 +218,7 @@ sub new {
 					$logger->debug("socket=$sfn");
 				}
 				
-				
+				# TODO: add skipping mechanism to prevent the cnc mqueue sockets from drowning out
 				
 				# on read
 				if($revents & EV::READ){
@@ -314,6 +314,12 @@ sub new {
 			my $error = $@;
 			die "failed. error=$error\n";
 		};
+		
+		# If we dont put this here, when a connection gets cut, the entire process dies
+		$evloop2->signal('PIPE', sub {
+			$logger->info("A tcp connection and/or PIPE has closed");
+		});
+		
 		
 		$logger->info("entering loop");
 		$evloop2->run();
@@ -518,9 +524,9 @@ sub cncstdio_add {
 	#warn "Hello - 1\n";
 	my ($our_uid,$our_pid) = ($>,$$); #real uid
 	
-	$logger->debug(sub{
-		return "got ghe:".$this->{'config'}->{'outputfd'};
-	});
+	#$logger->debug(sub{
+	#	return "got ghe:".$this->{'config'}->{'outputfd'};
+	#});
 	
 	my $mqin;
 	if(defined $this->{'config'}->{'inputfd'}){
@@ -580,10 +586,14 @@ sub cncstdio_add {
 		my $mqout2 = $mqout;
 		my $t1 = $this;
 		$logger->debug("running callback on out");
-		my $msg = $spv2->cnc_send_message_data('cnc out',$t1->{'cnc out'}->{'mark off'});
-		return undef unless defined $msg && 0 < length($msg);
-		$logger->debug("sending message on callback cnc out:[fd=".$mqout2->file_descriptor()."][$msg]");
-		$mqout2->send($msg);
+		# TODO: use a while loop and send out as many messages as possible
+		# ..otherwise, this socket will get drowned out by the Peer tcp sockets
+		while(my $msg = $spv2->cnc_send_message_data('cnc out',$t1->{'cnc out'}->{'mark off'})){
+			last unless defined $msg && 0 < length($msg);
+#			$logger->debug("sending message=[$msg]");
+			$mqout2->send($msg);
+		}
+		#$logger->debug("sending message on callback cnc out:[fd=".$mqout2->file_descriptor()."][$msg]");
 		#$spv2->receive_message($mqout2->receive());
 	};
 	$this->{'cnc out'}->{'watcher'} = $loop->io(

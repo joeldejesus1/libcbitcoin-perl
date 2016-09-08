@@ -146,6 +146,9 @@ sub init {
 	
 	$this->add_bloom_filter($options->{'bloom filter'});
 
+
+	# stats, speed
+	$this->{'stats'}->{'speed'}->{'current'} = 0;
 	
 }
 
@@ -486,16 +489,14 @@ In the directory:
 =cut
 
 sub add_header_to_chain {
-	my ($this,$peer, $header) = @_;
-	die "header is null" unless defined $header;
+	my ($this,$peer, $block_header) = @_;
+	die "header is null" unless defined $block_header;
 	
-	$this->add_header_to_inmemory_chain($peer, $header);
+	$this->add_header_to_inmemory_chain($peer, $block_header);
 	
 	
-	
-	$logger->debug("sending block out on cnc");
-	$this->cnc_send_message('cnc out','new header');
 }
+
 
 =pod
 
@@ -519,7 +520,9 @@ sub add_header_to_inmemory_chain {
 		#$this->{'header hash to hash'}->{$header->hash} = $header;
 		$this->{'header by hash'}->{$header->hash} = $header;
 		#return undef;
-	}	
+		$logger->debug("sending block out on cnc");
+		$this->cncout_send_header($header);
+	}
 	
 
 	
@@ -1235,7 +1238,7 @@ sub add_peer{
 	$this->add_peer_to_db($peer);
 	$logger->debug("2");
 
-	$this->cnc_send_message('cnc out','new peer:'.$peer->address);
+	#$this->cnc_send_message('cnc out','new peer:'.$peer->address);
 
 	# go by fileno, it is friendly to IO::Epoll
 	$this->{'peers'}->{fileno($socket)} = $peer;
@@ -1458,8 +1461,37 @@ sub hook_peer_onreadidle {
 		if($this->block_height() < $peer->block_height()){
 			#warn ."\n";
 			$logger->debug("alpha; block height diff=".( $peer->block_height() - $this->block_height() ));
-			$peer->send_getblocks();
-			#$peer->send_getheaders();
+			#$peer->send_getblocks();
+			
+			# if the speed is less than 10B/second, then give this to another peer
+			# ..
+			if($peer->speed() < 10){
+				# find another peer
+				$logger->debug("going to activate a peer just in case");
+				$this->activate_peer();
+				
+				my $current_fd = fileno($peer->socket());
+				my @fds = @{$this->{'peers'}};
+				my $bool = 1;
+				while(my $fd = shift(@fds)){
+					next if $fd == $current_fd;
+					my $other_peer = $this->peer_by_fileno($fd);
+					$logger->debug("using another peer to get headers");
+					$other_peer->send_getheaders();
+					$bool = 0;
+					last;
+				}
+				
+				if($bool){
+					$peer->send_getheaders();
+				}
+				
+				
+			}
+			else{
+				$peer->send_getheaders();
+			}
+			
 			#print "Bail out!";
 			#exit 0;
 		}
@@ -1751,6 +1783,9 @@ Put some data on the write queue.
 
 Check DefaultEventLoop module to see how this subroutine gets called.
 
+TODO: the mqueue sockets get drowned out by the tcp sockets.  Need away to send multiple mqueue messages in one shot.
+
+
 =cut
 
 sub cnc_send_message {
@@ -1790,6 +1825,42 @@ sub cnc_broadcast_message {
 
 =pod
 
+---++ cncout_send_header($block)
+
+Send a header out.
+
+=cut
+
+sub cncout_send_header{
+	my ($this,$block) = @_;
+	
+	
+	#$logger->debug("data=".unpack('H*',$data));
+	$this->cnc_send_message('cnc out',
+		CBitcoin::Message::serialize($block->header().pack('C',0),'block',$CBitcoin::network_bytes)
+	);
+}
+
+=pod
+
+---++ cncout_send_status()
+
+Send a status update out.
+
+=cut
+
+sub cncout_send_status {
+	my ($this) = @_;
+	
+	$this->cnc_send_message('cnc out',
+		CBitcoin::Message::serialize(JSON::encode_json({ 'time' => time() }),'custom_json',$CBitcoin::network_bytes)
+	);
+
+}
+
+
+=pod
+
 ---+ Broadasting Messages
 
 The logic used to figure out what needs to be uploaded and downloaded is stored here.
@@ -1813,6 +1884,9 @@ sub broadcast_message {
 		}
 	}
 }
+
+
+
 
 
 =pod
@@ -2258,6 +2332,7 @@ sub callback_gotheaders {
 	open(my $fh,'<',\$payload);
 	
 	my $num_of_headers = CBitcoin::Utilities::deserialize_varint($fh);
+	$logger->debug("number of headers=$num_of_headers");
 	return undef unless 0 < $num_of_headers;
 	my $x = CBitcoin::Utilities::serialize_varint($num_of_headers);
 	$x = length($x);
@@ -2265,23 +2340,24 @@ sub callback_gotheaders {
 	
 	for(my $i=0;$i<$num_of_headers;$i++){
 		my $block = CBitcoin::Block->deserialize(substr($payload, $x+ 81*$i, 81));
-		if(!$block->{'success'}){
-			warn "got bad header\n";
+		if(!$block->success()){
+			$logger->debug("got bad header");
 			next;
 		}
-		warn "($i/$num_of_headers)Got header=[".$block->hash_hex().
+		
+		$logger->debug("($i/$num_of_headers)Got header=[".$block->hash_hex().
 			";".$block->transactionNum.
-			";".length($msg->payload())."]\n";
+			";".length($msg->payload())."]");
 			
 		$this->add_header_to_chain($peer,$block);
 		
 		#delete $this->{'inv search'}->[2]->{$block->hash()};
 		if(defined  $this->{'inv search'}->[2]->{$block->hash()}){
-			warn "deleting inv with hash=".$block->hash_hex()."\n";
+			$logger->debug("deleting inv with hash=".$block->hash_hex());
 			delete $this->{'inv search'}->[2]->{$block->hash()};# = undef;
 		}
 		else{
-			#warn "missing inv with hash=".$block->hash_hex()."\n";
+			$logger->debug("missing inv with hash=".$block->hash_hex());
 		}
 		
 	}

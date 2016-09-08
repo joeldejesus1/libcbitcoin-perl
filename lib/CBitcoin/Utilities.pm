@@ -321,9 +321,9 @@ sub deserialize_inv{
 sub serialize_varint {
 	my $integer = shift;
 	die "bad integer" unless defined $integer && $integer =~ m/^(\d+)$/;
-	$logger->debug("Got integer=$integer");
+#	$logger->debug("Got integer=$integer");
 	if($integer < 0xfd ){
-		$logger->debug("outputting:".unpack('H*',pack('C',$integer)));
+#		$logger->debug("outputting:".unpack('H*',pack('C',$integer)));
 		return pack('C',$integer);
 	}
 	elsif($integer <= 0xffff){

@@ -191,7 +191,11 @@ sub deserialize_command {
 	return $command
 }
 
+=pod
 
+---++ deserialize($fh)
+
+=cut
 
 sub deserialize {
 	my $package = shift;
