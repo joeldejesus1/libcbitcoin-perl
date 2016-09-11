@@ -507,4 +507,49 @@ sub block_locator_indicies{
 }
 
 
+=pod
+
+---++ validate_filepath($file_path,$prefix)
+
+Strip the prefix and run a regex to validate the file path
+
+A full path must always be provided.
+
+=cut
+
+sub validate_filepath {
+	my $fp = shift;
+	my $prefix = shift;
+	$prefix = '' unless defined $prefix;
+	return undef unless defined $fp && 0 < length($fp);
+	
+	my $prefix_check = substr($fp,0,length($prefix));
+	return undef unless $prefix_check eq $prefix;
+	
+	$fp = substr($fp,length($prefix));
+	
+	my $leading_slash = 0;
+	my @untainted;
+	foreach my $dir (split('/',$fp)){
+		if($dir eq '' && !$leading_slash){
+			$leading_slash = 1;
+			push(@untainted,'');
+			next;
+		}
+		elsif($dir eq ''){
+			return undef;
+		}
+		
+		
+		if($dir =~ m/^([^*&%\s]+)$/){
+			push(@untainted,$1);
+		}
+		else{
+			return undef;
+		}
+	}
+	return join('/',@untainted);
+}
+
+
 1;

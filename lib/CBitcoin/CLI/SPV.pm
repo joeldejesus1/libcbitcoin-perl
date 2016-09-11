@@ -287,6 +287,8 @@ sub read_cmd_spv{
 		$spv->add_peer_to_inmemmory(pack('Q',1),$node->[0],$node->[1]);
 	}
 	
+	$SIG{'PIPE'} = 'IGNORE';
+	
 	
 	# activate only one peer, and let the $spv figure out how many peers to activate later on
 	$spv->activate_peer();

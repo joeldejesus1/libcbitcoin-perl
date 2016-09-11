@@ -46,7 +46,7 @@ sub new {
 	} unless defined $config;
 	
 	
-	$logger->debug("got abc outputfd=".$config->{'outputfd'});
+	#$logger->debug("got abc outputfd=".$config->{'outputfd'});
 	
 	
 	local $| = 1;
@@ -137,7 +137,7 @@ sub new {
 	# figure out socks 5 stuff
 	my $socks5 = add_socks5($config->{'socks5 address'},$config->{'socks5 port'});
 	
-	$logger->debug("got abc2 outputfd=".$config->{'outputfd'});
+	#$logger->debug("got abc2 outputfd=".$config->{'outputfd'});
 	
 	my $connectsub = sub{
 		
@@ -215,7 +215,7 @@ sub new {
 				}
 				else{
 					#warn "socket=$sfn";
-					$logger->debug("socket=$sfn");
+					#$logger->debug("socket=$sfn");
 				}
 				
 				# TODO: add skipping mechanism to prevent the cnc mqueue sockets from drowning out
@@ -244,7 +244,7 @@ sub new {
 				}
 			};
 			$internal_fn_watcher->{fileno($sck1)} = $evloop2->io($sck1, EV::READ | EV::WRITE, $readwritesub);
-			$logger->debug("connection part 3");
+#			$logger->debug("connection part 3");
 			# the sub is $sub->($timeout)
 			$spv->peer_set_sleepsub($sck1,sub{
 				my ($peer2,$timeout) = @_;
@@ -288,7 +288,7 @@ sub new {
 		}
 	};
 	
-	$logger->debug("got abc3 outputfd=".$config->{'outputfd'});
+	#$logger->debug("got abc3 outputfd=".$config->{'outputfd'});
 	
 	my $markwritesub = sub{
 		my ($sck1) = (shift);
@@ -320,12 +320,20 @@ sub new {
 			$logger->info("A tcp connection and/or PIPE has closed");
 		});
 		
+		$evloop2->signal('HUP', sub {
+			$logger->info("received HUP signal");
+		});
+		
+		$evloop2->signal('CHLD', sub {
+			$logger->info("received CHLD signal");
+		});
+		
 		
 		$logger->info("entering loop");
 		$evloop2->run();
 	};
 	
-	$logger->debug("got abc4 outputfd=".$config->{'outputfd'});
+	#$logger->debug("got abc4 outputfd=".$config->{'outputfd'});
 	my $this = {
 		'mode setting' => $mode_setting
 		,'reset timeout' => $resettimeout
@@ -342,7 +350,7 @@ sub new {
 	bless($this,$package);
 	
 	
-	$logger->debug("got abc5 outputfd=".$this->{'config'}->{'outputfd'});
+	#$logger->debug("got abc5 outputfd=".$this->{'config'}->{'outputfd'});
 	
 	return $this;
 }

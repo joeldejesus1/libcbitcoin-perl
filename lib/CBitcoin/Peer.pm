@@ -36,11 +36,14 @@ sub new {
 	my $package = shift;
 	my $this = {};
 	bless($this,$package);
-	$logger->debug("1");
-	$this = $this->init(shift);
-	$logger->debug("2");
+	#$logger->debug("1");
+	$this = $this->init(@_);
+	#$logger->debug("2");
 	$this->initialize_chain();
-	$logger->debug("3");
+	#$logger->debug("3");
+	
+	$logger->debug("Added Peer with address=".$this->address());
+	
 	return $this;
 }
 
@@ -55,19 +58,20 @@ Overload this subroutine when overloading this class.
 sub init {
 	my $this = shift;
 	my $options = shift;
-	$logger->debug("0");
+	
+	#$logger->debug("0");
 	die "no options given" unless defined $options && ref($options) eq 'HASH' && defined $options->{'address'} && defined $options->{'port'} 
 		&& defined $options->{'our address'} && defined $options->{'our port'} && defined $options->{'socket'} && fileno($options->{'socket'}) > 0;
 	
 	die "need spv base" unless defined $options->{'spv'};
-	$logger->debug("1");
+	#$logger->debug("1");
 	$options->{'block height'} ||= 0;
 	$options->{'version'} ||= 70012; 
 	$options->{'magic'} = 'MAINNET' unless defined $options->{'magic'};
 	
 	die "no good ip address given" unless CBitcoin::Utilities::ip_convert_to_binary($options->{'address'})
 		&& CBitcoin::Utilities::ip_convert_to_binary($options->{'our address'});
-	$logger->debug("2");
+	#$logger->debug("2");
 	die "no good ports given" unless $options->{'port'} =~ m/^\d+$/ && $options->{'our port'} =~ m/^\d+$/;
 	
 
@@ -107,15 +111,15 @@ sub init {
 	$this->{'address'} = $options->{'address'};
 	$this->{'port'} = $options->{'port'};
 	
-	$logger->debug("3");
+	#$logger->debug("3");
 	$this->{'handshake'}->{'our version'} = $this->version_serialize(
 		$options->{'address'},$options->{'port'},
 		$options->{'our address'},$options->{'our port'},
 		time(),$options->{'version'},$options->{'block height'}
 	); 
-	$logger->debug("4");
+	#$logger->debug("4");
 	$this->send_version();
-	$logger->debug("5");
+	#$logger->debug("5");
 	#die "Socket=".fileno($options->{'socket'})."\n";
 
 
@@ -531,27 +535,29 @@ Take an opportunity after processing to see if there is a need to close this con
 
 sub read_data {
 	use POSIX qw(:errno_h);
-#	warn "can read from peer";
+
 	my $this = shift;
 	
 	$this->{'bytes'} = '' unless defined $this->{'bytes'};
 	my $socket = $this->socket();
-#	warn "Socket=$socket\n";
+	
+	unless(0 < fileno($socket)){
+		$this->finish();
+		return undef;
+	}
+	
 	my $n = sysread(
 		$this->socket(),$this->{'bytes'},
 		$this->{'read buffer size'},
 		length($this->{'bytes'})
 	);
-	#warn "Read N=$n bytes";
 	
 	if(defined $n && $n == 0){
-		#warn "Closing peer, socket was closed from the other end.\n";
 		$logger->debug("Closing peer, socket was closed from the other end.");
 		$this->finish();
 	}
 	elsif(defined $n && 0 < $n){
 		$this->bytes_read($n);
-		#warn "Have ".$this->bytes_read()." bytes read into the buffer";
 		$logger->debug("Have ".$this->bytes_read()." bytes read into the buffer");
 		$this->{'rate limiting'}->{'size'} += $n;
 
@@ -559,17 +565,13 @@ sub read_data {
 		while(my $msg = $this->read_data_parse_msg()){
 			$logger->debug("Got command=".$msg->command());
 			if($msg->command eq 'version'){
-				#warn "Getting Message=".ref($msg)."\n";
 				$this->callback_gotversion($msg);
-				
 			}
 			elsif($msg->command eq 'verack'){
 				$this->callback_gotverack($msg);
-				
 			}
 			elsif($msg->command eq 'ping'){
 				$this->callback_gotping($msg);
-				
 			}
 			elsif($this->handshake_finished()){
 				$this->spv->callback_run($msg,$this);
@@ -584,7 +586,7 @@ sub read_data {
 				my $reason = CBitcoin::Utilities::deserialize_varstr($fh);
 				close($fh);
 				
-				$logger->debug("Version rejected:\n.....message=[$message]\n.....ccode=[$ccode]\n.....reason=[$reason]");
+				$logger->error("Version rejected:\n.....message=[$message]\n.....ccode=[$ccode]\n.....reason=[$reason]");
 				
 				$this->mark_finished();
 			}
@@ -605,7 +607,6 @@ sub read_data {
 	else{
 		# would block
 		$logger->debug("socket is blocking, so skip, error=".$!);
-		#warn "socket is blocking, so skip, error=".$!."";
 	}
 	
 	return undef;
@@ -654,7 +655,6 @@ sub read_data_single_msg_item {
 	
 	if(!defined $this->{'buffer'}->{$key} &&  $size <= $this->{'bytes read'} ){
 		$this->{'buffer'}->{$key} = substr($this->{'bytes'},0,$size);
-		#warn "Pre $key=".unpack('H*',$this->{'buffer'}->{$key})."\n";
 		substr($this->{'bytes'},0,$size) = ''; # delete  bytes we don't need
 		$this->{'bytes read'} = $this->{'bytes read'} - $size;
 		die "sizes do not match" unless $this->{'bytes read'} == length($this->{'bytes'});
@@ -662,6 +662,7 @@ sub read_data_single_msg_item {
 	}
 	elsif(defined $this->{'buffer'}->{$key}){
 		# skip this
+		$logger->debug("skip key=$key");
 		return 1;
 	}
 	else{
@@ -696,13 +697,7 @@ sub definition_size_mapper {
 =cut
 
 sub socket {
-	my $this = shift;
-	require Data::Dumper;
-	#my $xo = Data::Dumper::Dumper($this);
-	#open(my $fhout,'>','/tmp/bonus');
-	#print $fhout $xo;
-	#close($fhout);
-	return $this->{'socket'};
+	return shift->{'socket'};
 }
 
 =pod
@@ -865,7 +860,10 @@ sub write_data {
 		$rlref->{'size'} = 0;
 	}
 	
-	
+	unless(0 < fileno($this->socket())){
+		$this->finish();
+		return undef;
+	}
 	my $n = syswrite($this->socket(),$this->{'bytes to write'},BUFFSIZE);
 
 	if (!defined($n) && $! == EAGAIN) {
@@ -959,7 +957,7 @@ sub send_getheaders {
 sub send_version {
 	my $this = shift;
 	$this->{'sent version'} = 1;
-	$logger->debug("sending version:\n".unpack('H*',$this->our_version())."\n");
+	#$logger->debug("sending version:\n".unpack('H*',$this->our_version())."\n");
 	return $this->write(CBitcoin::Message::serialize($this->our_version(),'version'));
 }
 
@@ -979,12 +977,43 @@ sub send_verack {
 
 ---++ send_ping
 
+
+			if($peer->speed() < 10){
+				# find another peer
+				$logger->debug("going to activate a peer just in case");
+				$this->activate_peer();
+				
+				my $current_fd = fileno($peer->socket());
+				my @fds = @{$this->{'peers'}};
+				my $bool = 1;
+				while(my $fd = shift(@fds)){
+					next if $fd == $current_fd;
+					my $other_peer = $this->peer_by_fileno($fd);
+					$logger->debug("using another peer to get headers");
+					$other_peer->send_getheaders();
+					$bool = 0;
+					last;
+				}
+				
+				if($bool){
+					$peer->send_getheaders();
+				}
+				
+				
+			}
+			else{
+				$peer->send_getheaders();
+			}
+
 =cut
 
 sub send_ping {
 	my $this = shift;
 	$logger->debug("sending ping");
 	$this->{'sent ping nonce'} = CBitcoin::Utilities::generate_random(8);
+	
+	
+	
 	
 	return $this->write(CBitcoin::Message::serialize($this->{'sent ping nonce'},'ping',$this->magic));
 }

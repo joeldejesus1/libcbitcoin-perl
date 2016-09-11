@@ -127,7 +127,7 @@ sub init {
 		$options->{'max connections'} = $1;
 	}
 	elsif(!defined $options->{'max connections'}){
-		$options->{'max connections'} = 8;
+		$options->{'max connections'} = 3;
 	}
 	else{
 		die "bad max connection setting";
@@ -286,6 +286,7 @@ sub initialize_chain{
 	
 	# must get genesis block
 	$this->{'genesis block'} = CBitcoin::Block->genesis_block();
+	$this->cncout_send_header($this->{'genesis block'});
 	
 	$this->{'genesis block'}->height(1);
 	$this->{'genesis block'}->cummulative_difficulty( 
@@ -338,6 +339,7 @@ sub initialize_peerchain {
 	
 	my $hchain = $this->{'chain'};
 	
+	# this should be a copy
 	my @headers = @{$this->{'headers'}};
 	
 	my $ph2h = {};
@@ -360,11 +362,9 @@ sub initialize_peerchain {
 
 =pod
 
----++ initialize_chain_scan_files(\@files)
+---++ initialize_chain_scan_files()
 
-Given a set of files, scan in blocks.
-
-Make sure the hash/directory relationship matches that in CBitcoin::Utilities::HashToFilepath.
+Scan block headers (80B chunks, does not include tx count) from ./checkpoints.
 
 =cut
 
@@ -399,26 +399,26 @@ sub initialize_chain_scan_files {
 			$this->{'header by hash'}->{$header->hash()} = $header;
 			$hchain->{'latest'} = $header->hash();
 			push(@{$this->{'headers'}},$header->hash());
-			$hchain->{'current target'} = $header->target_bigint();
+			#$hchain->{'current target'} = $header->target_bigint();
 			
 			if(!defined $hchain->{'genesis block'}){
 				$hchain->{'genesis block'} = $header->hash();
-				$hchain->{'cummulative difficulty'} = Math::BigInt->bzero()->badd(
-					$hchain->{'maximum target'}->copy()->bsub($header->hash_bigint())
-				);
+				#$hchain->{'cummulative difficulty'} = Math::BigInt->bzero()->badd(
+				#	$hchain->{'maximum target'}->copy()->bsub($header->hash_bigint())
+				#);
 				$hchain->{'header hash to hash'}->{$header->hash} = ['',''];
 				#$header->cummulative_difficulty($header->hash_bigint());
 			}
 			else{
 				$logger->debug("Adding block[".$header->hash_hex.";".$i."]\n") if $i % $this->{'chain'}->{'checkpoint frequency'} == 0;
 				
-				$hchain->{'cummulative difficulty'}->badd(
-					$hchain->{'maximum target'}->copy()->bsub($header->hash_bigint())
-				);
+				#$hchain->{'cummulative difficulty'}->badd(
+				#	$hchain->{'maximum target'}->copy()->bsub($header->hash_bigint())
+				#);
 				$hchain->{'header hash to hash'}->{$header->hash} = [$header->prevBlockHash,''];
 				$hchain->{'header hash to hash'}->{$header->prevBlockHash}->[1] = $header->hash;
 			}
-			$header->cummulative_difficulty($hchain->{'cummulative difficulty'});
+			#$header->cummulative_difficulty($hchain->{'cummulative difficulty'});
 			
 			$i += 1;
 		}
@@ -540,11 +540,11 @@ sub add_header_to_inmemory_chain {
 	elsif(defined $pchain->{'header hash to hash'}->{$header->prevBlockHash}){
 		$logger->info("adding new block");
 		# calculate the cummulative difficulty
-		my $prevBlock = $this->{'header by hash'}->{$header->prevBlockHash};
-		my $cd = $prevBlock->cummulative_difficulty()->copy();
-		my $maxtarget = $this->{'chain'}->{'maximum target'}->copy();
-		$cd->badd( $maxtarget->bsub($header->hash_bigint()) );
-		$header->cummulative_difficulty($cd);
+		#my $prevBlock = $this->{'header by hash'}->{$header->prevBlockHash};
+		#my $cd = $prevBlock->cummulative_difficulty()->copy();
+		#my $maxtarget = $this->{'chain'}->{'maximum target'}->copy();
+		#$cd->badd( $maxtarget->bsub($header->hash_bigint()) );
+		#$header->cummulative_difficulty($cd);
 				
 		# TODO: check the target
 		$pchain->{'current target'} = $header->target_bigint(); 
@@ -600,16 +600,22 @@ sub sort_chain {
 	my ($this) = @_;
 	
 	return undef unless $this->{'header changed'};
-	
+	my $start_time = time();
 	my $peer_with_longest_chain;
-	my $tmpcd;
+	my $tmpcd = 0;
 	foreach my $fd (keys %{$this->{'peers'}}){
 		my $peer = $this->{'peers'}->{$fd};
 		#$peer->sort_chain();
-		my $cd = $this->sort_chain_by_peer($peer);
+		#my $cd = $this->sort_chain_by_peer($peer);
 		
-		if(!(defined $tmpcd) || $tmpcd->bcmp($cd) < 0  ){
-			$tmpcd = $cd;
+		#if(!(defined $tmpcd) || $tmpcd->bcmp($cd) < 0  ){
+		#	$tmpcd = $cd;
+		#	$peer_with_longest_chain = $peer;
+		#}
+		# TODO: figure out a memory safe way to calculate the difficulty
+		my $length_of_chain = $this->sort_chain_by_peer($peer);
+		if(!(defined $length_of_chain) || $length_of_chain < $tmpcd){
+			$tmpcd = $length_of_chain;
 			$peer_with_longest_chain = $peer;
 		}
 	}
@@ -640,7 +646,7 @@ sub sort_chain {
 		}
 	}
 	
-
+	$logger->debug("Time taken=".(time() - $start_time));
 	#push(@{$this->{'headers'}},$header->hash);
 }
 	
@@ -668,8 +674,12 @@ sub sort_chain_by_peer{
 	my $loopcheck = {}; # to see if the chain is actually a loop, prevent infinite loops
 	my $index = $last_checkpoint_i;
 	my $orig_height = scalar(@{$pchain->{'headers'}}) - 1;
-	my $maxtarget = $this->{'chain'}->{'maximum target'}->copy();
-	my $cummulative_difficulty = $maxtarget->copy()->bsub($header->hash_bigint());
+	
+	# TODO: calc difficulty without running out of memory
+	return $orig_height;
+	
+	#my $maxtarget = $this->{'chain'}->{'maximum target'}->copy();
+	#my $cummulative_difficulty = $maxtarget->copy()->bsub($header->hash_bigint());
 	my $curr_target = $header->target_bigint();
 	my $dweek = 2.0*7*24*60*60;
 	my @W1 = ($dweek/4.0 , $dweek * 4.0);
@@ -686,16 +696,16 @@ sub sort_chain_by_peer{
 				delete $pchain->{'orphans'}->{$curr_hash};
 			}
 			
-			$cummulative_difficulty = $cummulative_difficulty->badd(  
-				$maxtarget->copy()->bsub($header->hash_bigint())  
-			);
+			#$cummulative_difficulty = $cummulative_difficulty->badd(  
+			#	$maxtarget->copy()->bsub($header->hash_bigint())  
+			#);
 		}
 		elsif(
 			$pchain->{'headers'}->[$index] eq $curr_hash && 0 < $index
 		){
-			$cummulative_difficulty = $cummulative_difficulty->badd(  
-				$maxtarget->copy()->bsub($header->hash_bigint())  
-			);
+			#$cummulative_difficulty = $cummulative_difficulty->badd(  
+			#	$maxtarget->copy()->bsub($header->hash_bigint())  
+			#);
 			#warn "chain not finished, keep going\n";
 			#last;
 		}
@@ -727,12 +737,12 @@ sub sort_chain_by_peer{
 		$index += 1;
 	}
 	
-	$pchain->{'cummulative difficulty'} = $cummulative_difficulty;
+	#$pchain->{'cummulative difficulty'} = $cummulative_difficulty;
 	
 	#warn "finished sorting, new block_height=".scalar(@{$this->{'headers'}})."\n";
 	$pchain->{'header changed'} = 1;
 	
-	return $cummulative_difficulty;
+	#return $cummulative_difficulty;
 }
 
 =pod
@@ -1062,12 +1072,9 @@ sub activate_peer {
 	
 	
 	my $connect_sub = $this->{'connect sub'};
-	#warn "activating peer - 1\n";
 	# if we are maxed out on connections, then exit
 	return undef unless scalar(keys %{$this->{'peers'}}) < $this->max_connections();
-	#warn "activating peer - 1.1\n";
 	die "not given connection sub" unless defined $connect_sub && ref($connect_sub) eq 'CODE';
-	#warn "activating peer - 2\n";
 	
 	my $dir_pool = $this->db_path().'/peers/pool';
 	my $dir_active = $this->db_path().'/peers/active';
@@ -1081,9 +1088,6 @@ sub activate_peer {
 	my @peer_files = sort @files;
 	
 	my $numOfpeers = scalar(@peer_files);
-	
-	#warn "have num of peers =$numOfpeers\n";
-	
 	
 	
 	if(0 < $numOfpeers && $numOfpeers < 5 && 60 < time() - $this->{'last getaddr'}){
@@ -1113,7 +1117,7 @@ sub activate_peer {
 		
 		eval{
 			#warn "part 1\n";
-			$logger->debug("part 1");
+			#$logger->debug("part 1");
 			rename($dir_pool.'/'.$latest,$dir_pending.'/'.$latest) || die "alpha";
 			
 			# create connection
@@ -1121,7 +1125,7 @@ sub activate_peer {
 			my @guts = <$fh>;
 			close($fh);
 			#warn "part 2\n";
-			$logger->debug("part 2");
+			#$logger->debug("part 2");
 			die "charlie" unless scalar(@guts) == 3;
 			
 			# connect with ip address and port
@@ -1130,7 +1134,7 @@ sub activate_peer {
 			# so, let that logic be elsewhere, just send an anonymous subroutine
 			$socket = $connect_sub->($this,$guts[1],$guts[2]);
 			#warn "part 3 with socket=".fileno($socket)."\n";
-			$logger->debug("part 3 with socket=".fileno($socket));
+			#$logger->debug("part 3 with socket=".fileno($socket));
 			
 			unless(defined $socket && fileno($socket) > 0){
 				rename($dir_pending.'/'.$latest,$dir_banned.'/'.$latest);
@@ -1138,10 +1142,10 @@ sub activate_peer {
 			}
 			
 			# we have a socket, ready to go
-			$logger->debug("part 3.1");
+			#$logger->debug("part 3.1");
 			$this->add_peer($socket,$guts[1],$guts[2]);
 			#warn "part 4\n";
-			$logger->debug("part 4");
+			#$logger->debug("part 4");
 			rename($dir_pending.'/'.$latest,$dir_active.'/'.$latest);
 			
 		};
@@ -1344,27 +1348,27 @@ Here, these subroutines figure out what data we need to get from peers based on 
 
 =pod
 
----++ peer_hook_handshake_finished()
+---++ peer_hook_handshake_finished($peer)
 
 This is called when a handshake is finished.
 
 =cut
 
 sub peer_hook_handshake_finished{
-	my $this = shift;
-	my $peer = shift;
+	my ($this,$peer) = @_;
 	
-	warn "Running send getblocks since hand shake is finished\n";
-	
+	$logger->debug("Running send getblocks since hand shake is finished");
 	#$peer->send_getheaders();
 	#$peer->send_getaddr();
 	if($this->block_height() < $peer->block_height()){
-		warn "alpha; block height diff=".( $peer->block_height() - $this->block_height() );
-		$peer->send_getblocks();
+		$logger->debug("alpha; block height diff=".( $peer->block_height() - $this->block_height() ));
+		#$peer->send_getblocks();
+		$peer->send_getaddr();
+		$peer->send_getheaders();
 	}
 	else{
-		warn "beta; block height diff=".( $peer->block_height() - $this->block_height() );
-		#$peer->send_getaddr();
+		$logger->debug("beta; block height diff=".( $peer->block_height() - $this->block_height() ));
+		$peer->send_getaddr();
 	}
 	
 	#$peer->send_getblocks();
@@ -1380,6 +1384,10 @@ Add the pair to the list of inventory_vectors that need to be fetched
 1 	MSG_TX 	Hash is related to a transaction
 2 	MSG_BLOCK 	Hash is related to a data block
 3 	MSG_FILTERED_BLOCK 	Hash of a block header; identical to MSG_BLOCK. When used in a getdata message, this
+
+=cut
+
+=pod
 
 ---+++ Data Structure
  
@@ -1447,6 +1455,9 @@ sub hook_peer_onreadidle {
 	#	$this->{'getblocks timeout'} = time();
 	#}
 	
+	$this->activate_peer();
+	
+	
 	#warn "Peer=".$peer->address().";Num of Headers=".scalar(@{$this->{'headers'}})."\n";
 	$logger->debug("Peer=".$peer->address().";Num of Headers=".scalar(@{$this->{'headers'}}));
 	
@@ -1462,35 +1473,10 @@ sub hook_peer_onreadidle {
 			#warn ."\n";
 			$logger->debug("alpha; block height diff=".( $peer->block_height() - $this->block_height() ));
 			#$peer->send_getblocks();
-			
+			$peer->send_getheaders();
 			# if the speed is less than 10B/second, then give this to another peer
 			# ..
-			if($peer->speed() < 10){
-				# find another peer
-				$logger->debug("going to activate a peer just in case");
-				$this->activate_peer();
-				
-				my $current_fd = fileno($peer->socket());
-				my @fds = @{$this->{'peers'}};
-				my $bool = 1;
-				while(my $fd = shift(@fds)){
-					next if $fd == $current_fd;
-					my $other_peer = $this->peer_by_fileno($fd);
-					$logger->debug("using another peer to get headers");
-					$other_peer->send_getheaders();
-					$bool = 0;
-					last;
-				}
-				
-				if($bool){
-					$peer->send_getheaders();
-				}
-				
-				
-			}
-			else{
-				$peer->send_getheaders();
-			}
+
 			
 			#print "Bail out!";
 			#exit 0;
