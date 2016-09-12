@@ -281,47 +281,13 @@ sub initialize_chain{
 
 	$logger->info("initialize chain");
 	
-	# max target implies lowest difficulty (use this number to figure out "work done")
-	$this->{'chain'}->{'maximum target'} = Math::BigInt->from_hex('00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF');
 	
-	# must get genesis block
-	$this->{'genesis block'} = CBitcoin::Block->genesis_block();
-	$this->cncout_send_header($this->{'genesis block'});
+	$this->{'chain db'} = CBitcoin::Chain->new({
+		'path' => $this->db_path
+		,'genesis block' => CBitcoin::Block->genesis_block()
+	});
 	
-	$this->{'genesis block'}->height(1);
-	$this->{'genesis block'}->cummulative_difficulty( 
-		$this->{'chain'}->{'maximum target'}->copy()->bsub($this->{'genesis block'}->hash_bigint())
-	);
 	
-	$this->{'chain'}->{'header hash to hash'}->{$this->{'genesis block'}->hash()} = 
-		[$this->{'genesis block'}->prevBlockHash(),''];
-		
-		
-	# chain sorting for the spv.   copy these data structures in order to organize chains on peers.
-	$this->{'chain'}->{'genesis block'} = $this->{'genesis block'}->hash();
-	$this->{'chain'}->{'latest'} = $this->{'chain'}->{'genesis block'};
-	$this->{'chain'}->{'cummulative difficulty'} = $this->{'genesis block'}->cummulative_difficulty();
-	$this->{'chain'}->{'orphans'} = {};
-	$this->{'chain'}->{'current target'} = $this->{'genesis block'}->target_bigint();
-
-	$this->{'headers'}->[0] = $this->{'genesis block'}->hash();
-	$this->{'header by hash'}->{$this->{'genesis block'}->hash()} = $this->{'genesis block'};
-	$this->{'header changed'} = 1;
-	$this->sort_chain();
-	#print "Bail out!";
-	#die "bad news";
-	#$this->{'headers'}->[0] = $gen_block->hash;
-	
-	#warn "initialize chain 5 hash=".unpack('H*',$gen_block->hash)."\n";
-	$this->{'chain'}->{'last checkpoint'} = 0; # every 1000 blocks;
-	$this->{'chain'}->{'checkpoint frequency'} = 500 unless defined $this->{'chain'}->{'checkpoint frequency'}; 
-	#$this->add_header_to_chain($gen_block);
-	#push(@{$this->{'headers'}},$gen_block->hash);
-	
-	# make sure to call this before calling checkpoint_savefh
-	$this->initialize_chain_scan_files();
-	
-	$this->checkpoint_savefh();
 	
 	return 1;
 }
@@ -492,8 +458,9 @@ sub add_header_to_chain {
 	my ($this,$peer, $block_header) = @_;
 	die "header is null" unless defined $block_header;
 	
-	$this->add_header_to_inmemory_chain($peer, $block_header);
+	#$this->add_header_to_inmemory_chain($peer, $block_header);
 	
+	$this->chain->block_append($block_header);
 	
 }
 
@@ -871,6 +838,17 @@ sub db_path {
 sub event_loop{
 	return shift->{'event loop'};
 }
+
+=pod
+
+---++ chain
+
+=cut
+
+sub chain {
+	return shift->{'chain db'};
+}
+
 
 =pod
 

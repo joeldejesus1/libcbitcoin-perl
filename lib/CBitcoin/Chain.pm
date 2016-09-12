@@ -83,7 +83,7 @@ sub init_branches {
 	
 	my $head_id = $this->get('chain','head');
 	if(defined $head_id){
-		$this->init_branches_fromdb();
+		$this->init_branches_fromdb($head_id,$options);
 	}
 	else{
 		$this->init_branches_from_genesisblock($options);
@@ -92,12 +92,23 @@ sub init_branches {
 
 =pod
 
----++ init_branches_fromdb($block)
+---++ init_branches_fromdb($head_id)
+
+Starting with the node (block) at the end of the longest branch, go back until the genesis block is reached.
 
 =cut
 
 sub init_branches_fromdb {
-	my ($this,$options) = @_;
+	my ($this,$head_id,$options) = @_;
+	
+	my $lock = $this->lock();
+	my $node = CBitcoin::Chain::Node->load($this->chain,$id);
+	die "no node was returned, even though it was specified as the head of the chain" unless defined $node;
+	$this->branch_add(
+		CBitcoin::Chain::Branch->new($this->chain,$node)
+	);
+	
+	$lock->unlock();
 }
 
 =pod
@@ -296,9 +307,9 @@ sub branch_find {
 
 =pod
 
----++ block_append($block)
+---++ block_append($block)->0/1
 
-Append a block to a branch on this chain.
+Append a block to a branch on this chain.  Returns 0 (false) if the block is an orphan.
 
 =cut
 
@@ -309,10 +320,11 @@ sub block_append {
 	my $node = CBitcoin::Chain::Node->new($block);
 	
 	my $branch = $this->branch_find($node->prev);
-	return undef unless defined $branch;
+	return 0 unless defined $branch;
 	
 	$branch->append($node);
 	
+	return 1;
 }
 
 =pod
@@ -352,6 +364,7 @@ Return the longest branch.
 
 sub save{
 	my ($this) = @_;
+	
 	
 	my $branch = $this->branch_longest();
 	return undef unless defined $branch;

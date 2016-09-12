@@ -53,7 +53,11 @@ sub init{
 	die "no node" unless defined $node;
 	
 	$this->{'chain'} = $chain;
-	$this->{'node'} = $node;
+	
+	$this->{'score'} = $node->score()->copy();
+	$this->{'height'} = $node->height();
+	$this->{'id'} = $node->id();
+	$this->{'prev'} = $node->prev;
 	
 }
 
@@ -106,7 +110,7 @@ sub append{
 	$node->save($this->chain);
 	
 	$lock->unlock();
-	
+	# delete the old link to this branch, and put in a new link with the correct $node->id
 	$this->chain->branch_update($node->prev,$this);
 	
 	# this stuff stays in memory
@@ -166,6 +170,8 @@ sub chain {
 
 Always load the node from the database, in case any changes have taken place.
 
+If there have been any changes to the database, find the heighest node out of the new branches created.
+
 =cut
 
 sub node {
@@ -176,32 +182,77 @@ sub node {
 	
 	return $basenode if scalar($basenode->next_all()) == 0;
 	
+	# lock the db so that we dont end up in an infinite loop
+	my $lock = $this->chain->lock();
+	
 	my $headref = {};
-	unless($this->node_x($basenode,$headref)){
+	# go thru all the new nodes, find the head nodes at the end of their respective branches
+	unless($this->node_recursive($basenode,$headref)){
 		$headref->{$basenode->id} = $basenode;
 	}
+	# everything is in memory now, so release the lock
+	$lock->unlock();
 	
-	# TODO: go thru everything....
+	my ($lbr,$returnnode);
+	my ($bool,$height,$score) = (0,0, Math::BigInt->new(0));
+	foreach my $head_id (keys %{$headref}){
+		my $tmpbranch;
+		# create new branches and/or update this branch to point to the end of the chain
+		if(!$bool){
+			# just update this branch
+			$this->init($this->chain,$headref->{$head_id});
+			$bool = 1;
+			$tmpbranch = $this;
+		}
+		else{
+			# create a new branch
+			$tmpbranch = CBitcoin::Chain::Branch->new($this->chain,$headref->{$head_id});
+			$this->chain->branch_add($tmpbranch);
+		}
+		
+		# this section is for figuring out the longest branch, thereby which new node to return
+		if($score->bcmp($tmpbranch->score) < 0){
+			# score < branch
+			$lbr = $tmpbranch;
+			$score = $tmpbranch->score->copy();
+			$returnnode = $headref->{$head_id};
+		}
+		
+	}
 	
+	# return node that has the highest score
+	return $returnnode;
 }
 
-sub node_x {
+=pod
+
+---+++ node_recursive($basenode,$headref)
+
+From a single node, go up each branch until you get the head nodes on multiple branches.  Then put references to those nodes in the $headref.
+
+$headref maps $node->id to $node.
+
+=cut
+
+sub node_recursive {
 	my ($this,$basenode,$headref) = @_;
 	
 	my @nextids = $basenode->next_all();
 	return 0 unless 0 < scalar(@nextids);
 	
+	my $bool = 0;
 	foreach my $next_id (@nextids){
 		my $node = CBitcoin::Node->load($this->chain,$next_id);
 		# hopefully, catch all loop situations here
 		next if $node->height <= $basenode->height;
-		unless($this->node_x($node,$headref)){
+		unless($this->node_recursive($node,$headref)){
 			$headref->{$node->id} = $node;
 		}
 		
+		$bool = 1;
 	}
 	
-	return 1;
+	return $bool;
 }
 
 

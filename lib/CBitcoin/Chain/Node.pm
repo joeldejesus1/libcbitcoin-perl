@@ -193,7 +193,7 @@ sub height {
 
 ---++ save($chain)
 
-Format of node: [prev, 32B][height, 4B][score, varstr][num of next, 1B][..nextid,32B]
+Format of node: [prev, 32B][height, 4B][length of score, 1B][score, ?B][num of next, 1B][..nextid,32B]
 
 This will lock the database long enough for the changes to be saved to disk.
 
