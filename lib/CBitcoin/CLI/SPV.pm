@@ -152,7 +152,7 @@ sub parser {
 		}
 		
 		elsif($arg =~ m/^\-\-clientname\=\"(.*)\"$/){
-			warn "parse client name=[$1][$arg]\n";
+			#warn "parse client name=[$1][$arg]\n";
 			$options->{'client name'} = $1;
 		}
 		elsif($arg =~ m/^\-\-clientname\=(.*)$/){
@@ -160,7 +160,7 @@ sub parser {
 		}
 		
 		elsif(validate_filepath($arg,'--logconf=')){
-			warn "logconf ARG=$arg\n";
+			#warn "logconf ARG=$arg\n";
 			$options->{'logconf'} = validate_filepath($arg,'--logconf=');
 		}
 		elsif($arg =~ m/^\-\-logconf\=(.*)$/){
@@ -168,7 +168,7 @@ sub parser {
 		}
 		
 		elsif(validate_filepath($arg,'--dbpath=')){
-			warn "dbpath ARG=$arg\n";
+		#	warn "dbpath ARG=$arg\n";
 			$options->{'db path'} = validate_filepath($arg,'--dbpath=');
 		}
 		elsif($arg =~ m/^\-\-dbpath\=(.*)$/){
@@ -177,7 +177,7 @@ sub parser {
 		
 		
 		elsif($arg =~ m/^\-\-inputfd\=(\d+)$/){
-			warn "Got xyz inputfd=$1";
+#			warn "Got xyz inputfd=$1";
 			$options->{'inputfd'} = $1;
 		}
 		elsif($arg =~ m/^\-\-inputfd\=(.*)$/){
@@ -185,7 +185,7 @@ sub parser {
 		}
 		
 		elsif($arg =~ m/^\-\-outputfd\=(\d+)$/){
-			warn "Got xyz outputfd=$1";
+			#warn "Got xyz outputfd=$1";
 			$options->{'outputfd'} = $1;
 		}
 		elsif($arg =~ m/^\-\-outputfd\=(.*)$/){
@@ -194,7 +194,7 @@ sub parser {
 		
 	}
 	
-	warn "Got xyz Both[".$options->{'inputfd'}."][".$options->{'outputfd'}."]\n";
+	#warn "Got xyz Both[".$options->{'inputfd'}."][".$options->{'outputfd'}."]\n";
 	
 	return $options;
 }
@@ -262,16 +262,16 @@ sub read_cmd_spv{
 	
 	if(defined $options->{'inputfd'}){
 		#$logger->debug("setting inputfd=".$options->{'inputfd'});
-		warn "setting inputfd=".$options->{'inputfd'};
+		#warn "setting inputfd=".$options->{'inputfd'};
 		$eventloop_options->{'inputfd'} = $options->{'inputfd'};
 	}
 	if(defined $options->{'outputfd'}){
 		#$logger->debug("setting outputfd=".$options->{'outputfd'});
-		warn "setting outputfd=".$options->{'outputfd'};
+		#warn "setting outputfd=".$options->{'outputfd'};
 		$eventloop_options->{'outputfd'} = $options->{'outputfd'};
 	}	
 	
-	warn "prestart cn=".$options->{'outputfd'}."\n";
+	#warn "prestart cn=".$options->{'outputfd'}."\n";
 	my $spv = CBitcoin::SPV->new({
 		'client name' => $options->{'client name'},
 		'address' => $options->{'address'},	'port' => $options->{'port'}, # this line is for the purpose of creating version messages (not related to the event loop)

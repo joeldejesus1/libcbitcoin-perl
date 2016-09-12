@@ -4,9 +4,14 @@ use utf8;
 use strict;
 use warnings;
 
-
-
 use Math::BigInt only => 'GMP';
+
+use CBitcoin::Chain::Node;
+use CBitcoin::Utilities;
+
+my $logger = Log::Log4perl->get_logger();
+
+
 
 
 
@@ -59,6 +64,7 @@ sub init{
 	$this->{'id'} = $node->id();
 	$this->{'prev'} = $node->prev;
 	
+	die "no id" unless defined $this->{'id'};
 }
 
 =pod
@@ -80,16 +86,18 @@ sub append{
 	my ($this,$node) = @_;
 	die "node is already in chain" if $node->in_chain();
 	# make sure that this is the correct branch 
-	return 0 unless $this->node->id eq $node->prev;
-	
+	$logger->debug("1");
 	
 	my $lock = $this->chain->lock();
-	
 	my $prevnode = $this->node();
 	unless(defined $prevnode){
-		$lock->unlock();
+		$lock->cds_unlock();
 		die "prev node does not exist";
-	}
+	}	
+	
+	die "ids dont match" unless $prevnode->id eq $node->prev;
+	#$logger->debug(" ids match ");
+
 	
 	# update prevnode
 	$prevnode->next_add($node->id);
@@ -109,15 +117,16 @@ sub append{
 	$prevnode->save($this->chain);
 	$node->save($this->chain);
 	
-	$lock->unlock();
-	# delete the old link to this branch, and put in a new link with the correct $node->id
-	$this->chain->branch_update($node->prev,$this);
+	$lock->cds_unlock();
 	
 	# this stuff stays in memory
 	$this->{'score'} = $node->score()->copy();
 	$this->{'height'} = $node->height();
 	$this->{'id'} = $node->id();
 	$this->{'prev'} = $node->prev;
+
+	# delete the old link to this branch, and put in a new link with the correct $node->id
+	$this->chain->branch_update($this);
 	
 	return 1;
 }
@@ -130,6 +139,16 @@ sub append{
 
 sub id {
 	return shift->{'id'};
+}
+
+=pod
+
+---++ prev
+
+=cut
+
+sub prev {
+	return shift->{'prev'};
 }
 
 =pod
@@ -178,7 +197,7 @@ sub node {
 	my ($this) = @_;
 	
 	# TODO: need to find out if additional blocks have been added
-	my $basenode = CBitcoin::Node->load($this->chain,$this->id); 
+	my $basenode = CBitcoin::Chain::Node->load($this->chain,$this->id); 
 	
 	return $basenode if scalar($basenode->next_all()) == 0;
 	
@@ -191,7 +210,7 @@ sub node {
 		$headref->{$basenode->id} = $basenode;
 	}
 	# everything is in memory now, so release the lock
-	$lock->unlock();
+	$lock->cds_unlock();
 	
 	my ($lbr,$returnnode);
 	my ($bool,$height,$score) = (0,0, Math::BigInt->new(0));
@@ -242,7 +261,7 @@ sub node_recursive {
 	
 	my $bool = 0;
 	foreach my $next_id (@nextids){
-		my $node = CBitcoin::Node->load($this->chain,$next_id);
+		my $node = CBitcoin::Chain::Node->load($this->chain,$next_id);
 		# hopefully, catch all loop situations here
 		next if $node->height <= $basenode->height;
 		unless($this->node_recursive($node,$headref)){
@@ -264,11 +283,11 @@ sub node_recursive {
 
 sub locator{
 	my ($this) = @_;
-	
+	$logger->debug("1");
 	if(defined $this->{'last locator'} && $this->height() - $this->{'last locator'} < 50){
 		return [@{$this->{'short end'}},@{$this->{'big end'}}];
 	}
-	
+	$logger->debug("2");
 	my $branch_height = $this->height();
 	
 	my $node = $this->node();
@@ -276,10 +295,11 @@ sub locator{
 	
 	my @shortend;
 	my @bigend;
-	
+	$logger->debug("3");
 	while(1 < $node->height()){
 		my $oldheight = $node->height();
-		$node = CBitcoin::Chain::Node->new($this->chain,$node->prev);
+		$logger->debug("current height=$oldheight");
+		$node = CBitcoin::Chain::Node->load($this->chain,$node->prev);
 		die "bad chain, need to fix" unless defined $node;
 		
 		die "bad node, need to fix" unless $node->height() = $oldheight -1;
@@ -304,8 +324,8 @@ sub locator{
 	}
 	$this->{'last locator'} = $branch_height;
 	$this->{'short end'} = \@shortend;
-	$this->{'big end'} = @bigend;
-	
+	$this->{'big end'} = \@bigend;
+	$logger->debug("Big=".scalar(@bigend)." Short=".scalar(@shortend));
 	# always put in the genesis block
 	unshift(@blocks,$node->id);
 	

@@ -8,6 +8,7 @@ use CBitcoin::Message;
 use CBitcoin::Utilities;
 use CBitcoin::Peer;
 use CBitcoin::Block;
+use CBitcoin::Chain;
 
 use Net::IP;
 use Fcntl ':flock'; # Import LOCK_* constants
@@ -53,7 +54,7 @@ sub new {
 	$this->{'headers'} = [];
 	$this->{'transactions'} = {};
 	$this->initialize_chain();
-	$this->sort_chain();
+
 	
 	# brain
 	$this->{'inv'} = [{},{},{},{}];
@@ -569,9 +570,7 @@ sub block{
 =cut
 
 sub block_height {
-	my $this = shift;
-	$this->sort_chain();	
-	return scalar(@{$this->{'headers'}}) - 1;
+	return shift->{'chain db'}->height();
 }
 
 
@@ -640,7 +639,7 @@ Find a peer in a pool, and turn it on
 
 sub activate_peer {
 	my $this = shift;
-	
+	$logger->debug("activating peer - 0");
 	
 	my $connect_sub = $this->{'connect sub'};
 	# if we are maxed out on connections, then exit
@@ -651,7 +650,8 @@ sub activate_peer {
 	my $dir_active = $this->db_path().'/peers/active';
 	my $dir_pending = $this->db_path().'/peers/pending';
 	my $dir_banned = $this->db_path().'/peers/banned';
-	#warn "activating peer - 2\n";
+	
+	$logger->debug("activating peer - 2");
 	opendir(my $fh,$dir_pool) || die "cannot open directory";
 	my @files = grep { $_ ne '.' && $_ ne '..' } readdir $fh;
 	closedir($fh);
@@ -672,11 +672,14 @@ sub activate_peer {
 	}
 	elsif($numOfpeers == 0){
 		#die "ran out of nodes to connect to.";
+		$logger->error("ran out of nodes to connect to.");
+		return undef;
 	}
 	
 	
 	my ($latest,$socket);
-	#warn "activating peer - 3\n";
+	$logger->debug("activating peer - 3");
+	
 	while(scalar(@peer_files)>0){
 		$latest = shift(@peer_files);
 		#warn "Latest peer to try to connect to is hash=$latest\n";
@@ -726,6 +729,7 @@ sub activate_peer {
 		}
 		else{
 			#warn "finished looping to find a new peer\n";
+			$logger->debug("finished looping to find a new peer");
 			last;
 		}
 
@@ -750,6 +754,7 @@ sub add_peer_to_inmemmory{
 	
 	my ($this,$services, $addr_recv_ip,$addr_recv_port) = (shift,shift,shift,shift);
 	#warn "Adding peer to db ($addr_recv_ip,$addr_recv_port)\n";
+	$logger->debug("Adding peer to db ($addr_recv_ip,$addr_recv_port)");
 	
 	my $filename = Digest::SHA::sha256_hex("$addr_recv_ip:$addr_recv_port");
 	#warn "Filepath =".$this->db_path().'/peers/pool/'.$filename."\n";
@@ -1013,7 +1018,7 @@ A peer can do a read, so, after reading in the bytes, figure out what to do.
 sub hook_peer_onreadidle {
 	my ($this,$peer) = @_;
 	return undef unless $peer->handshake_finished();
-	$this->sort_chain();
+#	$this->sort_chain();
 	# check to see if we need to fetch more inv
 	#warn "check to see if we need to fetch more inv with p=".$this->hook_getdata_blocks_preview()."\n";
 	#$peer->send_getdata($this->hook_getdata());
@@ -1584,7 +1589,7 @@ BEGIN{
 
 sub callback_gotaddr {
 	my ($this,$msg,$peer) = @_;
-	#return undef;
+	return undef;
 	#warn "gotaddr\n";
 	open(my $fh,'<',\$msg->{'payload'});
 	my $addr_ref = CBitcoin::Utilities::deserialize_addr($fh);

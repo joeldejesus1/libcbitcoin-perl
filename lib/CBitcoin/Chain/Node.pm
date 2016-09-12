@@ -5,6 +5,9 @@ use warnings;
 
 use Math::BigInt only => 'GMP';
 
+use CBitcoin::Chain::Branch;
+use CBitcoin::Chain::Node;
+use CBitcoin::Utilities;
 
 my $logger = Log::Log4perl->get_logger();
 
@@ -59,6 +62,8 @@ sub init {
 	$this->{'height'} = 0;
 	$this->{'score'} = $min_diff->copy()->bsub($block->hash_bigint());
 	$this->{'prev'} = $block->prevBlockHash();
+	$this->{'next ids'} = [] unless defined $this->{'next ids'};
+	
 	
 	$this->in_chain(0);
 }
@@ -208,15 +213,24 @@ sub save{
 
 	my $lk = $chain->lock();
 	
-	$chain->save->('chain',
+	
+	my $numOfNext = scalar(@{$this->{'next ids'}});
+	my $nexts = pack('C',$numOfNext);
+	if($numOfNext){
+		$nexts = $nexts.join('',sort @{$this->{'next ids'}});
+	}
+	
+	$logger->debug("saving node: id=[".unpack('H*',$this->id)."] ");
+	
+	$chain->put('chain',
 		$this->id
 		,$this->prev
 			.pack('L',$this->height)
 			.pack('C',length($score)).$score
-			.pack('C',scalar(@{$this->{'next ids'}})).join('',sort @{$this->{'next ids'}})
+			.$nexts
 	);
 	
-	$chain->save->('data',
+	$chain->put('data',
 		$this->id
 		,$this->data
 	);
@@ -237,11 +251,14 @@ sub load{
 	bless($this,$package);
 	
 	# this is the 80B block header without the tx count
-	$this->{'data'} = $this->chain->load('data',$id);
+	$this->{'data'} = $chain->get('data',$id);
 	return undef unless defined $this->{'data'};
 	
+	$this->{'id'} = $id;
+	
+	
 	# this contains the node prev/next link information along with the score
-	my $chain_data = $this->chain->load('chain',$id);
+	my $chain_data = $chain->get('chain',$id);
 	return undef unless defined $chain_data && 0 < length($chain_data);
 	
 	open(my $fh,'<',\$chain_data);

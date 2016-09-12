@@ -58,6 +58,7 @@ sub init {
 	my $this = shift;
 	my $options = shift;
 	
+	
 	#$logger->debug("0");
 	die "no options given" unless defined $options && ref($options) eq 'HASH' && defined $options->{'address'} && defined $options->{'port'} 
 		&& defined $options->{'our address'} && defined $options->{'our port'} && defined $options->{'socket'} && fileno($options->{'socket'}) > 0;
@@ -289,7 +290,14 @@ Block height of peer at the time of handshake.
 =cut
 
 sub block_height {
-	return shift->chain->height();
+	my ($this,$x) = @_;
+	
+	if(defined $x){
+		$this->{'block height'} = $x;
+	}
+	
+	
+	return $this->{'block height'};
 }
 
 =pod

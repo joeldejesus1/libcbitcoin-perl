@@ -149,7 +149,7 @@ sub new {
 		my $sck1;
 		my $c2 = $config;
 		my $socks5_2 = $socks5;
-		#warn "Doing connection now, part 1\n";
+		warn "Doing connection now, part 1\n";
 		
 		my $internal_fn_watcher = $fn_to_watcher;
 		my $rst1 = $resettimeout;
@@ -324,9 +324,9 @@ sub new {
 			$logger->info("received HUP signal");
 		});
 		
-		$evloop2->signal('CHLD', sub {
-			$logger->info("received CHLD signal");
-		});
+		#$evloop2->signal('CHLD', sub {
+		#	$logger->info("received CHLD signal");
+		#});
 		
 		
 		$logger->info("entering loop");

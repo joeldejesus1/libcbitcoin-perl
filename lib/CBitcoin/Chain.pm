@@ -4,7 +4,13 @@ use strict;
 use warnings;
 use BerkeleyDB;
 
+use Math::BigInt only => 'GMP';
 
+use CBitcoin::Chain::Branch;
+use CBitcoin::Chain::Node;
+use CBitcoin::Utilities;
+
+my $logger = Log::Log4perl->get_logger();
 
 =pod
 
@@ -50,24 +56,29 @@ sub init{
 	die "no valid path" unless defined $this->{'path'};
 	
 	
-	# DB_CDB_ALLDB means locks apply to all databases
+	# DB_CDB_ALLDB means locks apply to all databases (but get invalid arg)
 	$this->{'db env'} = new BerkeleyDB::Env(
 		-Home => $this->{'path'},
-		-Flags  =>	DB_CREATE | DB_INIT_CDB | DB_INIT_MPOOL | DB_CDB_ALLDB
-	) || die "cannot open environment: $BerkeleyDB::Error\n";
-	# store chain here
-	$this->{'db chain'} = new BerkeleyDB::Env(
-		-Filename => 'chain.db',
-		-CacheSize => 10*1024*1024,
-		-Env => $this->{'db env'}
-	) || die "cannot open database: $BerkeleyDB::Error\n";
-	# store data here
-	$this->{'db data'} = new BerkeleyDB::Env(
-		-Filename => 'data.db',
-		-CacheSize => 5*1024*1024,
-		-Env => $this->{'db env'}
-	) || die "cannot open database: $BerkeleyDB::Error\n";	
+		-Flags  =>	DB_CREATE | DB_INIT_CDB | DB_INIT_MPOOL
+	) || die "berkeley env: $BerkeleyDB::Error with error=$!";
+	#$logger->debug("DBENV=".$this->{'db env'});
 	
+	# store chain here
+	$this->{'db chain'} = BerkeleyDB::Hash->new(
+		-Filename => 'chain.db',
+		-Env => $this->{'db env'},
+		-Flags  =>	DB_CREATE
+	) || die "berkeley database (chain)[path=".$this->{'path'}."/chain.db]: $BerkeleyDB::Error with error=$!";
+	#$logger->debug("DBCHAIN=".$this->{'db chain'});
+	
+	# store data here
+	$this->{'db data'} = BerkeleyDB::Hash->new(
+		-Filename => 'data.db',
+		-Env => $this->{'db env'},
+		-Flags  =>	DB_CREATE
+	) || die "berkeley database (data)[path=".$this->{'path'}."/data.db]: $BerkeleyDB::Error with error=$!";
+	
+	#$logger->debug("DBDATA=".$this->{'db data'});
 	
 	$this->init_branches($options);
 }
@@ -83,9 +94,11 @@ sub init_branches {
 	
 	my $head_id = $this->get('chain','head');
 	if(defined $head_id){
+		$logger->debug("Got head=".unpack('H*',$head_id));
 		$this->init_branches_fromdb($head_id,$options);
 	}
 	else{
+		$logger->debug("creating new database");
 		$this->init_branches_from_genesisblock($options);
 	}
 }
@@ -102,13 +115,15 @@ sub init_branches_fromdb {
 	my ($this,$head_id,$options) = @_;
 	
 	my $lock = $this->lock();
-	my $node = CBitcoin::Chain::Node->load($this->chain,$id);
+	my $node = CBitcoin::Chain::Node->load($this,$head_id);
 	die "no node was returned, even though it was specified as the head of the chain" unless defined $node;
+	$logger->debug("node id=".unpack('H*',$node->id));
+	
 	$this->branch_add(
-		CBitcoin::Chain::Branch->new($this->chain,$node)
+		CBitcoin::Chain::Branch->new($this,$node)
 	);
 	
-	$lock->unlock();
+	$lock->cds_unlock();
 	
 	
 }
@@ -131,11 +146,12 @@ sub init_branches_from_genesisblock {
 	
 	my $lock = $this->lock();
 	$node->height(1);
+	$node->in_chain(1);
 	$node->save($this);
 	$this->put('chain','head',$node->id);
-	$lock->unlock();
+	$lock->cds_unlock();
 	
-	my $branch = CBitcoin::Branch->new($this,$node);
+	my $branch = CBitcoin::Chain::Branch->new($this,$node);
 	
 	$this->branch_add($branch);
 }
@@ -191,7 +207,7 @@ Locks the database.
 To unlock the database:<verbatim>
 my $lock = $chain->lock();
 # do stuff...
-$lock->unlock();
+$lock->cds_unlock();
 </verbatim>
    * when $lock goes out of scope, then the lock is released automatically
 
@@ -211,12 +227,12 @@ sub lock{
 =cut
 
 sub put{
-	my ($this,$name) = (shift,shift);
+	my ($this,$name,$key,$value) = @_;
 	if($name eq 'data'){
-		return $this->db_data->db_put(shift,shift);
+		return $this->db_data->db_put($key,$value);
 	}
 	elsif($name eq 'chain'){
-		return $this->db_chain->db_put(shift,shift);
+		return $this->db_chain->db_put($key,$value);
 	}
 	else{
 		die "bad database name";
@@ -233,10 +249,12 @@ sub get{
 	my ($this,$name,$key) = @_;
 	my $value;
 	if($name eq 'data'){
-		return $this->db_data->db_get($key,$value);
+		$this->db_data->db_get($key,$value);
+		return $value;
 	}
 	elsif($name eq 'chain'){
-		return $this->db_chain->db_get($key,$value);
+		$this->db_chain->db_get($key,$value);
+		return $value;
 	}
 	else{
 		die "bad database name";
@@ -262,7 +280,7 @@ Add a new branch to the chain.
 sub branch_add {
 	my ($this,$branch) = @_;
 	die "no branch given" unless defined $branch;
-	
+	$logger->debug("Got id=".unpack('H*',$branch->id)." ref=".ref($branch));
 	$this->{'branches'}->{$branch->id} = $branch;
 }
 
@@ -275,11 +293,10 @@ While the $branch used to be identified by $id, the $branch->id has changed.  Th
 =cut
 
 sub branch_update {
-	my ($this,$id,$branch) = @_;
-	die "no id" unless defined $id;
+	my ($this,$branch) = @_;
 	die "no branch given" unless defined $branch;
 	
-	delete $this->{'branches'}->{$id};
+	delete $this->{'branches'}->{$branch->prev};
 	$this->{'branches'}->{$branch->id} = $branch;	
 }
 
@@ -300,10 +317,10 @@ sub branch_find {
 	}
 	
 	# need to create a new branch based on node
-	my $node = CBitcoin::Chain::Node->load($chain,$id);
+	my $node = CBitcoin::Chain::Node->load($this,$id);
 	return undef unless defined $node;
 	
-	my $branch = CBitcoin::Chain::Branch->new($node);
+	my $branch = CBitcoin::Chain::Branch->new($this,$node);
 	$this->branch_add($branch);
 	return $branch;
 }
@@ -320,11 +337,14 @@ sub block_append {
 	my ($this,$block) = @_;
 	die "no block" unless defined $block;
 	
+	
 	my $node = CBitcoin::Chain::Node->new($block);
+	
 	
 	my $branch = $this->branch_find($node->prev);
 	return 0 unless defined $branch;
 	
+	$logger->debug("Appending block=[".unpack('H*',$node->id)."][".unpack('H*',$node->prev)."]\n... to branch=".unpack('H*',$branch->id));
 	$branch->append($node);
 	
 	return 1;
@@ -366,7 +386,8 @@ sub branch_longest {
 	
 	my $lbr;
 	my ($score,$height) = (Math::BigInt->new(0),0);
-	foreach my $branch (keys %{$this->{'branches'}}){
+	foreach my $branch_id (keys %{$this->{'branches'}}){
+		my $branch = $this->{'branches'}->{$branch_id};
 		if($score->bcmp($branch->score) < 0){
 			# score < branch
 			$lbr = $branch;
@@ -409,11 +430,11 @@ sub save{
 	my $branch = $this->branch_longest();
 	return undef unless defined $branch;
 	
-	my $headid = $branch->node->id();
+	my $head_id = $branch->node->id();
 	
 	my $lock = $this->lock();
 	$this->put('chain','head',$head_id);
-	$lock->unlock();
+	$lock->cds_unlock();
 	
 }
 
