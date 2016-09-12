@@ -325,6 +325,7 @@ sub add_header_to_chain {
 	#$this->add_header_to_inmemory_chain($peer, $block_header);
 	
 	$this->chain->block_append($block_header);
+	$this->cncout_send_header($block_header);
 	
 	$this->add_header_to_db($block_header);
 }

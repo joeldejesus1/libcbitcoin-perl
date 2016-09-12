@@ -291,10 +291,10 @@ sub locator{
 	my $branch_height = $this->height();
 	
 	my $node = $this->node();
-	my @blocks;
+	my @blocks = ($node->id);
 	
 	my @shortend;
-	my @bigend;
+	my @bigend = ($node->id);
 	$logger->debug("3");
 	while(1 < $node->height()){
 		my $oldheight = $node->height();
