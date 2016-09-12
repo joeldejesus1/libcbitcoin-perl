@@ -256,6 +256,61 @@ sub node_recursive {
 }
 
 
+=pod
+
+---++ locator()->$arrayref
+
+=cut
+
+sub locator{
+	my ($this) = @_;
+	
+	if(defined $this->{'last locator'} && $this->height() - $this->{'last locator'} < 50){
+		return [@{$this->{'short end'}},@{$this->{'big end'}}];
+	}
+	
+	my $branch_height = $this->height();
+	
+	my $node = $this->node();
+	my @blocks;
+	
+	my @shortend;
+	my @bigend;
+	
+	while(1 < $node->height()){
+		my $oldheight = $node->height();
+		$node = CBitcoin::Chain::Node->new($this->chain,$node->prev);
+		die "bad chain, need to fix" unless defined $node;
+		
+		die "bad node, need to fix" unless $node->height() = $oldheight -1;
+		
+		my $diff = $branch_height - $node->height();
+		if( $diff <= 10){
+			unshift(@blocks,$node->id);
+			unshift(@shortend,$node->id);
+		}
+		elsif($diff <= 10*100 && $node->height() % 100){
+			unshift(@blocks,$node->id);
+			unshift(@shortend,$node->id);
+		}
+		elsif($diff <= 10*10000 && $node->height() % 10000){
+			unshift(@blocks,$node->id);
+			unshift(@bigend,$node->id);
+		}
+		elsif($node->height() % 100000){
+			unshift(@blocks,$node->id);
+			unshift(@bigend,$node->id);
+		}	
+	}
+	$this->{'last locator'} = $branch_height;
+	$this->{'short end'} = \@shortend;
+	$this->{'big end'} = @bigend;
+	
+	# always put in the genesis block
+	unshift(@blocks,$node->id);
+	
+	return \@blocks;
+}
 
 
 

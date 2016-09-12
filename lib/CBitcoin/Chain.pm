@@ -109,6 +109,8 @@ sub init_branches_fromdb {
 	);
 	
 	$lock->unlock();
+	
+	
 }
 
 =pod
@@ -128,6 +130,7 @@ sub init_branches_from_genesisblock {
 	my $node = CBitcoin::Chain::Node->new($block);
 	
 	my $lock = $this->lock();
+	$node->height(1);
 	$node->save($this);
 	$this->put('chain','head',$node->id);
 	$lock->unlock();
@@ -329,6 +332,27 @@ sub block_append {
 
 =pod
 
+---++ block_locator($hash_stop)
+
+Given an integer between 1 and the height of the chain, return the block.
+
+=cut
+
+sub block_locator {
+	my ($this) = @_;
+	#die "no integer" unless defined $i && $i =~ m/(\d+)/ && 0 < $i;
+		
+	my $branch = $this->branch_longest();
+	die "no branches exist" unless defined $branch;
+	
+	# get every 100k-th block
+	return $branch->locator();
+
+	
+}
+
+=pod
+
 ---++ branch_longest()
 
 Return the longest branch.
@@ -351,6 +375,22 @@ sub branch_longest {
 	}
 	
 	return $lbr;	
+}
+
+
+=pod
+
+---++ height()
+
+What is the height of the longest branch.
+
+=cut
+
+sub height{
+	my ($this) = @_;
+	my $branch = $this->branch_longest();
+	die "no branch" unless defined $branch;
+	return $branch->height();	
 }
 
 

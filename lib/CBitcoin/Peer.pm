@@ -39,7 +39,6 @@ sub new {
 	#$logger->debug("1");
 	$this = $this->init(@_);
 	#$logger->debug("2");
-	$this->initialize_chain();
 	#$logger->debug("3");
 	
 	$logger->debug("Added Peer with address=".$this->address());
@@ -136,22 +135,6 @@ sub init {
 
 
 	return $this;
-}
-
-
-=pod
-
----++ initialize_chain
-
-Mimic the same subroutine in the SPV module.
-
-=cut
-
-sub initialize_chain{
-	my ($this) = @_;
-	
-	# makes a clean copy of the spv chain, so the peer can independently figure out what the chain is....???
-	$this->{'chain'} = $this->spv->initialize_peerchain();
 }
 
 
@@ -306,18 +289,7 @@ Block height of peer at the time of handshake.
 =cut
 
 sub block_height {
-	my $this = shift;
-	my $new_height = shift;
-	if(defined $new_height && $new_height =~ m/^(\d+)$/){
-		$this->{'block height'} += $1;
-		return $this->{'block height'};
-	}
-	elsif(!defined $new_height){
-		return $this->{'block height'};
-	}
-	else{
-		die "bad block height";
-	}
+	return shift->chain->height();
 }
 
 =pod
@@ -347,7 +319,7 @@ sub our_version {
 =cut
 
 sub chain {
-	return shift->{'chain'};
+	return shift->spv->chain();
 }
 
 =pod
