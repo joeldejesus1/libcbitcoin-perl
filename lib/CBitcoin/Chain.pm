@@ -79,8 +79,15 @@ sub init{
 	) || die "berkeley database (data)[path=".$this->{'path'}."/data.db]: $BerkeleyDB::Error with error=$!";
 	
 	#$logger->debug("DBDATA=".$this->{'db data'});
+	$this->{'cache'} = {
+		'height' => 0
+		,'longest branch' => undef
+	};
+	
 	
 	$this->init_branches($options);
+	
+	
 }
 
 =pod
@@ -92,6 +99,7 @@ sub init{
 sub init_branches {
 	my ($this,$options) = @_;
 	
+	
 	my $head_id = $this->get('chain','head');
 	if(defined $head_id){
 		$logger->debug("Got head=".unpack('H*',$head_id));
@@ -101,6 +109,13 @@ sub init_branches {
 		$logger->debug("creating new database");
 		$this->init_branches_from_genesisblock($options);
 	}
+	my $branch = $this->branch_longest();
+	
+	die "Bad Branch Height" if $branch->height == 0;
+	
+	$this->cache_longest_branch($branch);
+	
+	
 }
 
 =pod
@@ -114,18 +129,25 @@ Starting with the node (block) at the end of the longest branch, go back until t
 sub init_branches_fromdb {
 	my ($this,$head_id,$options) = @_;
 	
+	
 	my $lock = $this->lock();
 	my $node = CBitcoin::Chain::Node->load($this,$head_id);
 	die "no node was returned, even though it was specified as the head of the chain" unless defined $node;
 	$logger->debug("node id=".unpack('H*',$node->id));
 	
-	$this->branch_add(
-		CBitcoin::Chain::Branch->new($this,$node)
-	);
+	my $branch = CBitcoin::Chain::Branch->new($this,$node);
+	$this->branch_add($branch);
 	
 	$lock->cds_unlock();
 	
+	# figure out if this is the top of the chain
+	$branch->node();
 	
+	# just calculate the locator
+	my @stuff = $this->block_locator();
+	$logger->debug(sub{return "test Locator".join("\n...",@stuff);});
+	
+	die "testing";
 }
 
 =pod
@@ -280,8 +302,9 @@ Add a new branch to the chain.
 sub branch_add {
 	my ($this,$branch) = @_;
 	die "no branch given" unless defined $branch;
-	$logger->debug("Got id=".unpack('H*',$branch->id)." ref=".ref($branch));
+	$logger->debug("Got id=".unpack('H*',$branch->id)." height=".$branch->height);
 	$this->{'branches'}->{$branch->id} = $branch;
+
 }
 
 =pod
@@ -340,12 +363,26 @@ sub block_append {
 	
 	my $node = CBitcoin::Chain::Node->new($block);
 	
+	my $othernode = CBitcoin::Chain::Node->load($this,$node->id);
+	return 1 if defined $othernode;
 	
 	my $branch = $this->branch_find($node->prev);
 	return 0 unless defined $branch;
+
+
 	
-	$logger->debug("Appending block=[".unpack('H*',$node->id)."][".unpack('H*',$node->prev)."]\n... to branch=".unpack('H*',$branch->id));
+	#$logger->debug("Appending block=[".unpack('H*',$node->id)."][".unpack('H*',$node->prev)."]\n... to branch=".unpack('H*',$branch->id));
 	$branch->append($node);
+	
+	#if($this->cache_longest_branch->height < $branch->height){
+	#	$this->cache_longest_branch($branch);
+	#	$logger->debug("appending to longest branch");
+		
+		# mark the head of the chain
+		my $lock = $this->lock();
+		$this->put('chain','head',$branch->id());
+		$lock->cds_unlock();
+	#}
 	
 	return 1;
 }
@@ -413,6 +450,28 @@ sub height{
 	die "no branch" unless defined $branch;
 	return $branch->height();	
 }
+
+
+=pod
+
+---++ cache_longest_branch()
+
+This is used to determine whether or not to save a node as the highest point of the chain.
+
+=cut
+
+sub cache_longest_branch{
+	my ($this,$x) = @_;
+	if(defined $x && ref($x) eq 'CBitcoin::Chain::Branch'){
+		$this->{'cache'}->{'longest branch'} = $x;
+	}
+	elsif(defined $x){
+		die "bad branch";
+	}
+	return $this->{'cache'}->{'longest branch'};
+}
+
+
 
 
 =pod

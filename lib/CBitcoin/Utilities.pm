@@ -494,7 +494,7 @@ sub block_locator_indicies{
 	
 	my ($step,$start,$i) = (1,0,$top_depth);
 	
-	while($i > 0){
+	while($i > 1){
 		if(10 <= $start ){
 			$step *= 2; 
 		}
@@ -502,7 +502,7 @@ sub block_locator_indicies{
 		$i -= $step;
 		$start += 1;
 	}
-	push(@ans,0);
+	push(@ans,1);
 	return @ans;
 }
 

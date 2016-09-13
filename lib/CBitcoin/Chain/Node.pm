@@ -88,6 +88,7 @@ sub in_chain {
 	my ($this,$x) = @_;
 	
 	if($x){
+		die "cannot mark as in chain without height" if $this->height() == 0;
 		$this->{'is inserted in chain?'} = 1;
 	}
 	elsif(defined $x){
@@ -140,7 +141,7 @@ sub prev {
 sub next_add {
 	my ($this,$x) = @_;
 	if(defined $x && !defined $this->{'next ids proof'}->{$x}){
-		$logger->debug("already added");
+		#$logger->debug("already added");
 	}
 	elsif(defined $x){
 		$this->{'next ids proof'} = 1;
@@ -184,9 +185,16 @@ sub score {
 =cut
 
 sub height {
-	return shift->{'height'};
+	my ($this,$x) = @_;
+	if(defined $x && $x =~ m/^(\d+)$/){
+		$this->{'height'} = $1;
+	}
+	elsif(defined $x){
+		die "bad floor";
+	}
+	
+	return $this->{'height'};
 }
-
 
 =pod
 
@@ -208,6 +216,7 @@ sub save{
 	my ($this,$chain) = @_;
 	
 	die "cannot save node" unless $this->in_chain();
+	die "cannot save, bad height" if $this->height == 0;
 	
 	my $score = pack('H*',$this->score()->as_hex());
 
@@ -220,7 +229,7 @@ sub save{
 		$nexts = $nexts.join('',sort @{$this->{'next ids'}});
 	}
 	
-	$logger->debug("saving node: id=[".unpack('H*',$this->id)."] ");
+	#$logger->debug("saving node: id=[".unpack('H*',$this->id)."] ");
 	
 	$chain->put('chain',
 		$this->id
@@ -273,6 +282,7 @@ sub load{
 	$n = read($fh,$buf,4);
 	return undef unless $n == 4;
 	$this->{'height'} = unpack('L',$buf);	
+	die "height is zero" unless 0 < $this->{'height'};
 	
 	# get the score
 	$n = read($fh,$buf,1);

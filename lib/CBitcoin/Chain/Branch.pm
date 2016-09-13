@@ -40,7 +40,11 @@ sub new{
 	my $this = {};
 	bless($this,$package);
 	
+	$this->{'block queue'} = [];
+	
 	$this->init(@_);
+	
+	
 	
 	return $this;
 }
@@ -65,6 +69,9 @@ sub init{
 	$this->{'prev'} = $node->prev;
 	
 	die "no id" unless defined $this->{'id'};
+	
+	
+	
 }
 
 =pod
@@ -86,7 +93,7 @@ sub append{
 	my ($this,$node) = @_;
 	die "node is already in chain" if $node->in_chain();
 	# make sure that this is the correct branch 
-	$logger->debug("1");
+	#$logger->debug("1");
 	
 	my $lock = $this->chain->lock();
 	my $prevnode = $this->node();
@@ -117,7 +124,12 @@ sub append{
 	$prevnode->save($this->chain);
 	$node->save($this->chain);
 	
+	# save reference blockheight -> block->hash.
+	$this->node_queue_save();
+	
 	$lock->cds_unlock();
+	
+	$this->node_queue_add($node);
 	
 	# this stuff stays in memory
 	$this->{'score'} = $node->score()->copy();
@@ -283,55 +295,109 @@ sub node_recursive {
 
 sub locator{
 	my ($this) = @_;
-	$logger->debug("1");
-	if(defined $this->{'last locator'} && $this->height() - $this->{'last locator'} < 50){
-		return [@{$this->{'short end'}},@{$this->{'big end'}}];
-	}
-	$logger->debug("2");
-	my $branch_height = $this->height();
+
+	my @blocks;
+
 	
 	my $node = $this->node();
-	my @blocks = ($node->id);
+	my $branch_height = $node->height();
+	die "Branch height is 0" unless 0 < $branch_height;
+	#$logger->debug("height=$branch_height");
+	my @indicies = CBitcoin::Utilities::block_locator_indicies($branch_height);
 	
-	my @shortend;
-	my @bigend = ($node->id);
-	$logger->debug("3");
-	while(1 < $node->height()){
+	# check to see if we have a link to the db via block height
+	
+	
+	my $index = shift(@indicies);
+	
+	$logger->debug(sub{
+		require Data::Dumper;
+		return "indicies:".Data::Dumper::Dumper(\@indicies);
+	});
+	
+	
+	$logger->debug("Branch=".$this."  height=".$node->height());
+	while(1 < $node->height() && 0 < scalar(@indicies)){
 		my $oldheight = $node->height();
-		$logger->debug("current height=$oldheight");
+		#$logger->debug("current height=$oldheight: index=$index");
+		
+		
+		if($oldheight == $index){
+			#$logger->debug("Adding node to locator: index=$index");
+			$index = shift(@indicies);
+			push(@blocks,$node->id());
+			
+			# see if we can skip down to the next needed block
+			my $prevnode_id = $this->chain->get('chain','i='.$index);
+			if(defined $prevnode_id){
+				$node = CBitcoin::Chain::Node->load($this->chain,$prevnode_id);
+				die "bad chain, need to fix" unless defined $node && $node->height == $index;
+				next;
+			}
+			
+		}
+		
+		# iterate to the previous node		
 		$node = CBitcoin::Chain::Node->load($this->chain,$node->prev);
 		die "bad chain, need to fix" unless defined $node;
-		
-		die "bad node, need to fix" unless $node->height() = $oldheight -1;
-		
-		my $diff = $branch_height - $node->height();
-		if( $diff <= 10){
-			unshift(@blocks,$node->id);
-			unshift(@shortend,$node->id);
-		}
-		elsif($diff <= 10*100 && $node->height() % 100){
-			unshift(@blocks,$node->id);
-			unshift(@shortend,$node->id);
-		}
-		elsif($diff <= 10*10000 && $node->height() % 10000){
-			unshift(@blocks,$node->id);
-			unshift(@bigend,$node->id);
-		}
-		elsif($node->height() % 100000){
-			unshift(@blocks,$node->id);
-			unshift(@bigend,$node->id);
-		}	
+		die "bad node, need to fix" unless $node->height() == $oldheight -1;
+
 	}
-	$this->{'last locator'} = $branch_height;
-	$this->{'short end'} = \@shortend;
-	$this->{'big end'} = \@bigend;
-	$logger->debug("Big=".scalar(@bigend)." Short=".scalar(@shortend));
-	# always put in the genesis block
-	unshift(@blocks,$node->id);
+	# this should be the genesis block
+	push(@blocks,$node->id());
+	
+	
 	
 	return \@blocks;
 }
 
+
+=pod
+
+---++ node_queue_add($node)
+
+Add blocks to queue.
+
+=cut
+
+sub node_queue_add{
+	my ($this,$node) = @_;
+	die "no node" unless defined $node;
+	
+	#$logger->debug("Ref=".ref(\@x));
+	push(@{$this->{'block queue'}},[$node->height,$node->id]);
+}
+
+=pod
+
+---++ node_queue_save()
+
+Once the blocks are comfortably behind the head of the branch (ie secure), save a reference to them via block height.
+
+=cut
+
+sub node_queue_save {
+	my ($this) = @_;
+
+	my $branch_height = $this->height();
+	
+	
+	my ($i,$n) = (0,scalar(@{$this->{'block queue'}}));
+	
+	while($i < $n){
+		my $xref = shift(@{$this->{'block queue'}});
+		
+		#$logger->debug("Xref=".ref($xref)." hi=".$xref);
+		#die "not an array ref" unless ref($xref) eq 'HASH';
+		$i++;
+		if(20 < $branch_height - $xref->[0]){
+			$this->chain->put('chain','i='.$xref->[0],$xref->[1]);
+		}
+		else{
+			push(@{$this->{'block queue'}},$xref);
+		}
+	}
+}
 
 
 1;

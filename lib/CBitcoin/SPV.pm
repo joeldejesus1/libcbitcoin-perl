@@ -323,11 +323,14 @@ sub add_header_to_chain {
 	die "header is null" unless defined $block_header;
 	
 	#$this->add_header_to_inmemory_chain($peer, $block_header);
-	
-	$this->chain->block_append($block_header);
-	$this->cncout_send_header($block_header);
-	
-	$this->add_header_to_db($block_header);
+
+	if($this->chain->block_append($block_header)){
+		$this->add_header_to_db($block_header);
+	}
+	else{
+		# this block as already been appended
+		$logger->debug("this block has already been appended");
+	}
 }
 
 
@@ -375,7 +378,9 @@ sub calculate_block_locator {
 sub add_header_to_db {
 	my ($this, $header) = @_;
 	
-	$logger->debug("New header with hash=".unpack('H*',$header->hash));
+	#$logger->debug("New header with hash=".unpack('H*',$header->hash));
+	
+	$this->cncout_send_header($header);
 }
 
 =pod
@@ -1331,7 +1336,7 @@ sub cnc_send_message_data {
 		return undef;
 	}
 	else{
-		$logger->debug("pid=$target sending data");
+		#$logger->debug("pid=$target sending data");
 		return shift(@{$this->{'cnc queues'}->{$target}});
 	}
 }
@@ -1360,7 +1365,7 @@ sub cnc_send_message {
 		$this->{'cnc callbacks'}->{$target}->{'mark write'}->();
 		delete $this->{'cnc callbacks'}->{$target}->{'mark write'};
 	}
-	$logger->debug("$target queue size is ".scalar(@{$this->{'cnc queues'}->{$target}}));
+	#$logger->debug("$target queue size is ".scalar(@{$this->{'cnc queues'}->{$target}}));
 	return scalar(@{$this->{'cnc queues'}->{$target}});
 }
 
@@ -1908,9 +1913,9 @@ sub callback_gotheaders {
 			next;
 		}
 		
-		$logger->debug("($i/$num_of_headers)Got header=[".$block->hash_hex().
-			";".$block->transactionNum.
-			";".length($msg->payload())."]");
+		#$logger->debug("($i/$num_of_headers)Got header=[".$block->hash_hex().
+		#	";".$block->transactionNum.
+		#	";".length($msg->payload())."]");
 			
 		$this->add_header_to_chain($peer,$block);
 		
@@ -1920,7 +1925,7 @@ sub callback_gotheaders {
 			delete $this->{'inv search'}->[2]->{$block->hash()};# = undef;
 		}
 		else{
-			$logger->debug("missing inv with hash=".$block->hash_hex());
+			#$logger->debug("missing inv with hash=".$block->hash_hex());
 		}
 		
 	}

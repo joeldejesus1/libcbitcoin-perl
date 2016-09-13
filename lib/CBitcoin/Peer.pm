@@ -642,7 +642,7 @@ sub read_data_single_msg_item {
 	}
 	elsif(defined $this->{'buffer'}->{$key}){
 		# skip this
-		$logger->debug("skip key=$key");
+#		$logger->debug("skip key=$key");
 		return 1;
 	}
 	else{
