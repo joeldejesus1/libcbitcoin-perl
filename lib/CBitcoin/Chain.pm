@@ -133,7 +133,7 @@ sub init_branches_fromdb {
 	my $lock = $this->lock();
 	my $node = CBitcoin::Chain::Node->load($this,$head_id);
 	die "no node was returned, even though it was specified as the head of the chain" unless defined $node;
-	$logger->debug("node id=".unpack('H*',$node->id));
+	$logger->debug("node id=".unpack('H*',$node->id)." and height=".$node->height());
 	
 	my $branch = CBitcoin::Chain::Branch->new($this,$node);
 	$this->branch_add($branch);
@@ -142,12 +142,13 @@ sub init_branches_fromdb {
 	
 	# figure out if this is the top of the chain
 	$branch->node();
+	# after loading the longest branch, double check that we are, in fact, on the longest branch
+	$branch = $this->branch_longest();
 	
 	# just calculate the locator
 	my @stuff = $this->block_locator();
 	$logger->debug(sub{return "test Locator".join("\n...",@stuff);});
 	
-	die "testing";
 }
 
 =pod
@@ -286,6 +287,32 @@ sub get{
 
 =pod
 
+---++ del('data',$key)
+
+=cut
+
+sub del{
+	my ($this,$name,$key) = @_;
+	my $value;
+	if($name eq 'data'){
+		$this->db_data->db_del($key);
+		#return $value;
+	}
+	elsif($name eq 'chain'){
+		$this->db_chain->db_del($key);
+		#return $value;
+	}
+	else{
+		die "bad database name";
+	}
+	return 1;
+}
+
+
+
+
+=pod
+
 ---+ utilities
 
 =cut
@@ -364,28 +391,103 @@ sub block_append {
 	my $node = CBitcoin::Chain::Node->new($block);
 	
 	my $othernode = CBitcoin::Chain::Node->load($this,$node->id);
-	return 1 if defined $othernode;
+	return 0 if defined $othernode;
 	
 	my $branch = $this->branch_find($node->prev);
-	return 0 unless defined $branch;
+	#return 0 unless defined $branch;
+	unless(defined $branch){
+#		my $longest_branch = $this->branch_longest();
+#		my $latestnode = $longest_branch->node();
+#		my $block = CBitcoin::Block->deserialize($latestnode->data.pack('C',0));
+#		
+#		my $timediff = $timestamp - unpack('l',$block->timestamp());
+		# check if new block is too old		
+		
+		$this->block_orphan_add($block);
+		return 0;
+	}
+	
+
 
 
 	
 	#$logger->debug("Appending block=[".unpack('H*',$node->id)."][".unpack('H*',$node->prev)."]\n... to branch=".unpack('H*',$branch->id));
-	$branch->append($node);
+	$branch->append($node,unpack('l',$block->timestamp()));
 	
 	#if($this->cache_longest_branch->height < $branch->height){
 	#	$this->cache_longest_branch($branch);
 	#	$logger->debug("appending to longest branch");
 		
 		# mark the head of the chain
-		my $lock = $this->lock();
-		$this->put('chain','head',$branch->id());
-		$lock->cds_unlock();
+	my $lock = $this->lock();
+	$this->put('chain','head',$branch->id());
+	$lock->cds_unlock();
 	#}
 	
 	return 1;
 }
+
+
+=pod
+
+---++ block_orphan_add($block)
+
+Store an orphan block.
+
+put(o=$block->hash,$block->header)
+
+=cut
+
+sub block_orphan_add {
+	my ($this,$block) = @_;
+	
+	my $lock = $this->lock();
+	my $f = $this->get('data','o='.$block->hash);
+	return undef unless defined $f;
+	$this->put('data','o='.$block->hash,$block->header);
+	
+	# as this to list of orphan blocks
+	my $list = $this->get('data','blockorphans');
+	$list .= $block->hash();
+	$this->put('data','blockorphans',$list);
+	
+	$lock->cds_unlock();
+}
+
+=pod
+
+---++ block_orphan_save()
+
+Save orphan blocks that are not orphan any more.  Called in SPV callback_gotheaders.
+
+=cut
+
+sub block_orphan_save {
+	my ($this) = @_;
+	
+	$logger->debug("check to see if the orphan blocks can go on a branch");
+
+	# as this to list of orphan blocks
+	my $lock = $this->lock();
+	my $list = $this->get('data','blockorphans');
+	$this->del('data','blockorphans');
+	$lock->cds_unlock();
+	
+	my $i = 0;
+	while($i * 32 < length($list)){
+		my $hash = substr($list,$i*32,32);
+		my $data = $this->get('data','o='.$hash);
+		next unless defined $data;
+		
+		
+		my $block = CBitcoin::Block->deserialize($data.pack('C',0));
+		$this->block_append($block);
+		
+		$i++;
+	}
+
+}
+
 
 =pod
 

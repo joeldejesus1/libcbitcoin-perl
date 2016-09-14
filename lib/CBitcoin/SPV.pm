@@ -128,7 +128,7 @@ sub init {
 		$options->{'max connections'} = $1;
 	}
 	elsif(!defined $options->{'max connections'}){
-		$options->{'max connections'} = 3;
+		$options->{'max connections'} = 2;
 	}
 	else{
 		die "bad max connection setting";
@@ -325,11 +325,12 @@ sub add_header_to_chain {
 	#$this->add_header_to_inmemory_chain($peer, $block_header);
 
 	if($this->chain->block_append($block_header)){
+		$this->chain->block_orphan_save();
 		$this->add_header_to_db($block_header);
 	}
 	else{
 		# this block as already been appended
-		$logger->debug("this block has already been appended");
+#		$logger->debug("this block has already been appended");
 	}
 }
 
@@ -470,6 +471,22 @@ sub peers_path {
 	return shift->{'db path'}.'/peers';
 }
 
+=pod
+
+---++ peer_pool_count
+
+How many peer addresses are there to connect to?
+
+=cut
+
+sub peer_pool_count {
+	my ($this) = @_;
+		
+	opendir(my $fh,$this->db_path().'/peers/pool');
+	my @f = readdir($fh);
+	closedir($fh);
+	return (scalar(@f) - 2);
+}
 
 =pod
 
@@ -945,7 +962,6 @@ sub peer_hook_handshake_finished{
 	if($this->block_height() < $peer->block_height()){
 		$logger->debug("alpha; block height diff=".( $peer->block_height() - $this->block_height() ));
 		#$peer->send_getblocks();
-		$peer->send_getaddr();
 		$peer->send_getheaders();
 	}
 	else{
@@ -953,8 +969,15 @@ sub peer_hook_handshake_finished{
 		$peer->send_getaddr();
 	}
 	
+	if($this->peer_pool_count() < 30){
+		$peer->send_getaddr();
+	}
+	
 	#$peer->send_getblocks();
 }
+
+
+
 
 =pod
 
@@ -1067,7 +1090,11 @@ sub hook_peer_onreadidle {
 			#warn "we are caught up with peer=$peer";
 			$logger->debug("we are caught up with peer=$peer");
 			#$peer->send_getaddr();
-		}		
+		}
+		
+		if($this->peer_pool_count() < 20){
+			$peer->send_getaddr();
+		}
 	}
 
 }
@@ -1164,7 +1191,7 @@ sub hook_getdata {
 		# hook_getdata
 		# $this->spv->{'inv search'}->[2]
 		#warn "need to do another block fetch...";
-		$this->sort_chain();
+
 		
 		# when a peer is not busy, the first peer to see this will fetch a block
 		$this->is_marked_getblocks(1);
@@ -1870,13 +1897,30 @@ For when we have a block that has transactions of interest.  Overload this subro
 
 sub callback_gotblock_withtx{
 	my ($this,$block) = @_;
-	my $header = $block->header();
-	open(my $fh,'>','/tmp/spv/'.$block->hash_hex);
-	my ($m) = (0);
-	while(0 < length($header) - $m){
-		$m += syswrite($fh,$header,8192,$m);
-	}
-	close($fh);
+	
+	$logger->debug("Got Block with transaction");
+}
+
+=pod
+
+---++ callback_gottx
+
+Got tx that has not been confirmed.
+
+=cut
+
+sub callback_gottx{
+	my ($this,$tx) = @_;
+	
+	$logger->debug("Got TX");
+	
+	#my $header = $block->header();
+	#open(my $fh,'>','/tmp/spv/'.$block->hash_hex);
+	#my ($m) = (0);
+	#while(0 < length($header) - $m){
+#		$m += syswrite($fh,$header,8192,$m);
+#	}
+#	close($fh);
 }
 
 

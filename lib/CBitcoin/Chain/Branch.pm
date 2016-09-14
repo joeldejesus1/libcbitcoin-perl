@@ -90,13 +90,15 @@ Do a lock here and add the node to the end of this branch.  Returns 0 if the nod
 =cut
 
 sub append{
-	my ($this,$node) = @_;
+	my ($this,$node,$timestamp) = @_;
 	die "node is already in chain" if $node->in_chain();
 	# make sure that this is the correct branch 
 	#$logger->debug("1");
 	
 	my $lock = $this->chain->lock();
 	my $prevnode = $this->node();
+		
+	
 	unless(defined $prevnode){
 		$lock->cds_unlock();
 		die "prev node does not exist";
@@ -380,6 +382,7 @@ sub node_queue_save {
 	my ($this) = @_;
 
 	my $branch_height = $this->height();
+	
 	
 	
 	my ($i,$n) = (0,scalar(@{$this->{'block queue'}}));
