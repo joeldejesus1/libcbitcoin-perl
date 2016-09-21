@@ -90,7 +90,7 @@ Do a lock here and add the node to the end of this branch.  Returns 0 if the nod
 =cut
 
 sub append{
-	my ($this,$node,$timestamp) = @_;
+	my ($this,$node) = @_;
 	die "node is already in chain" if $node->in_chain();
 	# make sure that this is the correct branch 
 	#$logger->debug("1");

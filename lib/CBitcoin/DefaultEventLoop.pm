@@ -159,7 +159,7 @@ sub new {
 		
 		eval{
 			local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
-			alarm 15;
+			alarm 6;
 			chomp($ipaddress);
 			chomp($port);
 

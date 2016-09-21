@@ -336,6 +336,13 @@ sub branch_add {
 
 =pod
 
+---+ handle blocks
+
+=cut
+
+
+=pod
+
 ---++ branch_update($id,$branch)
 
 While the $branch used to be identified by $id, the $branch->id has changed.  This sub is called in $branch->append($node).
@@ -399,26 +406,22 @@ sub block_append {
 #		my $longest_branch = $this->branch_longest();
 #		my $latestnode = $longest_branch->node();
 #		my $block = CBitcoin::Block->deserialize($latestnode->data.pack('C',0));
-#		
+		
 #		my $timediff = $timestamp - unpack('l',$block->timestamp());
 		# check if new block is too old		
 		
 		$this->block_orphan_add($block);
 		return 0;
 	}
-	
 
-
-
-	
 	#$logger->debug("Appending block=[".unpack('H*',$node->id)."][".unpack('H*',$node->prev)."]\n... to branch=".unpack('H*',$branch->id));
-	$branch->append($node,unpack('l',$block->timestamp()));
+	$branch->append($node);
 	
 	#if($this->cache_longest_branch->height < $branch->height){
 	#	$this->cache_longest_branch($branch);
 	#	$logger->debug("appending to longest branch");
 		
-		# mark the head of the chain
+	# mark the head of the chain
 	my $lock = $this->lock();
 	$this->put('chain','head',$branch->id());
 	$lock->cds_unlock();
@@ -470,6 +473,8 @@ sub block_orphan_save {
 	# as this to list of orphan blocks
 	my $lock = $this->lock();
 	my $list = $this->get('data','blockorphans');
+	return undef unless defined $list && 0 < length($list);
+	
 	$this->del('data','blockorphans');
 	$lock->cds_unlock();
 	

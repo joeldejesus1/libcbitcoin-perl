@@ -877,6 +877,57 @@ The logic used to figure out what needs to be uploaded and downloaded is stored 
 
 =pod
 
+---++ send_tx($tx)
+
+Send a tx out.  Please avoid sending out the same transaction to the same peer multiple times.
+
+=cut
+
+sub send_tx {
+	my ($this,$tx) = @_;
+	return undef unless defined $tx;
+	
+	my $basedir = $this->db_path();
+	
+	my $peerName = Digest::SHA::sha256_hex($this->address().':'.$this->port);
+	my $peerfp = join('/',$basedir,'peers','active',$peerName);
+	
+	# my $sentdir = join('/',$basedir,'sent');
+	
+	# see if we have already sent this tx out
+	# ..untaint
+	my $hash_hex;
+	if(unpack('H*',$tx->hash) =~ m/^([0-9a-fA-F]+)$/){
+		$hash_hex = $1;
+	}
+	else{
+		die "failed to get hash";
+	}
+	
+	unless(-d join('/',$basedir,'sent',$hash_hex) ){
+		# already sent
+		$logger->debug("creating tx");
+		mkdir(join('/',$basedir,'sent',$hash_hex)) || die "could not create directory";
+	}
+	
+	if(-l join('/',$basedir,'sent',$hash_hex,$peerName)){
+		$logger->debug("already sent tx");
+		return undef;
+	}
+	
+	symlink($peerfp,join('/',$basedir,'sent',$hash_hex,$peerName));
+	
+	return $this->write(CBitcoin::Message::serialize(
+		$tx->serialize(),
+		'tx',
+		$this->magic
+	));	
+	
+}
+
+
+=pod
+
 ---++ send_getblocks()
 
 Calculate the block locator based on the block headers we have, then send a message out.
@@ -957,33 +1008,6 @@ sub send_verack {
 
 ---++ send_ping
 
-
-			if($peer->speed() < 10){
-				# find another peer
-				$logger->debug("going to activate a peer just in case");
-				$this->activate_peer();
-				
-				my $current_fd = fileno($peer->socket());
-				my @fds = @{$this->{'peers'}};
-				my $bool = 1;
-				while(my $fd = shift(@fds)){
-					next if $fd == $current_fd;
-					my $other_peer = $this->peer_by_fileno($fd);
-					$logger->debug("using another peer to get headers");
-					$other_peer->send_getheaders();
-					$bool = 0;
-					last;
-				}
-				
-				if($bool){
-					$peer->send_getheaders();
-				}
-				
-				
-			}
-			else{
-				$peer->send_getheaders();
-			}
 
 =cut
 

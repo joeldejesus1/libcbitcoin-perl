@@ -183,6 +183,10 @@ sub make_directories{
 	# ./pending
 	mkdir("$base/pending") unless -d "$base/pending";
 	
+	# ./sent
+	mkdir("$base/sent") unless -d "$base/sent";
+	
+	
 	# ./locators
 	mkdir("$base/locators") unless -d "$base/locators";
 	
@@ -676,9 +680,9 @@ sub activate_peer {
 	
 	$logger->debug("activating peer - 2");
 	opendir(my $fh,$dir_pool) || die "cannot open directory";
-	my @files = grep { $_ ne '.' && $_ ne '..' } readdir $fh;
+	my @files = sort grep { $_ ne '.' && $_ ne '..' } readdir $fh;
 	closedir($fh);
-	
+
 	my @peer_files = sort @files;
 	
 	my $numOfpeers = scalar(@peer_files);
@@ -695,7 +699,7 @@ sub activate_peer {
 	}
 	elsif($numOfpeers == 0){
 		#die "ran out of nodes to connect to.";
-		$logger->error("ran out of nodes to connect to.");
+		$logger->error("no more peers in the pool");
 		return undef;
 	}
 	
@@ -1622,7 +1626,7 @@ BEGIN{
 
 sub callback_gotaddr {
 	my ($this,$msg,$peer) = @_;
-	return undef;
+	$logger->debug("1");
 	#warn "gotaddr\n";
 	open(my $fh,'<',\$msg->{'payload'});
 	my $addr_ref = CBitcoin::Utilities::deserialize_addr($fh);
@@ -1632,6 +1636,7 @@ sub callback_gotaddr {
 		
 		foreach my $addr (@{$addr_ref}){
 			# timestamp, services, ipaddress, port
+			$logger->debug("Adding address to db:".$addr->{'ipaddress'}.":".$addr->{'port'});
 			$this->add_peer_to_inmemmory(
 				$addr->{'services'},
 				$addr->{'ipaddress'},
@@ -1643,6 +1648,7 @@ sub callback_gotaddr {
 	}
 	else{
 		#warn "Got no new addresses\n";
+		$logger->debug("got no new addresses");
 	}
 	return 1;
 	
@@ -1976,6 +1982,30 @@ sub callback_gotheaders {
 	
 	$this->hook_peer_onreadidle($peer);
 }
+
+
+=pod
+
+---++ callback_gotsendheaders
+
+Upon receipt of this message, the node is be permitted, but not required, to announce new blocks by headers command (instead of inv command).   This message is supported by the protocol version >= 70012 or Bitcoin Core version >= 0.12.0. 
+   * [[https://en.bitcoin.it/wiki/Protocol_documentation#sendheaders][sendheaders]]
+
+=cut
+
+BEGIN{
+	$callback_mapper->{'command'}->{'sendheaders'} = {
+		'subroutine' => \&callback_gotsendheaders
+	}
+};
+
+sub callback_gotsendheaders {
+	my ($this,$msg) = @_;
+	
+	
+	return 1;
+}
+
 
 =pod
 

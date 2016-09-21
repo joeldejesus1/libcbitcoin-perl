@@ -4,12 +4,37 @@ package CBitcoin;
 use strict;
 use warnings;
 
+=pod
+
+---+ Constants
+
+   * [[https://github.com/bitcoin/bitcoin/blob/e9d76a161d30ee3081acf93d70a9ae668a9d6ed1/src/version.h][version]]
+   * [[https://en.bitcoin.it/wiki/Protocol_documentation#sendheaders][constants]]
+=cut
+
 use constant {
-	MAINNET => 0xD9B4BEF9,
-	TESTNET => 0xDAB5BFFA,
-	TESTNET3 => 0x0709110B,
-	NAMECOIN => 0xFEB4BEF9
+	MAINNET => 0xD9B4BEF9
+	,TESTNET => 0xDAB5BFFA
+	,TESTNET3 => 0x0709110B
+	,NAMECOIN => 0xFEB4BEF9
+	
+	
+	,SPV_PROTOCOL_VERSION => 70014
+	,SPV_INIT_PROTO_VERSION => 209
+	,SPV_GETHEADERS_VERSION => 31800
+	,SPV_MIN_PEER_PROTO_VERSION => 31800
+	,SPV_CADDR_TIME_VERSION => 31402
+	,SPV_BIP0031_VERSION => 70014
+	,SPV_MEMPOOL_GD_VERSION => 70014
+	,SPV_NO_BLOOM_VERSION => 70011
+	,SPV_BIP0031_VERSION => 60000
+	,SPV_SENDHEADERS_VERSION  => 70012
+	,SPV_FEEFILTER_VERSION => 70013
+	,SPV_SHORT_IDS_BLOCKS_VERSION => 70014
 };
+
+
+
 
 =head1 NAME
 
