@@ -4,6 +4,8 @@ use strict;
 use warnings;
 
 use Net::IP;
+use Net::DNS;
+use CBitcoin;
 use Convert::Base32;
 use constant TORPREFIX => 'fd87d87eeb43';
 
@@ -550,6 +552,83 @@ sub validate_filepath {
 	}
 	return join('/',@untainted);
 }
+
+
+=pod
+
+---++ dns_fetch_peers()
+
+Fetch peers via DNS requests, returns serialized addr packets.
+
+=cut
+
+our $node_seeds;
+BEGIN{
+	$node_seeds = [time(),[]];
+}
+
+sub dns_fetch_peers{
+	my $dest = shift;
+	
+	return $node_seeds->[1] if time() - $node_seeds->[0] < 5*60*60  && 0 < scalar(@{$node_seeds->[1]});
+	
+	my $port;
+	$dest = undef unless defined $dest && ref($dest) eq 'ARRAY' && 0 < scalar(@{$dest});
+	if($CBitcoin::network_bytes == CBitcoin::MAINNET){
+		$port  = 8333;
+		$dest //= [
+			"seed.breadwallet.com", "seed.bitcoin.sipa.be", "dnsseed.bluematt.me", "dnsseed.bitcoin.dashjr.org",
+			"seed.bitcoinstats.com", "bitseed.xf2.org", "seed.bitcoin.jonasschnelli.ch"
+		];
+	}
+	elsif($CBitcoin::network_bytes == CBitcoin::TESTNET){
+		$port = 18333;
+		$dest //= [
+			"test.seed.breadwallet.com"
+		];
+	}
+	else{
+		die "bad network bytes";
+	}
+	
+	my $res   = Net::DNS::Resolver->new;
+	
+	my @addresses;
+	foreach my $host (@{$dest}){
+		# A for ipv4 and AAAA for ipv6
+		foreach my $type ('A','AAAA'){
+			my $reply = $res->query($host,$type);
+			if ($reply) {
+				foreach my $rr ($reply->answer) {
+					#print $rr->address, "\n";
+					push(@addresses,[time(),pack('Q',1),$rr->address,$port]);
+				}
+			} else {
+				$logger->debug("query failed: ".$res->errorstring);
+			}
+		}
+		
+	}
+	$node_seeds->[1] = \@addresses;
+	
+	
+	
+	
+	$node_seeds->[0] = time();
+	
+	return $node_seeds->[1];
+}
+
+
+
+
+
+
+
+
+
+
+
 
 
 1;

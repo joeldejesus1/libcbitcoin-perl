@@ -264,6 +264,11 @@ sub initialize_peers {
 		rename("$fp_active/$f1", "$fp_pool/$f1") 
 			|| die "Move $fp_active/$f1 -> $fp_pool/$f1 failed: $!";
 	}
+	
+	
+	foreach my $p (@{CBitcoin::Utilities::dns_fetch_peers()}){
+		$this->add_peer_to_inmemmory($p->[1],$p->[2],$p->[3]);
+	}
 }
 
 =pod

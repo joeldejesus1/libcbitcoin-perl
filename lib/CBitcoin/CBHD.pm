@@ -47,6 +47,11 @@ our $default_kdf_sub = sub{			return Digest::SHA::sha256(shift); 	};
 
 # Preloaded methods go here.
 
+
+# dispatch table, use it in Kgc::Safe
+
+our $dispatch;
+
 =pod
 
 ---+ constructors
@@ -64,6 +69,9 @@ TODO: check for the appropriate network bytes.
 
 =cut
 
+BEGIN{
+	$dispatch->{'new'} = \&new;
+}
 
 
 sub new {
@@ -107,6 +115,9 @@ generate a key (parent)
 
 =cut
 
+BEGIN{
+	$dispatch->{'generate'} = \&generate;
+}
 
 sub generate {
 	my ($package,$seed) = @_;
@@ -168,6 +179,10 @@ go from private parent keypair to private child keypair, then set $hardbool to t
 
 =cut
 
+BEGIN{
+	$dispatch->{'deriveChild'} = \&deriveChild;
+}
+
 sub deriveChild {
 	my ($this,$hardbool,$childid) = @_;
 	
@@ -202,6 +217,10 @@ From Hard to Soft.
 
 =cut
 
+BEGIN{
+	$dispatch->{'deriveChildPubExt'} = \&deriveChildPubExt;
+}
+
 sub deriveChildPubExt {
 	my ($this,$childid) = @_;
 	
@@ -232,6 +251,9 @@ Returns true if yes, false if soft.
 
 =cut
 
+BEGIN{
+	$dispatch->{'is_soft_child'} = \&is_soft_child;
+}
 
 sub is_soft_child {
 	my $this = shift;
@@ -256,6 +278,10 @@ sub is_soft_child {
 
 =cut
 
+BEGIN{
+	$dispatch->{'export_xpub'} = \&export_xpub;
+}
+
 sub export_xpub {
 	my $this = shift;
 	
@@ -275,6 +301,10 @@ sub export_xpub {
 ---++ export_xprv
 
 =cut
+
+BEGIN{
+	$dispatch->{'export_xprv'} = \&export_xprv;
+}
 
 sub export_xprv {
 	my $this = shift;
@@ -307,6 +337,10 @@ Return either 'production' or 'test' depending on whether we are on testnet or m
 
 =cut
 
+BEGIN{
+	$dispatch->{'network_bytes'} = \&network_bytes;
+}
+
 sub network_bytes {
 	my $this = shift;
 	my $xpub = $this->export_xpub();
@@ -331,6 +365,10 @@ Return 'private' if we posses the serialized private key, else return public.
 
 =cut
 
+BEGIN{
+	$dispatch->{'cbhd_type'} = \&cbhd_type;
+}
+
 sub cbhd_type {
 	my $this = shift;
 
@@ -352,6 +390,10 @@ The network bytes are determined by the global variable $CBitcoin::network_bytes
 
 =cut
 
+BEGIN{
+	$dispatch->{'address'} = \&address;
+}
+
 sub address {
 	my $this = shift;
 	
@@ -371,6 +413,7 @@ sub address {
 Provide the public key in raw binary form.
 
 =cut
+
 
 sub publickey {
 	return shift->{'public key'};
@@ -405,6 +448,10 @@ sub ripemdHASH160 {
 
 =cut
 
+BEGIN{
+	$dispatch->{'new'} = \&new;
+}
+
 sub index {
 	my ($this) = @_;
 	
@@ -426,6 +473,10 @@ sub index {
 ---++ childid->($hardbool,$index)
 
 =cut
+
+BEGIN{
+	$dispatch->{'new'} = \&new;
+}
 
 sub childid {
 	my ($this) = @_;
