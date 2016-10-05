@@ -23,7 +23,10 @@ sub new {
 		,'index' => $index
 		,'hdkey' => undef
 		,'hard' => 1
-		,'sub index' => Kgc::HTML::Bitcoin::Tree::MAXACCOUNTS
+		,'sub index' => CBitcoin::Tree::MAXACCOUNTS
+		,'output pool' => []
+		,'output pool unique check' => {}
+		,'output inflight' => []
 	};
 	bless($this,$package);
 
@@ -31,9 +34,126 @@ sub new {
 
 }
 
+=pod
+
+---++ balance($type)
+
+Get the balance for the current node.  Default is output pool.
+
+For satoshi outbound but not confirmed yet, set type='inflight'.
+
+=cut
+
+sub balance {
+	my ($this,$type) = @_;
+	# go thru all the outputs:  [$type,$input,$value,...]
+	my $sum = 0;
+	my $array_ref;
+	if(!defined $type){
+		$array_ref = $this->{'output pool'};
+	}
+	elsif($type eq 'inflight'){
+		# how many satoshi have been spent, but not confirmed
+		$array_ref = $this->{'output inflight'};
+	}
+	else{
+		die "bad type";
+	}
+	my $n = @{$array_ref};
+	return $sum unless 0 < $n;
+	
+	$sum = [map {$sum +=$_->[2] } @{$array_ref}]->[$n - 1];
+	return $sum;	
+	
+}
+
+=pod
+
+---++ balance_recursive($type)
+
+Get the balance for this node and all child nodes.
+
+=cut
+
+sub balance_recursive {
+	my ($this,$type) = @_;
+	my $total = 0;
+	
+	foreach my $sym ('|','/'){
+		my $hardbool = ($sym eq '|') ? 1 : 0;
+		foreach my $i (keys %{$this->{'next '.$sym}}){
+			$total += $this->{'next '.$sym}->{$i}->balance_recursive($type);
+		}
+	}
+	
+	$total += $this->balance($type);
+	
+	return $total;
+}
+
+=pod
+
+---++ input_add_p2pkh($txinput,$value,$hardbool,$index)
+
+Add an input that can be used in a future transaction.
+
+=cut
+
+sub input_add_p2pkh {
+	my ($this,$input,$value,$hardbool,$index) = @_;
+	#return undef if defined $this->{'output pool unique check'}->{$input->prevOutHash.$input->prevOutIndex};
+	push(@{$this->{'output pool'}},['p2pkh',$input,$value,$hardbool,$index]);
+	#$this->{'output pool unique check'}->{$input->prevOutHash.$input->prevOutIndex} = 1;
+}
+
+=pod
+
+---++ input_use()
+
+Use all inputs in node.  If type=p2pkh, then the ref=['p2pkh',$input,$value,$hardbool,$index].
+
+Returns:<verbatim>{
+	'p2pkh' => [[$input,$value,$hdkey],...]
+	,'p2sh' => [[$input,$value,$m,$hdkey1,$hdkey2,....],...]
+}
+
+=cut
+
+sub input_use{
+	my ($this) = @_;
+	
+	my $out = {'p2pkh' => [], 'p2sh' => []};
+	while(my $ref = shift(@{$this->{'output pool'}})){
+		push(@{$this->{'output inflight'}},$ref);
+		if($ref->[0] eq 'p2pkh'){
+			push(@{$out->{'p2pkh'}},[$ref->[1],$ref->[2],$this->hdkey->deriveChild($ref->[3],$ref->[4])]);	
+		}
+		elsif($ref->[0] eq 'p2sh'){
+			die "cannot do multisig yet";
+		}
+	}
+	
+	return $out;
+}
+
+
+=pod
+
+---++ index
+
+
+=cut
+
 sub index {
 	return shift->{'index'};
 }
+
+=pod
+
+---++ hdkey
+
+
+=cut
 
 sub hdkey {
 	my ($this,$x,$bool) = @_;
@@ -190,7 +310,7 @@ sub hard{
 sub max_i_update {
 	my ($this,$dict,$currentmax,$nextmax) = @_;
 	die "no dictionary" unless defined $dict && ref($dict) eq 'HASH';
-
+	#warn "updating from $currentmax to $nextmax";
 	die "bad max" unless defined $currentmax && $currentmax =~ m/^(\d+)$/ 
 		&& defined $nextmax && $nextmax =~ m/^(\d+)$/
 		&& $currentmax <= $nextmax && 0 < $currentmax;
@@ -209,6 +329,17 @@ sub max_i_update {
 		$dict->{$p1}->{$p2} = [] unless defined $dict->{$p1}->{$p2};
 		push(@{$dict->{$p1}->{$p2}},$ref);
 	}
+	
+	
+	foreach my $sym ('|','/'){
+		my $hardbool = ($sym eq '|') ? 1 : 0;
+		foreach my $i (keys %{$this->{'next '.$sym}}){
+			my $node = $this->{'next '.$sym}->{$i};
+			$node->max_i_update($dict,$currentmax,$nextmax);
+		}
+	}
+	
+	
 	return $dict;
 }
 

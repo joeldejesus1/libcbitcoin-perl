@@ -20,6 +20,24 @@ my $logger = Log::Log4perl->get_logger();
 
 =cut
 
+=pod
+
+---++ fisher_yates_shuffle($array_ref)
+
+Shuffle an array in place.
+
+=cut
+
+sub fisher_yates_shuffle
+{
+    my $array = shift;
+    my $i = @$array;
+    while ( --$i )
+    {
+        my $j = int rand( $i+1 );
+        @$array[$i,$j] = @$array[$j,$i];
+    }
+}
 
 =pod
 

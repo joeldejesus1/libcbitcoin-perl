@@ -21,7 +21,7 @@
 #     NAME => q[CBitcoin]
 #     OBJECT => q[$(O_FILES)]
 #     PL_FILES => {  }
-#     PREREQ_PM => { Test::More=>q[0] }
+#     PREREQ_PM => { BerkeleyDB=>q[0], Test::More=>q[0] }
 #     TEST_REQUIRES => {  }
 #     TYPEMAPS => []
 #     VERSION => q[0.1]
@@ -194,6 +194,9 @@ MAN3PODS = lib/CBitcoin.pm \
 	lib/CBitcoin/BloomFilter.pm \
 	lib/CBitcoin/CBHD.pm \
 	lib/CBitcoin/CLI/SPV.pm \
+	lib/CBitcoin/Chain.pm \
+	lib/CBitcoin/Chain/Branch.pm \
+	lib/CBitcoin/Chain/Node.pm \
 	lib/CBitcoin/DefaultEventLoop.pm \
 	lib/CBitcoin/Message.pm \
 	lib/CBitcoin/Peer.pm \
@@ -202,6 +205,8 @@ MAN3PODS = lib/CBitcoin.pm \
 	lib/CBitcoin/Transaction.pm \
 	lib/CBitcoin/TransactionInput.pm \
 	lib/CBitcoin/TransactionOutput.pm \
+	lib/CBitcoin/Tree.pm \
+	lib/CBitcoin/Tree/Node.pm \
 	lib/CBitcoin/Utilities.pm
 
 # Where is the Config information that we are using/depend on
@@ -231,6 +236,9 @@ TO_INST_PM = lib/CBitcoin.pm \
 	lib/CBitcoin/BloomFilter.pm \
 	lib/CBitcoin/CBHD.pm \
 	lib/CBitcoin/CLI/SPV.pm \
+	lib/CBitcoin/Chain.pm \
+	lib/CBitcoin/Chain/Branch.pm \
+	lib/CBitcoin/Chain/Node.pm \
 	lib/CBitcoin/DefaultEventLoop.pm \
 	lib/CBitcoin/Message.pm \
 	lib/CBitcoin/Message/Version.pm \
@@ -240,6 +248,8 @@ TO_INST_PM = lib/CBitcoin.pm \
 	lib/CBitcoin/Transaction.pm \
 	lib/CBitcoin/TransactionInput.pm \
 	lib/CBitcoin/TransactionOutput.pm \
+	lib/CBitcoin/Tree.pm \
+	lib/CBitcoin/Tree/Node.pm \
 	lib/CBitcoin/Utilities.pm
 
 PM_TO_BLIB = lib/CBitcoin.pm \
@@ -254,6 +264,12 @@ PM_TO_BLIB = lib/CBitcoin.pm \
 	blib/lib/CBitcoin/CBHD.pm \
 	lib/CBitcoin/CLI/SPV.pm \
 	blib/lib/CBitcoin/CLI/SPV.pm \
+	lib/CBitcoin/Chain.pm \
+	blib/lib/CBitcoin/Chain.pm \
+	lib/CBitcoin/Chain/Branch.pm \
+	blib/lib/CBitcoin/Chain/Branch.pm \
+	lib/CBitcoin/Chain/Node.pm \
+	blib/lib/CBitcoin/Chain/Node.pm \
 	lib/CBitcoin/DefaultEventLoop.pm \
 	blib/lib/CBitcoin/DefaultEventLoop.pm \
 	lib/CBitcoin/Message.pm \
@@ -272,6 +288,10 @@ PM_TO_BLIB = lib/CBitcoin.pm \
 	blib/lib/CBitcoin/TransactionInput.pm \
 	lib/CBitcoin/TransactionOutput.pm \
 	blib/lib/CBitcoin/TransactionOutput.pm \
+	lib/CBitcoin/Tree.pm \
+	blib/lib/CBitcoin/Tree.pm \
+	lib/CBitcoin/Tree/Node.pm \
+	blib/lib/CBitcoin/Tree/Node.pm \
 	lib/CBitcoin/Utilities.pm \
 	blib/lib/CBitcoin/Utilities.pm
 
@@ -591,6 +611,9 @@ manifypods : pure_all  \
 	lib/CBitcoin/BloomFilter.pm \
 	lib/CBitcoin/CBHD.pm \
 	lib/CBitcoin/CLI/SPV.pm \
+	lib/CBitcoin/Chain.pm \
+	lib/CBitcoin/Chain/Branch.pm \
+	lib/CBitcoin/Chain/Node.pm \
 	lib/CBitcoin/DefaultEventLoop.pm \
 	lib/CBitcoin/Message.pm \
 	lib/CBitcoin/Peer.pm \
@@ -599,6 +622,8 @@ manifypods : pure_all  \
 	lib/CBitcoin/Transaction.pm \
 	lib/CBitcoin/TransactionInput.pm \
 	lib/CBitcoin/TransactionOutput.pm \
+	lib/CBitcoin/Tree.pm \
+	lib/CBitcoin/Tree/Node.pm \
 	lib/CBitcoin/Utilities.pm
 	$(NOECHO) $(POD2MAN) --section=3 --perm_rw=$(PERM_RW) -u \
 	  lib/CBitcoin.pm $(INST_MAN3DIR)/CBitcoin.$(MAN3EXT) \
@@ -607,6 +632,9 @@ manifypods : pure_all  \
 	  lib/CBitcoin/BloomFilter.pm $(INST_MAN3DIR)/CBitcoin::BloomFilter.$(MAN3EXT) \
 	  lib/CBitcoin/CBHD.pm $(INST_MAN3DIR)/CBitcoin::CBHD.$(MAN3EXT) \
 	  lib/CBitcoin/CLI/SPV.pm $(INST_MAN3DIR)/CBitcoin::CLI::SPV.$(MAN3EXT) \
+	  lib/CBitcoin/Chain.pm $(INST_MAN3DIR)/CBitcoin::Chain.$(MAN3EXT) \
+	  lib/CBitcoin/Chain/Branch.pm $(INST_MAN3DIR)/CBitcoin::Chain::Branch.$(MAN3EXT) \
+	  lib/CBitcoin/Chain/Node.pm $(INST_MAN3DIR)/CBitcoin::Chain::Node.$(MAN3EXT) \
 	  lib/CBitcoin/DefaultEventLoop.pm $(INST_MAN3DIR)/CBitcoin::DefaultEventLoop.$(MAN3EXT) \
 	  lib/CBitcoin/Message.pm $(INST_MAN3DIR)/CBitcoin::Message.$(MAN3EXT) \
 	  lib/CBitcoin/Peer.pm $(INST_MAN3DIR)/CBitcoin::Peer.$(MAN3EXT) \
@@ -615,6 +643,8 @@ manifypods : pure_all  \
 	  lib/CBitcoin/Transaction.pm $(INST_MAN3DIR)/CBitcoin::Transaction.$(MAN3EXT) \
 	  lib/CBitcoin/TransactionInput.pm $(INST_MAN3DIR)/CBitcoin::TransactionInput.$(MAN3EXT) \
 	  lib/CBitcoin/TransactionOutput.pm $(INST_MAN3DIR)/CBitcoin::TransactionOutput.$(MAN3EXT) \
+	  lib/CBitcoin/Tree.pm $(INST_MAN3DIR)/CBitcoin::Tree.$(MAN3EXT) \
+	  lib/CBitcoin/Tree/Node.pm $(INST_MAN3DIR)/CBitcoin::Tree::Node.$(MAN3EXT) \
 	  lib/CBitcoin/Utilities.pm $(INST_MAN3DIR)/CBitcoin::Utilities.$(MAN3EXT) 
 
 
@@ -692,8 +722,8 @@ realclean_subdirs :
 # Delete temporary files (via clean) and also delete dist files
 realclean purge ::  clean realclean_subdirs
 	- $(RM_F) \
-	  $(FIRST_MAKEFILE) $(OBJECT) \
-	  $(MAKEFILE_OLD) 
+	  $(FIRST_MAKEFILE) $(MAKEFILE_OLD) \
+	  $(OBJECT) 
 	- $(RM_RF) \
 	  $(DISTVNAME) 
 
@@ -721,6 +751,7 @@ metafile : create_distdir
 	$(NOECHO) $(ECHO) '    - t' >> META_new.yml
 	$(NOECHO) $(ECHO) '    - inc' >> META_new.yml
 	$(NOECHO) $(ECHO) 'requires:' >> META_new.yml
+	$(NOECHO) $(ECHO) '  BerkeleyDB: '\''0'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) '  Test::More: '\''0'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) 'version: '\''0.1'\''' >> META_new.yml
 	-$(NOECHO) $(MV) META_new.yml $(DISTVNAME)/META.yml
@@ -759,6 +790,7 @@ metafile : create_distdir
 	$(NOECHO) $(ECHO) '      },' >> META_new.json
 	$(NOECHO) $(ECHO) '      "runtime" : {' >> META_new.json
 	$(NOECHO) $(ECHO) '         "requires" : {' >> META_new.json
+	$(NOECHO) $(ECHO) '            "BerkeleyDB" : "0",' >> META_new.json
 	$(NOECHO) $(ECHO) '            "Test::More" : "0"' >> META_new.json
 	$(NOECHO) $(ECHO) '         }' >> META_new.json
 	$(NOECHO) $(ECHO) '      }' >> META_new.json
@@ -1146,6 +1178,7 @@ ppd :
 	$(NOECHO) $(ECHO) '    <ABSTRACT></ABSTRACT>' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '    <AUTHOR>Joel DeJesus (Work Email) &lt;dejesus.joel@e-flamingo.jp&gt;</AUTHOR>' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '    <IMPLEMENTATION>' >> $(DISTNAME).ppd
+	$(NOECHO) $(ECHO) '        <REQUIRE NAME="BerkeleyDB::" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <REQUIRE NAME="Test::More" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <ARCHITECTURE NAME="x86_64-linux-gnu-thread-multi-5.20" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <CODEBASE HREF="" />' >> $(DISTNAME).ppd
@@ -1163,6 +1196,9 @@ pm_to_blib : $(FIRST_MAKEFILE) $(TO_INST_PM)
 	  lib/CBitcoin/BloomFilter.pm blib/lib/CBitcoin/BloomFilter.pm \
 	  lib/CBitcoin/CBHD.pm blib/lib/CBitcoin/CBHD.pm \
 	  lib/CBitcoin/CLI/SPV.pm blib/lib/CBitcoin/CLI/SPV.pm \
+	  lib/CBitcoin/Chain.pm blib/lib/CBitcoin/Chain.pm \
+	  lib/CBitcoin/Chain/Branch.pm blib/lib/CBitcoin/Chain/Branch.pm \
+	  lib/CBitcoin/Chain/Node.pm blib/lib/CBitcoin/Chain/Node.pm \
 	  lib/CBitcoin/DefaultEventLoop.pm blib/lib/CBitcoin/DefaultEventLoop.pm \
 	  lib/CBitcoin/Message.pm blib/lib/CBitcoin/Message.pm \
 	  lib/CBitcoin/Message/Version.pm blib/lib/CBitcoin/Message/Version.pm \
@@ -1172,6 +1208,8 @@ pm_to_blib : $(FIRST_MAKEFILE) $(TO_INST_PM)
 	  lib/CBitcoin/Transaction.pm blib/lib/CBitcoin/Transaction.pm \
 	  lib/CBitcoin/TransactionInput.pm blib/lib/CBitcoin/TransactionInput.pm \
 	  lib/CBitcoin/TransactionOutput.pm blib/lib/CBitcoin/TransactionOutput.pm \
+	  lib/CBitcoin/Tree.pm blib/lib/CBitcoin/Tree.pm \
+	  lib/CBitcoin/Tree/Node.pm blib/lib/CBitcoin/Tree/Node.pm \
 	  lib/CBitcoin/Utilities.pm blib/lib/CBitcoin/Utilities.pm 
 	$(NOECHO) $(TOUCH) pm_to_blib
 

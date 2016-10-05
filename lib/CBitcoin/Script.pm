@@ -299,8 +299,27 @@ sub deserialize_script {
 	my $x = shift;
 	return undef unless defined $x && 0 < length($x);
 	$x = picocoin_parse_script($x);
+	# ? do we have to pop the last item?
+	pop(@{$x}) if $x->[-1] eq '1';
 	return convert_CCOIN_to_OP(@{$x});
 }
+
+=pod
+
+---++ deserialize_scriptSig
+
+=cut
+
+sub deserialize_scriptSig {
+	my $x = shift;
+	return undef unless defined $x && 0 < length($x);
+	
+	picocoin_parse_scriptsig($x);
+	
+	#$x = picocoin_parse_script($x);
+	#return convert_CCOIN_to_OP(@{$x});
+}
+
 
 
 =pod

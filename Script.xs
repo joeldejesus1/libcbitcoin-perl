@@ -271,6 +271,7 @@ err_out:
 
 
 
+
 MODULE = CBitcoin::Script	PACKAGE = CBitcoin::Script
 
 

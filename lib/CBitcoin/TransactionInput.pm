@@ -57,30 +57,32 @@ sub new {
 	my $x = shift;
 	unless(
 		defined $x && ref($x) eq 'HASH' 
-		&& defined $x->{'script'} && defined $x->{'prevOutHash'} 
+		&& ($x->{'script'} || $x->{'scriptSig'} ) && defined $x->{'prevOutHash'} 
 		&& defined $x->{'prevOutIndex'} && $x->{'prevOutIndex'} =~ m/^\d+$/
 	){
 		return undef;
 	}
-	foreach my $col ('script','prevOutHash','prevOutIndex'){
+	foreach my $col ('script','prevOutHash','prevOutIndex','scriptSig'){
 		$this->{$col} = $x->{$col};
 	}
 	
 	
-	if($this->type_of_script() eq 'multisig'){
-		$this->{'this is a p2sh'} = 1;
-		
-		# change the script to p2sh
-		my $x = $this->{'script'};
-		$x = CBitcoin::Script::script_to_address($x);
-		die "no valid script" unless defined $x;
-		$this->{'script'} = CBitcoin::Script::address_to_script($x);
-		die "no valid script" unless defined $x;
+	if(defined $this->{'script'}){
+		if($this->type_of_script() eq 'multisig'){
+			$this->{'this is a p2sh'} = 1;
+			
+			# change the script to p2sh
+			my $x = $this->{'script'};
+			$x = CBitcoin::Script::script_to_address($x);
+			die "no valid script" unless defined $x;
+			$this->{'script'} = CBitcoin::Script::address_to_script($x);
+			die "no valid script" unless defined $x;
+		}
+		elsif($this->type_of_script() eq 'p2sh'){
+			$this->{'this is a p2sh'} = 1;
+		}		
 	}
-	elsif($this->type_of_script() eq 'p2sh'){
-		$this->{'this is a p2sh'} = 1;
-		
-	}
+
 	
 	return $this;
 }
@@ -116,7 +118,8 @@ sub scriptSig {
 
 sub type_of_script {
 	my $this = shift;
-	return CBitcoin::Script::whatTypeOfScript( $this->script );
+	return undef unless $this->{'script'};
+	return CBitcoin::Script::whatTypeOfScript( $this->{'script'} );
 }
 
 =item prevOutHash

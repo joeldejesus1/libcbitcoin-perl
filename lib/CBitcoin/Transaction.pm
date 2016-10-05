@@ -130,9 +130,35 @@ output = {value, script}
 sub deserialize{
 	my ($package,$data) = @_;
 	
+	my $this = picocoin_tx_des($data);
+	bless($this,$package);
 	
-
-#	return $tx;
+	$this->{'inputs'} = [];
+	foreach my $in (@{$this->{'vin'}}){
+		push(@{$this->{'inputs'}},CBitcoin::TransactionInput->new({
+			'prevOutHash' => pack('H*',$in->{'prevHash'})
+			,'prevOutIndex' => $in->{'prevIndex'}
+			,'scriptSig' => $in->{'scriptSig'}
+		}));
+	}
+	delete $this->{'vin'};
+	
+	$this->{'outputs'} = [];
+	foreach my $in (@{$this->{'vout'}}){
+		push(@{$this->{'outputs'}},CBitcoin::TransactionOutput->new({
+			'script' => $in->{'script'}
+			,'value' => $in->{'value'}
+		}));
+	}
+	delete $this->{'vout'};
+	
+	
+	$this->{'sha256'} = join '', reverse split /(..)/, $this->{'sha256'};
+	$this->{'hash'} = pack('H*',$this->{'sha256'});
+	
+	delete $this->{'sha256'};
+	
+	return $this;
 }
 
 
@@ -477,6 +503,22 @@ sub push_data{
 	}
 }
 
+
+=pod
+
+---++ txfee($size)
+
+70 satoshis/byte.
+
+=cut
+
+sub txfee{
+	my $size = shift;
+	die "bad size" unless defined $size && $size =~ m/^(\d+)$/ && 0 < $size;
+	my $fee = 70;
+
+	return $size*$fee;
+}
 
 =head1 AUTHOR
 

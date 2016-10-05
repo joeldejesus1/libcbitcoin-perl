@@ -260,6 +260,123 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 
 }
 
+HV* picocoin_emptytx(HV * rh){
+	hv_store(rh, "success", 7, newSViv((int) 0), 0);
+	
+	return rh;
+}
+
+// given a full hdkey, fill in a perl hash with relevant data
+HV* picocoin_returntx(HV * rh, const struct bp_tx *tx){
+	hv_store(rh, "success", 7, newSViv((int) 1), 0);
+	
+	hv_store(rh, "version", 7, newSViv((int)tx->nVersion), 0);
+	hv_store(rh, "lockTime", 8, newSViv((int)tx->nLockTime), 0);
+	
+	bp_tx_calc_sha256(tx);
+	
+	
+	if(tx->sha256_valid){
+		char *hexstr = malloc(32*2*sizeof(char));
+		bu256_hex(hexstr,&tx->sha256);
+		hv_store(rh, "sha256", 6, newSVpv(hexstr,32*2), 0);
+	}
+		
+
+	if(tx->vin && tx->vin->len){
+		int j;
+		struct bp_txin *txin;
+		AV* avtxin = (AV *) sv_2mortal ((SV *) newAV ());
+		
+		for( j=0; j<tx->vin->len; j++){
+			//fprintf(stderr,"txin=%d\n",j);
+			txin = parr_idx(tx->vin, j);
+			
+			HV * rhtxin = (HV *) sv_2mortal ((SV *) newHV ());
+			
+			struct bp_outpt prevout;
+	
+			//cstring s = { (char *)(out->data), 0, sizeof(out->data) + 1 };
+			char prevHash[BU256_STRSZ];
+			bu256_hex(prevHash, &txin->prevout.hash);
+			
+			hv_store( rhtxin, "prevHash", 8, newSVpv( prevHash,  BU256_STRSZ), 0);
+			hv_store( rhtxin, "prevIndex", 9, newSViv(txin->prevout.n), 0);
+			//fprintf(stderr,"hash[%s]\n",prevHash);
+			
+			
+			
+			if(txin->scriptSig && txin->scriptSig->len){
+				// scriptSig
+				uint8_t * scriptSig = malloc(txin->scriptSig->len * sizeof(uint8_t) );
+				memcpy(scriptSig,txin->scriptSig->str,txin->scriptSig->len);
+				//SV* ans_sv = newSVpv(answer,length);
+				hv_store( rhtxin, "scriptSig", 9, newSVpv( scriptSig,  txin->scriptSig->len), 0);
+				
+			}
+			
+			
+			av_push(avtxin, newRV((SV *) rhtxin));
+			//av_push(avtxin, newSViv(j));
+		}
+		
+		hv_store( rh, "vin", 3, newRV((SV *)avtxin), 0);
+	}
+	
+	if(tx->vout && tx->vout->len){
+		int j;
+		struct bp_txout *txout;
+		AV* avtxout = (AV *) sv_2mortal ((SV *) newAV ());
+		
+		for( j=0; j<tx->vout->len; j++){
+			//fprintf(stderr,"txin=%d\n",j);
+			txout = parr_idx(tx->vout, j);
+			
+			HV * rhtxout = (HV *) sv_2mortal ((SV *) newHV ());
+			
+	
+			hv_store( rhtxout, "value", 5, newSViv( txout->nValue ), 0);
+			
+			uint8_t *spk = malloc(txout->scriptPubKey->len * sizeof(uint8_t));
+			memcpy(spk,txout->scriptPubKey->str,txout->scriptPubKey->len);				
+			hv_store( rhtxout, "script", 6, newSVpv(spk,txout->scriptPubKey->len), 0);
+					
+			
+			av_push(avtxout, newRV((SV *) rhtxout));
+			//av_push(avtxin, newSViv(j));
+		}
+		//av_push(avTX, newRV((SV *)avtxout) );
+		//bloom_contains(struct bloom *bf, const void *data, size_t data_len);
+		hv_store( rh, "vout", 4, newRV((SV *)avtxout), 0);
+	}
+	
+	return rh;
+}
+
+HV* picocoin_tx_des(SV* tx_data){
+	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
+	//fprintf(stderr,"in - 1\n");
+	
+	
+	STRLEN len_txdata;
+	uint8_t * txdata_pointer = (uint8_t*) SvPV(tx_data,len_txdata);
+	struct const_buffer txbuf = { txdata_pointer, len_txdata };
+	//fprintf(stderr,"in - 2\n");
+	struct bp_tx tx;
+	bp_tx_init(&tx);
+	//fprintf(stderr,"in - 3\n");
+	if(!deser_bp_tx(&tx, &txbuf))
+		goto err;
+	//fprintf(stderr,"in - 4\n");
+	picocoin_returntx(rh,&tx);
+	return rh;
+	
+err:
+	//fprintf(stderr,"in - 5\n");
+	picocoin_emptytx(rh);
+	return rh;
+}
+
 /*
  *  scriptPubKey is the script in the previous transaction output.
  *  scriptSig is the script that gets ripemd hash160's into a p2sh (need this to make signature)
@@ -293,3 +410,7 @@ picocoin_tx_sign_p2pkh(hdkey_data,fromPubKey_data,txdata,index,HashType)
 	SV* txdata
 	int index
 	int HashType
+	
+HV*	
+picocoin_tx_des(tx_data)
+	SV* tx_data

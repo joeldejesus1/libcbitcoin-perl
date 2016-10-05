@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Kgc::HTML::Bitcoin::Tree;
+use CBitcoin::Tree;
 
 use CBitcoin;
 use CBitcoin::CBHD;
@@ -12,7 +12,7 @@ use File::Slurp;
 
 use Data::Dumper;
 
-use Test::More tests => 1;
+use Test::More tests => 4;
 
 =pod
 
@@ -30,25 +30,50 @@ $CBitcoin::network_bytes = CBitcoin::TESTNET;
 
 
 
-my $tree = Kgc::HTML::Bitcoin::Tree->new(	
+my $tree = CBitcoin::Tree->new(	
 	["ROOT/CHANNEL","ROOT/SERVERS/2/CHANNEL","ROOT/CASH"]
 );
 
 $tree->hdkey_set("ROOT",$xprv);
 $tree->max_i('+40');
 
-ok('n1KKWuBaKw3akvUbWaYdoRYmU1receRGGT' eq $tree->deposit("ROOT/CASH"), 'Got correct deposit');
+{
+	# check the deposit address
+	
+	ok('n1KKWuBaKw3akvUbWaYdoRYmU1receRGGT' eq $tree->deposit("ROOT/CASH"), 'Got correct deposit');
+	
+}
 
 
 {
 	# Got 0.301 sent to n1KKWuBaKw3akvUbWaYdoRYmU1receRGGT
 	# scan the transaction
-	#my $txdata = pack('H*',File::Slurp::read_file( '.data/tx1' ));
+	my $txdata = pack('H*',File::Slurp::read_file( '.data/tx1' ));
+	#warn "hi with txdata=".length($txdata);
+	my $tx = CBitcoin::Transaction->deserialize($txdata);
+	
+	$tree->tx_add($tx);
+	
+	ok($tree->balance() == 30100000,'positive balance');
 	
 }
 
 
-# mgae6AK7dPpahnnh8b9eHpoLzxX5qb9NtF 
+{
+	#ok('mjjH9fkNVZwyL5afgdYu9oKXVKSd7Peob6' eq $tree->deposit("ROOT/CHANNEL"), );
+	
+	my $serializedtx = $tree->cash_move("ROOT/CASH","ROOT/CHANNEL",10102039);
+	#warn "TX=".unpack('H*',$serializedtx);
+	
+	#ok('n2hVgrwSxGrJ6AnRuzKEfcq9h5KkvLcR6Z' eq $tree->deposit("ROOT/CASH"));
+	#ok('n2hVgrwSxGrJ6AnRuzKEfcq9h5KkvLcR6Z' eq $tree->deposit("ROOT/CHANNEL"));
+	#warn "Balance=".$tree->balance();
+	ok($tree->balance() == 0,'No bitcoins available.');
+	ok($tree->balance('inflight') == 30100000 ,'All bitcoins are outbound.');
+	
+	
+	
+}
 
 
 
