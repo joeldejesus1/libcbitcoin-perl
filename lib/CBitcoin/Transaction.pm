@@ -135,6 +135,7 @@ sub deserialize{
 	
 	$this->{'inputs'} = [];
 	foreach my $in (@{$this->{'vin'}}){
+		$in->{'prevHash'} = join '', reverse split /(..)/, substr($in->{'prevHash'},0,64);
 		push(@{$this->{'inputs'}},CBitcoin::TransactionInput->new({
 			'prevOutHash' => pack('H*',$in->{'prevHash'})
 			,'prevOutIndex' => $in->{'prevIndex'}

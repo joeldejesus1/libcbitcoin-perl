@@ -479,7 +479,6 @@ sub tx_add {
 sub tx_add_single {
 	my ($this,$tx) = @_;
 	die "not a transaction" unless defined $tx && ref($tx) eq 'CBitcoin::Transaction';
-
 	my $addbool = 0;
 	my $txhash = $tx->hash;
 	for(my $i=0;$i<$tx->numOfInputs;$i++){
@@ -520,8 +519,15 @@ sub tx_add_singleinput{
 	if($n == 2 && substr($s[0],0,2) eq '0x' && substr($s[1],0,2) eq '0x'){
 		# my ($sig,$pubkey) = ($s[0],$s[1]);
 		my $pubkey = pack('H*',substr($s[1],2));
-		$ref = $this->dict_node($pubkey);
-		return 0 unless $this->dict_check($pubkey);
+		if($this->dict_check($pubkey)){
+			$ref = $this->dict_node($pubkey);
+			# mark an input as having been spent
+			$ref->[0]->input_spent($input->prevOutHash,$input->prevOutIndex);			
+		}
+		else{
+			return 0;
+		}
+		
 	}
 	elsif($n == 2){
 		warn "I do not know what we have";

@@ -24,9 +24,10 @@ sub new {
 		,'hdkey' => undef
 		,'hard' => 1
 		,'sub index' => CBitcoin::Tree::MAXACCOUNTS
-		,'output pool' => []
+		,'output pool' => {}
 		,'output pool unique check' => {}
-		,'output inflight' => []
+		,'output inflight' => {}
+		,'output spent' => {}
 	};
 	bless($this,$package);
 
@@ -48,21 +49,22 @@ sub balance {
 	my ($this,$type) = @_;
 	# go thru all the outputs:  [$type,$input,$value,...]
 	my $sum = 0;
-	my $array_ref;
+	my $href;
 	if(!defined $type){
-		$array_ref = $this->{'output pool'};
+		$href = $this->{'output pool'};
 	}
 	elsif($type eq 'inflight'){
 		# how many satoshi have been spent, but not confirmed
-		$array_ref = $this->{'output inflight'};
+		$href = $this->{'output inflight'};
 	}
 	else{
 		die "bad type";
 	}
-	my $n = @{$array_ref};
-	return $sum unless 0 < $n;
 	
-	$sum = [map {$sum +=$_->[2] } @{$array_ref}]->[$n - 1];
+	foreach my $k (keys %{$href}){
+		$sum += $href->{$k}->[2];
+	}
+	
 	return $sum;	
 	
 }
@@ -77,18 +79,18 @@ Get the balance for this node and all child nodes.
 
 sub balance_recursive {
 	my ($this,$type) = @_;
-	my $total = 0;
+	my $sum = 0;
 	
 	foreach my $sym ('|','/'){
 		my $hardbool = ($sym eq '|') ? 1 : 0;
 		foreach my $i (keys %{$this->{'next '.$sym}}){
-			$total += $this->{'next '.$sym}->{$i}->balance_recursive($type);
+			$sum += $this->{'next '.$sym}->{$i}->balance_recursive($type);
 		}
 	}
 	
-	$total += $this->balance($type);
+	$sum += $this->balance($type);
 	
-	return $total;
+	return $sum;
 }
 
 =pod
@@ -101,9 +103,8 @@ Add an input that can be used in a future transaction.
 
 sub input_add_p2pkh {
 	my ($this,$input,$value,$hardbool,$index) = @_;
-	#return undef if defined $this->{'output pool unique check'}->{$input->prevOutHash.$input->prevOutIndex};
-	push(@{$this->{'output pool'}},['p2pkh',$input,$value,$hardbool,$index]);
-	#$this->{'output pool unique check'}->{$input->prevOutHash.$input->prevOutIndex} = 1;
+	#warn "input_add_p2pkh:[".unpack('H*',$input->prevOutHash)."][".$input->prevOutIndex."]\n";
+	$this->{'output pool'}->{$input->prevOutHash.$input->prevOutIndex} = ['p2pkh',$input,$value,$hardbool,$index]; 
 }
 
 =pod
@@ -123,24 +124,55 @@ sub input_use{
 	my ($this) = @_;
 	
 	my $out = {'p2pkh' => [], 'p2sh' => []};
-	while(my $ref = shift(@{$this->{'output pool'}})){
-		push(@{$this->{'output inflight'}},$ref);
+	foreach my $y (keys %{$this->{'output pool'}}){
+		my $ref = $this->{'output pool'}->{$y};
+		$this->{'output inflight'}->{$ref->[1]->prevOutHash.$ref->[1]->prevOutIndex} = $ref;
+		#push(@{$this->{'output inflight'}},$ref);
 		if($ref->[0] eq 'p2pkh'){
+		#	warn "input_use:[".unpack('H*',$ref->[1]->prevOutHash)."][".$ref->[1]->prevOutIndex."]\n";
 			push(@{$out->{'p2pkh'}},[$ref->[1],$ref->[2],$this->hdkey->deriveChild($ref->[3],$ref->[4])]);	
 		}
 		elsif($ref->[0] eq 'p2sh'){
 			die "cannot do multisig yet";
 		}
+		delete $this->{'output pool'}->{$y};
 	}
 	
 	return $out;
+}
+
+=pod
+
+---++ input_spent($prevHash,$prevIndex)
+
+Mark an input as having been spent.
+
+=cut
+
+sub input_spent {
+	my ($this,$prevHash,$prevIndex) = @_;
+	#warn "input_spent:[".unpack('H*',$prevHash)."][".$prevIndex."]\n";
+	# TODO: dont use a loop to find the input, use a %hash next time	
+	if(defined $this->{'output inflight'}->{$prevHash.$prevIndex}){
+	#	warn "moving input from inflight to spent";
+		$this->{'output spent'}->{$prevHash.$prevIndex} = $this->{'output inflight'}->{$prevHash.$prevIndex};
+		delete $this->{'output inflight'}->{$prevHash.$prevIndex};
+	}
+	elsif(defined $this->{'output pool'}->{$prevHash.$prevIndex}){
+	#	warn "moving input from pool to spent";
+		$this->{'output spent'}->{$prevHash.$prevIndex} = $this->{'output pool'}->{$prevHash.$prevIndex};
+		delete $this->{'output pool'}->{$prevHash.$prevIndex};		
+	}
+	else{
+	#	warn "what happened?";
+	}
+	
 }
 
 
 =pod
 
 ---++ index
-
 
 =cut
 

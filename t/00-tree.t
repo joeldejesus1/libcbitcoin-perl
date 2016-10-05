@@ -12,7 +12,7 @@ use File::Slurp;
 
 use Data::Dumper;
 
-use Test::More tests => 4;
+use Test::More tests => 6;
 
 =pod
 
@@ -60,20 +60,33 @@ $tree->max_i('+40');
 
 
 {
-	#ok('mjjH9fkNVZwyL5afgdYu9oKXVKSd7Peob6' eq $tree->deposit("ROOT/CHANNEL"), );
+	# move money from ROOT/CASH to ROOT/CHANNEL
 	
 	my $serializedtx = $tree->cash_move("ROOT/CASH","ROOT/CHANNEL",10102039);
-	#warn "TX=".unpack('H*',$serializedtx);
 	
-	#ok('n2hVgrwSxGrJ6AnRuzKEfcq9h5KkvLcR6Z' eq $tree->deposit("ROOT/CASH"));
-	#ok('n2hVgrwSxGrJ6AnRuzKEfcq9h5KkvLcR6Z' eq $tree->deposit("ROOT/CHANNEL"));
-	#warn "Balance=".$tree->balance();
+	# broadcast $serializedtx out on the network, eventually download it back via block
+	
 	ok($tree->balance() == 0,'No bitcoins available.');
 	ok($tree->balance('inflight') == 30100000 ,'All bitcoins are outbound.');
 	
+}
+
+{
+	# register the transaction created above as if it came in off the peer to peer network
+	my $txdata = pack('H*',File::Slurp::read_file( '.data/tx2' ));
+	$tree->tx_add(CBitcoin::Transaction->deserialize($txdata));
 	
+	ok(20000000 < $tree->balance && $tree->balance < 30100000, 'new balance recognized');
+	ok($tree->balance('inflight') == 0, 'inflight balance is 0');
+}
+
+
+{
+	# do a broadcast on ROOT/CHANNEL
 	
 }
+
+
 
 
 
