@@ -28,6 +28,7 @@ sub new {
 		,'output pool unique check' => {}
 		,'output inflight' => {}
 		,'output spent' => {}
+		,'callbacks' => []
 	};
 	bless($this,$package);
 
@@ -375,6 +376,50 @@ sub max_i_update {
 	return $dict;
 }
 
+=pod
+
+---+ Broadcasting
+
+=cut
+
+=pod
+
+---++ broadcast_receive($node,$serialized_message)->$txdata
+
+
+=cut
+
+sub broadcast_receive{
+	my ($this,$message) = @_;
+	die "no message!" unless defined $message;
+	$message = CBitcoin::Tree::Broadcast::deserialize($message);
+	return undef unless defined $message;
+	
+	my $n = scalar(@{$this->{'callbacks'}});
+	return undef unless 0 < $n;
+	for(my $i=0;$i<$n;$i++){
+		$this->{'callbacks'}->[$i]->($this,$message);
+	}
+	
+}
+
+=pod
+
+---++ broadcast_callback($sub)->return_id
+
+=cut
+
+sub broadcast_callback{
+	my ($this,$sub) = @_;
+	return undef unless defined $sub;
+	die "bad sub" unless ref($sub) eq 'CODE';
+	
+	push(@{$this->{'callbacks'}},$sub);
+	
+	return scalar(@{$this->{'callbacks'}}) - 1;
+}
+
+
 
 
 
@@ -382,3 +427,14 @@ sub max_i_update {
 
 
 1;
+
+
+
+
+
+
+
+
+
+
+__END__

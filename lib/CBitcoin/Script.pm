@@ -269,6 +269,9 @@ sub whatTypeOfScript {
 	elsif($s[-1] eq 'OP_CHECKMULTISIG'){
 		return 'multisig';
 	}
+	elsif($s[0] eq 'OP_RETURN'){
+		return 'return';
+	}
 	else{
 		die "bad script type";
 	}

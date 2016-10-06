@@ -145,9 +145,10 @@ sub deserialize{
 	delete $this->{'vin'};
 	
 	$this->{'outputs'} = [];
+	
 	foreach my $in (@{$this->{'vout'}}){
 		push(@{$this->{'outputs'}},CBitcoin::TransactionOutput->new({
-			'script' => $in->{'script'}
+			'script' => CBitcoin::Script::deserialize_script($in->{'script'}) 
 			,'value' => $in->{'value'}
 		}));
 	}

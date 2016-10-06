@@ -18,6 +18,7 @@ use constant {
 use List::Util qw(shuffle);
 use CBitcoin::Script;
 use CBitcoin::Tree::Node;
+use CBitcoin::Tree::Broadcast;
 use Digest::MD5 qw(md5);
 
 
@@ -481,12 +482,13 @@ sub tx_add_single {
 	die "not a transaction" unless defined $tx && ref($tx) eq 'CBitcoin::Transaction';
 	my $addbool = 0;
 	my $txhash = $tx->hash;
+	my $input_nodes = [];
 	for(my $i=0;$i<$tx->numOfInputs;$i++){
-		$addbool = 1 if $this->tx_add_singleinput($tx->input($i),$txhash,$i);
+		$input_nodes = $this->tx_add_singleinput($tx->input($i),$txhash,$i);
 	}
 
 	for(my $i=0;$i<$tx->numOfOutputs;$i++){
-		$addbool = 1 if $this->tx_add_singleoutput($tx->output($i),$txhash,$i);
+		$addbool = 1 if $this->tx_add_singleoutput($input_nodes,$tx->output($i),$txhash,$i);
 	}
 
 	if($addbool){
@@ -515,6 +517,7 @@ sub tx_add_singleinput{
 	
 	my $n = scalar(@s);
 	
+	my @nodes;
 	my $ref;
 	if($n == 2 && substr($s[0],0,2) eq '0x' && substr($s[1],0,2) eq '0x'){
 		# my ($sig,$pubkey) = ($s[0],$s[1]);
@@ -522,31 +525,26 @@ sub tx_add_singleinput{
 		if($this->dict_check($pubkey)){
 			$ref = $this->dict_node($pubkey);
 			# mark an input as having been spent
-			$ref->[0]->input_spent($input->prevOutHash,$input->prevOutIndex);			
+			$ref->[0]->input_spent($input->prevOutHash,$input->prevOutIndex);
+			push(@nodes,$ref->[0]);			
 		}
 		else{
-			return 0;
+			return [];
 		}
 		
 	}
 	elsif($n == 2){
 		warn "I do not know what we have";
-		return 0;
+		return [];
 	}
 	else{
 		# TODO: check for multisig
-		return 0;
+		return [];
 	}
-	
-	# at this point, this input belongs to us
-	# $ref = [[$node,$hardbool,$index],...]
-	# find the correct node
+
 	
 	
-	# find the script/value from previous transaction, adjust balance of node
-	
-	
-	return 1;
+	return \@nodes;
 }
 
 =pod
@@ -558,12 +556,12 @@ Increases balances and decreases balances.
 =cut
 
 sub tx_add_singleoutput{
-	my ($this,$output,$hash,$i) = @_;
+	my ($this,$input_nodes_ref,$output,$hash,$i) = @_;
 	
-	my $script = CBitcoin::Script::deserialize_script($output->script);
+	#my $script = $output->script;
 	
-	my $type = CBitcoin::Script::whatTypeOfScript($script);
-	my @s = split(' ',$script);
+	my $type = CBitcoin::Script::whatTypeOfScript($output->script);
+	my @s = split(' ',$output->script);
 	my $value = $output->value;
 	
 	# p2sh, p2pkh, multisig
@@ -579,7 +577,7 @@ sub tx_add_singleoutput{
 			my $t_in = CBitcoin::TransactionInput->new({
 				'prevOutHash' => $hash #should be 32 byte hash
 				,'prevOutIndex' => $i
-				,'script' => CBitcoin::Script::deserialize_script($output->script) # scriptPubKey (after being turned into p2sh)
+				,'script' => $output->script # scriptPubKey (after being turned into p2sh)
 			});
 			
 			# add output to database
@@ -587,34 +585,42 @@ sub tx_add_singleoutput{
 		}
 
 	}
+	elsif($type eq 'return'){
+		# have a broadcast!, but don't do anything.....
+		if($output->script =~ m/^OP_RETURN\s0x([0-9a-fA-F]+)/){
+			my $s = pack('H*',$1);
+			foreach my $node (@{$input_nodes_ref}){
+				$node->broadcast_receive($s);
+			}
+		}
+	}
 	
 	return (defined $node) ?  1 : 0;
 }
 
 =pod
 
----++ cash_move($from,$to,$amount)
-
-Move cash from one node to another node.
+---++ spend($from_path,@tx_outputs)
 
 =cut
 
-sub cash_move{
-	my ($this,$from_path,$to_path,$destination_amount) = @_;
+sub spend{
+	my ($this,$from_path) = (shift,shift);
+	my @outs = @_;
+
+	
+	##### figure out the source of funds ######
 	my $from_node = $this->node_get_by_path($from_path);
 	return undef unless defined $from_node;
-	my $to_node = $this->node_get_by_path($to_path);
-	return undef unless defined $to_node;
-	return undef unless defined $destination_amount && $destination_amount =~ m/^(\d+)$/;
-	$destination_amount = $1;
 	
-	my $destination_address = $this->deposit($to_path);
 	
-	### at this point, we have:  ($destination_amount,$destination_address,$from_path) ####
+	########## construct change address transaction output #############
+	my $total_amount_leaving = 0;
+	$total_amount_leaving = [map {$total_amount_leaving +=$_->value} @outs]->[$#outs];
 	
 	# size of tx
 	# for each outpoint, ?
-	my ($numOfInputs,$numOfOutputs) = (3,3);
+	my ($numOfInputs,$numOfOutputs) = (3,scalar(@outs) + 1); # extra 1 is for change address
 	
 	my $fee = CBitcoin::Transaction::txfee(4 + 1 + 41*$numOfInputs + 1 + 9*$numOfOutputs + 4);
 	
@@ -622,9 +628,19 @@ sub cash_move{
 	my $balance = $from_node->balance();
 	
 	# need to calculate change address amount
-	my $change_amount = $balance - $fee - $destination_amount;
+	my $change_amount = $balance - $fee - $total_amount_leaving;
 	return undef unless MINTXAMOUNT <= $change_amount;
 	my $change_address = $this->deposit($from_path);
+	
+	# make the change address output
+	push(@outs, CBitcoin::TransactionOutput->new({
+		'value' => $change_amount
+		,'script' => CBitcoin::Script::address_to_script($change_address)
+	}));
+	
+	@outs = shuffle(@outs);
+	
+	
 	
 	
 	####### construct the transaction inputs ##########
@@ -649,21 +665,6 @@ sub cash_move{
 	my @ins_mapping = shuffle((0..($N_p2pkh + $N_p2sh - 1)));
 	@ins = map { $ins[$_] } @ins_mapping;
 	@ins_outputs = map { $ins_outputs[$_] } @ins_mapping;
-	
-	########## construct transaction outputs #############
-	my @outs;
-	# make the change address output
-	push(@outs, CBitcoin::TransactionOutput->new({
-		'value' => $change_amount
-		,'script' => CBitcoin::Script::address_to_script($change_address)
-	}));
-	# make the destination address output
-	push(@outs, CBitcoin::TransactionOutput->new({
-		'value' => $destination_amount
-		,'script' => CBitcoin::Script::address_to_script($destination_address)	
-	})); 
-	
-	@outs = shuffle(@outs);
 	
 	######### construct raw transaction ############
 	my $tx = CBitcoin::Transaction->new({
@@ -715,4 +716,91 @@ sub _cash_move_txsign_p2sh {
 	die "cannot do multisignatures yet";
 }
 
+=pod
+
+---++ cash_move($from,$to,$amount)
+
+Move cash from one node to another node.
+
+=cut
+
+sub cash_move{
+	my ($this,$from_path,$to_path,$destination_amount) = @_;
+	my $to_node = $this->node_get_by_path($to_path);
+	return undef unless defined $to_node;
+	return undef unless defined $destination_amount && $destination_amount =~ m/^(\d+)$/;
+	$destination_amount = $1;
+	my $destination_address = $this->deposit($to_path);
+	
+	
+	my @outs;
+	# make the destination address output
+	push(@outs, CBitcoin::TransactionOutput->new({
+		'value' => $destination_amount
+		,'script' => CBitcoin::Script::address_to_script($destination_address)	
+	})); 	
+	
+	
+	return $this->spend($from_path,@outs);
+}
+
+=pod
+
+---+ Broadcasting
+
+=cut
+
+=pod
+
+---++ broadcast_send($path,$message)->$txdata
+
+For example: $tree->broadcast("ROOT/CHANNEL","BR_SERVER 426655440000123e4567e89b12d3a456123e4567 123e4567-e89b-12d3-a456-426655440000 READMETA|WRITEMETA")
+
+=cut
+
+sub broadcast_send{
+	my ($this,$path,$message) = @_;
+	
+	#### parse the message ######
+	
+	my $msg = CBitcoin::Tree::Broadcast::serialize($message);
+	return undef unless defined $msg;	
+	
+	#### create and sign transaction ####
+	return $this->spend($path,CBitcoin::TransactionOutput->new({
+		'value' => 0
+		,'script' => "OP_RETURN 0x".unpack('H*',$msg)
+	}));
+	
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 1;
+
+
+
+
+
+
+
+
+
+__END__
+
+
+

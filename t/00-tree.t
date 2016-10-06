@@ -2,17 +2,19 @@ use strict;
 use warnings;
 
 use CBitcoin::Tree;
+use CBitcoin::Tree::Broadcast;
 
 use CBitcoin;
 use CBitcoin::CBHD;
 use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
 use CBitcoin::Transaction;
+
 use File::Slurp;
 
 use Data::Dumper;
 
-use Test::More tests => 6;
+use Test::More tests => 10;
 
 =pod
 
@@ -78,11 +80,50 @@ $tree->max_i('+40');
 	
 	ok(20000000 < $tree->balance && $tree->balance < 30100000, 'new balance recognized');
 	ok($tree->balance('inflight') == 0, 'inflight balance is 0');
+	
+	ok($tree->node_get_by_path('ROOT/CHANNEL')->balance == 10102039, 'ROOT/CHANNEL has correct balance');
 }
 
 
 {
-	# do a broadcast on ROOT/CHANNEL
+	# check Broadcast scripting
+	my $channel = $tree->node_get_by_path("ROOT/SERVERS/2/CHANNEL")->hdkey->ripemdHASH160;
+	$channel = unpack('H*',$channel);
+	
+	my $uuid = '123e4567-e89b-12d3-a456-426655440000';
+	
+	my $rights = join('|','READMETA','WRITEMETA');
+	
+	
+	# BR_SERVER [$ripemd, 20B] [$uuid, 16B] [$RightsBitField, 4B]
+	my $msg = CBitcoin::Tree::Broadcast::serialize("BR_SERVER $channel $uuid $rights");
+	ok(defined $msg && unpack('H*',$msg) eq '01324dd9d96c7d90ea0a84cac785937daee99bb0f5123e4567e89b12d3a4564266554400000300', 'parsed message');
+	
+	# create BROADCAST
+	# check example: https://live.blockcypher.com/btc-testnet/tx/7ec5ee73c51618efd86eecf19ea357ad14047aae218f87c16881e44f5a672654/
+	my $txdata = $tree->broadcast_send("ROOT/CHANNEL","BR_SERVER $channel $uuid $rights");
+	
+	ok(defined $txdata && 0 < length($txdata),'can broadcast');
+	
+	
+}
+
+{
+	my $check_broadcast = 'BR_SERVER 324dd9d96c7d90ea0a84cac785937daee99bb0f5 123e4567e89b12d3a456426655440000 WRITEMETA|READMETA';
+	
+	# to receive broadcast, add callback
+	my $node = $tree->node_get_by_path("ROOT/CHANNEL");
+	
+	
+	$node->broadcast_callback(sub{
+		my ($this,$message) = @_;
+		ok($check_broadcast eq $message,'Got broadcast on correct channel');
+	});
+	
+	# receive a broadcast
+	my $txdata = pack('H*',File::Slurp::read_file( '.data/tx3' ));
+	$tree->tx_add(CBitcoin::Transaction->deserialize($txdata));
+	
 	
 }
 
@@ -90,91 +131,6 @@ $tree->max_i('+40');
 
 
 
-
 __END__
-
-#require Data::Dumper;
-#print "Final\n".Data::Dumper::Dumper($tree)."\n";
-
-#print "part 2\n";
-my $string = $tree->export("ROOT/SERVERS/2/CHANNEL",'address');
-
-print "S=$string\n";
-
-
-# do deposits
-
-$string = $tree->deposit(2,2,"ROOT/CASH","ROOT/CHANNEL");
-
-print "Deposit=$string\n";
-
-# set max_i
-
-$tree->max_i('+5');
-
-
-# add transactions
-
-{
-	my @inputs = (
-		{
-			'hash' => '60163bdd79e0b67b33eb07dd941af5dfd9ca79b85866c9d69993d95488e71f2d'
-			,'index' => 3
-			,'script' => 'OP_DUP OP_HASH160 0x'.
-				unpack('H*',$tree->export("ROOT/CASH",'ripemdHASH160') )
-				.' OP_EQUALVERIFY OP_CHECKSIG'
-			,'value' => 0.01032173*100000000
-		}
-		,{
-			'hash' => '353082e37e57d2006517db8b6a75d905c49ae528cfff523a959a4fbf44203860'
-			,'index' => 0
-			,'script' => 'OP_DUP OP_HASH160 0x'.
-				unpack('H*',$tree->export("ROOT/CASH",'ripemdHASH160') )
-				.' OP_EQUALVERIFY OP_CHECKSIG'
-			,'value' => 0.00119999*100000000		
-		}
-	);
-	my $i = 1;
-	my @ins;
-	foreach my $in (@inputs){
-		my $address = CBitcoin::Script::script_to_address($in->{'script'});
-		# warn "Address=".$root->deriveChild(1,$i)->address()."\n";
-		$i++;
-		push(@ins,CBitcoin::TransactionInput->new({
-			'prevOutHash' => pack('H*',$in->{'hash'}) #should be 32 byte hash
-			,'prevOutIndex' => $in->{'index'}
-			,'script' => $in->{'script'} # scriptPubKey
-		}));
-		
-		
-	}
-	my @outputs = (
-		{
-			'address' => '198Lb2wtUEMzAAMdxBjqhGsUPG1RkKFUgh'
-			,'script' => 'OP_DUP OP_HASH160 0x592444aa94e0d8a06442c73f2dc56c5c11de7c5b OP_EQUALVERIFY OP_CHECKSIG'
-			,'value' => 0.010173*100_000_000
-		}
-		,{
-			'address' => '1L9cXroh15fCoegiNqbsrxZg7wemc7a2r1'
-			,'script' => 'OP_DUP OP_HASH160 0xd20b60d4a931079074d43c92fc4686dc37ac5f7b OP_EQUALVERIFY OP_CHECKSIG'
-			,'value' => 0.010472*100_000_000
-		}
-	);
-	my @outs;
-	foreach my $x (@outputs){
-		push(@outs,CBitcoin::TransactionOutput->new($x));
-	}
-
-	my @hashes = (
-		'6105e342232a9e67e4fa4ee0651eb8efd146dc0d7d346c788f45d8ad591c4577',
-		'da16a3ea5101e9f2ff975ec67a4ad85767dd306c27b94ef52500c26bc88af5c9'
-	);
-	my $tx = CBitcoin::Transaction->new({
-		'inputs' => \@ins, 'outputs' => \@outs
-	});
-
-	# add transactions to the database
-	$tree->tx_add($tx);
-}
 
 
