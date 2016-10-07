@@ -24,6 +24,7 @@ Build out the default tree and set the root of the tree with the super secret xp
 
 =cut
 
+
 my $xstring = File::Slurp::read_file( '.secret' );
 my $xprv = CBitcoin::CBHD->new($xstring);
 die "no xprv" unless defined $xprv;
@@ -31,9 +32,11 @@ die "no xprv" unless defined $xprv;
 $CBitcoin::network_bytes = CBitcoin::TESTNET;
 
 
+unlink('db1');
 
 my $tree = CBitcoin::Tree->new(	
 	["ROOT/CHANNEL","ROOT/SERVERS/2/CHANNEL","ROOT/CASH"]
+	,{'base directory' => 'db1', 'id' => 'wallet'}
 );
 
 $tree->hdkey_set("ROOT",$xprv);
@@ -115,18 +118,21 @@ $tree->max_i('+40');
 	my $node = $tree->node_get_by_path("ROOT/CHANNEL");
 	
 	
+	my $m1 = '';
 	$node->broadcast_callback(sub{
 		my ($this,$message) = @_;
-		ok($check_broadcast eq $message,'Got broadcast on correct channel');
-	});
+		my $m2 = \$m1;
+		$$m2 = $message;
+ 	});
 	
 	# receive a broadcast
 	my $txdata = pack('H*',File::Slurp::read_file( '.data/tx3' ));
 	$tree->tx_add(CBitcoin::Transaction->deserialize($txdata));
 	
 	
+	
+	ok($check_broadcast eq $m1,'Got broadcast on correct channel');
 }
-
 
 
 

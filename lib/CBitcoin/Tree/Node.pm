@@ -7,12 +7,12 @@ use warnings;
 
 use CBitcoin::Tree;
 use Digest::MD5 qw(md5);
-
+use Fcntl qw(:flock SEEK_END);
 
 
 sub new {
 	my $package = shift;
-	my ($index) = @_;
+	my ($index,$base_dir) = @_;
 
 	die "bad index" unless defined $index && $index =~ m/^(\d+)$/;
 	# Kgc::HTML::Bitcoin::Tree::MAXACCOUNTS
@@ -29,6 +29,7 @@ sub new {
 		,'output inflight' => {}
 		,'output spent' => {}
 		,'callbacks' => []
+		,'base directory' => $base_dir
 	};
 	bless($this,$package);
 
@@ -124,19 +125,32 @@ Returns:<verbatim>{
 sub input_use{
 	my ($this) = @_;
 	
+	# create file on disk, and lock it
+	
+	
 	my $out = {'p2pkh' => [], 'p2sh' => []};
 	foreach my $y (keys %{$this->{'output pool'}}){
 		my $ref = $this->{'output pool'}->{$y};
-		$this->{'output inflight'}->{$ref->[1]->prevOutHash.$ref->[1]->prevOutIndex} = $ref;
-		#push(@{$this->{'output inflight'}},$ref);
-		if($ref->[0] eq 'p2pkh'){
-		#	warn "input_use:[".unpack('H*',$ref->[1]->prevOutHash)."][".$ref->[1]->prevOutIndex."]\n";
-			push(@{$out->{'p2pkh'}},[$ref->[1],$ref->[2],$this->hdkey->deriveChild($ref->[3],$ref->[4])]);	
+		my $input_fp = $this->base_dir.join('/','input_inflight',unpack('H*',$ref->[1]->prevOutHash).$ref->[1]->prevOutIndex);
+		if(-d $input_fp){
+			# another process is already using this
+			# delete $this->{'output pool'}->{$y};
+			warn "input is being used already";
 		}
-		elsif($ref->[0] eq 'p2sh'){
-			die "cannot do multisig yet";
+		else{
+			$this->{'output inflight'}->{$ref->[1]->prevOutHash.$ref->[1]->prevOutIndex} = $ref;
+			#push(@{$this->{'output inflight'}},$ref);
+			if($ref->[0] eq 'p2pkh'){
+			#	warn "input_use:[".unpack('H*',$ref->[1]->prevOutHash)."][".$ref->[1]->prevOutIndex."]\n";
+				push(@{$out->{'p2pkh'}},[$ref->[1],$ref->[2],$this->hdkey->deriveChild($ref->[3],$ref->[4])]);	
+			}
+			elsif($ref->[0] eq 'p2sh'){
+				die "cannot do multisig yet";
+			}
+			delete $this->{'output pool'}->{$y};	
 		}
-		delete $this->{'output pool'}->{$y};
+		
+
 	}
 	
 	return $out;
@@ -170,6 +184,15 @@ sub input_spent {
 	
 }
 
+=pod
+
+---++ base_dir
+
+=cut
+
+sub base_dir {
+	return shift->{'base directory'};
+}
 
 =pod
 
@@ -183,7 +206,7 @@ sub index {
 
 =pod
 
----++ hdkey
+---++ hdkey($cbhd,$bool)
 
 
 =cut
@@ -192,7 +215,11 @@ sub hdkey {
 	my ($this,$x,$bool) = @_;
 	if(defined $x){
 		$this->{'hdkey'} = $x;
+		
 		return $x if defined $bool && !$bool;
+		
+		
+		
 		foreach my $index (keys %{$this->{'next /'}}){
 			$this->{'next /'}->{$index}->hdkey($x->deriveChild(1,$index));
 		}
@@ -327,6 +354,8 @@ sub hard{
 
 	return $this->{'hard'};
 }
+
+
 
 =pod
 

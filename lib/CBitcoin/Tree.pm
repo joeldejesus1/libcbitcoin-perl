@@ -3,7 +3,8 @@ package CBitcoin::Tree;
 use utf8;
 use strict;
 use warnings;
-
+use Fcntl qw(:DEFAULT :flock SEEK_END);
+	
 use constant {
 	MAXACCOUNTS => 1024
 	,MINTXAMOUNT => 800 # 800 satoshis are the minimum size before tx is considered dust
@@ -15,6 +16,7 @@ use constant {
 	,USERS => '1/3'
 };
 
+use Data::UUID;
 use List::Util qw(shuffle);
 use CBitcoin::Script;
 use CBitcoin::Tree::Node;
@@ -80,19 +82,38 @@ Set up the linked nodes.
 =cut
 
 sub init{
-	my $this = shift;
+	my ($this,$schema,$options) = @_;
 
+	$options //= {};
+	die "bad option" unless ref($options) eq 'HASH';
 
-	$this->{'max i'} = MAXACCOUNTS;
+	foreach my $k (keys %{$options}){
+		$this->{$k} = $options->{$k};
+	}
+	
+	if(defined $this->{'base directory'}){
+		$this->{'base directory'} = CBitcoin::Utilities::validate_filepath($this->{'base directory'});
+		die "bad directory" unless defined $this->{'base directory'}; 
+	}
+	else{
+		$this->{'base directory'} = 'db';
+	}
+	
+	$this->{'uuid generator'} = Data::UUID->new;
+	$this->{'id'} //= $this->uuid_gen->to_string($this->uuid_gen->create());
+	
+	$this->init_dirs();
+	
+	$this->{'max i'} //= MAXACCOUNTS;
 
 	$this->{'dict'} = {};
 
-	$this->{'tree'} = CBitcoin::Tree::Node->new(0);
+	$this->{'tree'} = CBitcoin::Tree::Node->new(0,$this->base_dir);
 
 	$this->{'txs'} = {};
 	$this->{'tx ordering'} = [];
 
-	my $schema = shift;
+	
 	if(defined $schema && ref($schema) eq 'ARRAY'){
 		foreach my $s (@{$schema}){
 			$this->node_create_by_name($s);
@@ -106,7 +127,43 @@ sub init{
 	#my $xo = Data::Dumper::Dumper($this->{'tree'});
 	#print "Tree=$xo\n";
 	$this->max_i(MAXACCOUNTS, MAXACCOUNTS + 40);
+	
 }
+
+=pod
+
+---+++ init_dirs
+
+Set up directories to store tree.
+
+=cut
+
+
+sub init_dirs{
+	my ($this) = @_;
+	my $basedir = $this->base_dir();
+	
+	unless(-d $basedir){
+		mkdir($basedir);
+	}
+	$basedir .= '/trees';
+	unless(-d $basedir){
+		mkdir($basedir);
+	}
+	$basedir .= '/'.$this->id;
+	unless(-d $basedir){
+		mkdir($basedir);
+	}
+	
+	mkdir("$basedir/input_inflight");
+	
+	# only allow read and writes
+	sysopen (my $fh, "$basedir/tx.db", O_RDWR|O_CREAT, 0600) || die "cannot open tx db";
+	binmode($fh);
+	$this->{'tx db file handle'} = $fh;
+
+}
+
 
 =pod
 
@@ -123,6 +180,47 @@ sub init{
 sub dict{
 	return shift->{'dict'};
 }
+
+=pod
+
+---++ tx_fh
+
+=cut
+
+sub tx_fh{
+	return shift->{'tx db file handle'};
+}
+
+=pod
+
+---++ base_dir
+
+=cut
+
+sub base_dir{
+	return shift->{'base directory'};
+}
+
+=pod
+
+---++ id
+
+=cut
+
+sub id{
+	return shift->{'id'};
+}
+
+=pod
+
+---++ uuid_gen
+
+=cut
+
+sub uuid_gen{
+	return shift->{'uuid generator'};
+}
+
 
 =pod
 
@@ -231,7 +329,7 @@ sub node_create_by_name {
 			if(1 < $depth){
 				my $nextnode = $node->next($x[1],$x[0]);
 				unless(defined $nextnode){
-					$nextnode = CBitcoin::Tree::Node->new($x[1]);
+					$nextnode = CBitcoin::Tree::Node->new($x[1],$this->base_dir);
 					$node->append($nextnode,$x[0]);
 				}
 				$node = $nextnode;
@@ -464,6 +562,40 @@ sub txoutput_get{
 	
 	return $tx->output($i);
 }
+
+=pod
+
+---++ tx_fh_read
+
+=cut
+
+sub tx_fh_read{
+	my $this = shift;
+	
+	my $fh = $this->tx_fh;
+	
+	# get a lock on the tx file
+	my $tries = 0;
+	while( !flock($fh, LOCK_EX)  && $tries < 5){
+		sleep 1;
+		$tries += 1;
+	}
+	die "cannot lock tx db" if 5 <= $tries;
+	
+	
+	
+	
+	
+	flock($fh, LOCK_UN) or die "Cannot unlock tx db - $!\n";
+	
+	#         my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
+    #        $atime,$mtime,$ctime,$blksize,$blocks)
+    #           = stat($filename);
+    
+    # my $mode = (stat($filename))[2];
+    # my $size = (stat($filename))[7];
+}
+
 
 =pod
 
