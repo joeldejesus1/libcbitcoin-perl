@@ -112,7 +112,7 @@ $tree->max_i('+40');
 }
 
 {
-	my $check_broadcast = 'BR_SERVER 324dd9d96c7d90ea0a84cac785937daee99bb0f5 123e4567e89b12d3a456426655440000 WRITEMETA|READMETA';
+	my $check_broadcast = 'BR_SERVER 324dd9d96c7d90ea0a84cac785937daee99bb0f5 123e4567e89b12d3a456426655440000 READMETA|WRITEMETA';
 	
 	# to receive broadcast, add callback
 	my $node = $tree->node_get_by_path("ROOT/CHANNEL");

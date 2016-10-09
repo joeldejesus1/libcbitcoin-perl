@@ -22,7 +22,7 @@ use CBitcoin::Script;
 use CBitcoin::Tree::Node;
 use CBitcoin::Tree::Broadcast;
 use Digest::MD5 qw(md5);
-
+use Cwd;
 
 
 
@@ -128,6 +128,8 @@ sub init{
 	#print "Tree=$xo\n";
 	$this->max_i(MAXACCOUNTS, MAXACCOUNTS + 40);
 	
+	
+	$this->db_tx_index();
 }
 
 =pod
@@ -146,6 +148,8 @@ sub init_dirs{
 	unless(-d $basedir){
 		mkdir($basedir);
 	}
+	mkdir("$basedir/txs");
+	
 	$basedir .= '/trees';
 	unless(-d $basedir){
 		mkdir($basedir);
@@ -155,13 +159,36 @@ sub init_dirs{
 		mkdir($basedir);
 	}
 	
+	mkdir("$basedir/txs");
 	mkdir("$basedir/input_inflight");
 	
 	# only allow read and writes
-	sysopen (my $fh, "$basedir/tx.db", O_RDWR|O_CREAT, 0600) || die "cannot open tx db";
+	sysopen (my $fh, "$basedir/txs/.lock", O_RDWR|O_CREAT, 0600) || die "cannot open tx db";
 	binmode($fh);
-	$this->{'tx db file handle'} = $fh;
-
+	$this->{'tx db lock fh'} = $fh;
+	
+	$this->{'base directory'} = $basedir;
+	
+	
+	$this->db_tx_lock();
+	my $size = (stat("basedir/txs/.lock"))[7];
+	$size //= 0;
+	if($size == 0){
+		
+		sysseek($fh,0,0);
+		syswrite($fh,pack('l',0));
+		$this->{'lock time'} = 0;
+		
+	}
+	else{
+		sysseek($fh,0,0);
+		my ($n,$buf);
+		$n = sysread($fh,$buf,4);
+		die "bad lock read" unless $n == 4;
+		$this->{'lock time'} = unpack('l',$buf);
+	}
+	
+	$this->db_tx_unlock();
 }
 
 
@@ -563,60 +590,72 @@ sub txoutput_get{
 	return $tx->output($i);
 }
 
-=pod
-
----++ tx_fh_read
-
-=cut
-
-sub tx_fh_read{
-	my $this = shift;
-	
-	my $fh = $this->tx_fh;
-	
-	# get a lock on the tx file
-	my $tries = 0;
-	while( !flock($fh, LOCK_EX)  && $tries < 5){
-		sleep 1;
-		$tries += 1;
-	}
-	die "cannot lock tx db" if 5 <= $tries;
-	
-	
-	
-	
-	
-	flock($fh, LOCK_UN) or die "Cannot unlock tx db - $!\n";
-	
-	#         my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
-    #        $atime,$mtime,$ctime,$blksize,$blocks)
-    #           = stat($filename);
-    
-    # my $mode = (stat($filename))[2];
-    # my $size = (stat($filename))[7];
-}
-
 
 =pod
 
----++ tx_add
+---++ tx_add($time,@txdatas)
+
+Use this to add transactions from a block.  Use the block time to timestamp the transactions, not the block height.
 
 =cut
 
 sub tx_add {
 	my $this = shift;
-	my @done = map {$this->tx_add_single($_)} @_;
+	my $time = shift;
+	die "bad time" unless defined $time && $time =~ m/^(\d+)$/;
+	
+	my $time_hex = lc(unpack('H*',pack('l',$time)));
+	if($time_hex =~ m/^([0-9a-f]+)$/){
+		$time_hex = $1;
+	}
+	my @txs;
+	
+	############# Lock DB ###################
+	$this->db_tx_lock();
+	
+	# check to see if another process has added transactions
+	push(@txs,$this->db_tx_index());
+	
+	while(my $txdata = shift(@_)){
+		my $tx;
+		if(ref($txdata) eq 'CBitcoin::Transaction'){
+			$tx = $txdata;
+			$txdata = $tx->serialize();
+			$this->db_tx_insert($tx);
+		}
+		elsif($tx = CBitcoin::Transaction->deserialize($txdata)){
+			$this->db_tx_insert($tx,$time_hex);
+		}
+		else{
+			warn "failed to get transaction";
+			next;
+		}
+		push(@txs,$tx);
+	}
+	$this->db_tx_unlock();
+	##########################################
+	
+	while(my $tx = shift(@txs)){
+		$this->tx_add_single($tx);
+	}
 	
 }
+
+# only handles inmemory stuff
 
 sub tx_add_single {
 	my ($this,$tx) = @_;
 	die "not a transaction" unless defined $tx && ref($tx) eq 'CBitcoin::Transaction';
+	
+	
 	my $addbool = 0;
 	my $txhash = $tx->hash;
+	return 0 if $this->{'txs'}->{$txhash};
+	
 	my $input_nodes = [];
 	for(my $i=0;$i<$tx->numOfInputs;$i++){
 		$input_nodes = $this->tx_add_singleinput($tx->input($i),$txhash,$i);
+		$addbool = 1 if 0 < scalar(@{$input_nodes});
 	}
 
 	for(my $i=0;$i<$tx->numOfOutputs;$i++){
@@ -626,6 +665,9 @@ sub tx_add_single {
 	if($addbool){
 		$this->{'txs'}->{$txhash} = $tx;
 		push(@{$this->{'tx ordering'}},$tx);
+	}
+	else{
+		die "did not add tx";
 	}
 
 	return $addbool;
@@ -912,13 +954,208 @@ sub broadcast_send{
 
 
 
+=pod
+
+---+ db
+
+=cut
+
+=pod
+
+---++ db_tx_lock
+
+=cut
+
+sub db_tx_lock{
+	my $this = shift;
+	# get a lock on the tx file
+	my $fh = $this->{'tx db lock fh'};
+	die "no lock" unless defined $fh && 0 < fileno($fh);
+	
+	my $tries = 0;
+	while( !flock($fh, LOCK_EX)  && $tries < 5){
+		sleep 1;
+		$tries += 1;
+	}
+	die "cannot lock tx db" if 5 <= $tries;
+	
+	$this->{'tx db locked'} = 1;
+	
+}
+
+=pod
+
+---++ db_tx_unlock
+
+=cut
+
+sub db_tx_unlock{
+	my $this = shift;
+	return undef unless $this->{'tx db locked'};
+	
+	
+	my $fh = $this->{'tx db lock fh'};
+	
+	flock($fh, LOCK_UN) or die "Cannot unlock tx db - $!\n";
+	
+	$this->{'tx db locked'} = 0;
+}
+
+=pod
+
+---++ db_tx_insert($tx)->0/1
+
+True means successful insert.  False means file already exists.
+
+   1. Write txdata to txh1/txh2/txh3
+   1. Create a symlink from tx_3 -> txh1/txh2/txh3 txdata file
+
+=cut
+
+sub db_tx_insert{
+	my ($this,$tx,$time_hex) = @_;
+	
+	my $txbasedir = join('/',$this->base_dir,'..','..','txs');
+	
+	my $hash = lc(unpack('H*',$tx->hash));
+	my @fp;
+	if($hash =~ m/^([0-9a-f]{1})([0-9a-f]{2})([0-9a-f]+)$/){
+		# db/txs/h1/h2/h3
+		@fp = ($txbasedir,$1,$2,$3);
+		mkdir(join('/',@fp[0..1]));
+		mkdir(join('/',@fp[0..2]));
+		
+		$hash = $1.$2.$3;
+	}
+	else{
+		die "should not be here with h=$hash";
+	}
+	
+	my $fh;
+	if(sysopen ($fh, join('/',@fp), O_RDWR|O_CREAT|O_EXCL, 0600)){
+		# file does not exist, so write txdata to disk
+		
+		binmode($fh);
+		
+		# get full tx
+		my $txdata = $tx->serialize(0);
+		my ($m,$n) = (0,length($txdata));
+		while(0 < $n - $m){
+			$m += syswrite($fh,$txdata,$n - $m, $m);
+		}
+		close($fh);
+	}
+	
+	return 0 unless defined $time_hex;
+	die "bad time" unless $time_hex =~ m/^([0-9a-fA-F]+)$/;
+	$time_hex = $1;
+	
+	# create a symlink from the time directory to the actual txdata file
+	# .. we use the time directory to keep track of the ordering of transactions
+	# .. we also realize that rename is atomic, but symlink is not.
+	# .. therefore, create the symlink at a random location, then move it
+	my $tx_fp = join('/',@fp);
+	my @link = ($txbasedir,'t_'.$time_hex,$hash);
+	mkdir(join('/',@link[0..1]));
+	
+	my $link_fp = join('/',@link);
+	my $init = int(rand(10000));
+	if($init =~ m/^(\d+)$/){
+		$init = $1;
+	}
+	
+	# create a link (with relative file paths)
+	my $curr_dir = Cwd::fastgetcwd();
+	# chdir db/txs/t_f4af3abb
+	Cwd::chdir(join('/',@link[0..1]));
+	# ln -s ../h1/h2/h3  hash
+	# h1/h2/h3 = @fp[1..3]
+	symlink(join('/','..',@fp[1..3]),$init);
+	
+	if(rename($init,$hash)){
+		Cwd::chdir($curr_dir);
+		return 1;
+	}
+	else{
+		unlink($init);
+		Cwd::chdir($curr_dir);
+		return 0;
+	}
+}
 
 
 
 
+=pod
 
+---++ db_tx_index()->@txs
 
+Read all new transactions that have been written since the last time this process read the disk.
 
+=cut
+
+sub db_tx_index{
+	my ($this) = @_;
+	
+	#die "no tx" unless defined $tx;
+	my @txs;
+	
+	
+	my $fh = $this->{'tx db lock fh'};
+	sysseek($fh,0,0);
+	my ($n,$buf);
+	$n = sysread($fh,$buf,4);
+	die "bad lock read" unless $n == 4;
+	my $curr_time = unpack('l',$buf);
+	my $last_time = $this->{'lock time'};
+	
+	return @txs unless $last_time < $curr_time;
+	
+	# db/txs
+	my $txbasedir = join('/',$this->base_dir,'..','..','txs');
+	
+	# read files in alphabetical order
+	opendir(my $fhdir,$txbasedir);
+	my @files = sort(readdir($fhdir));
+	closedir($fhdir);
+	# for each file, read the txdata
+	my $t = 0;
+
+	foreach my $f (@files){
+		next if $f eq '.' || $f eq '..';
+		my $name;
+		if($f =~ m/^t_([0-9a-fA-F]{8})$/){
+			$t = unpack('l',pack('H*',$1));
+			$name = 't_'.$1;
+			
+			next if $t <= $last_time;
+		}
+		else{
+			next;
+		}
+		
+		# read in the txdata
+		unless(open(my $fh,'<',$txbasedir.'/'.$name)){
+			warn "could not open ".$txbasedir.'/'.$name;
+			next;
+		}
+		
+		my ($n,$m,$txdata);
+		$n = 0;
+		while($m = sysread($fh,$txdata,8192,$n)){
+			$n += $m;
+		}
+		close($fh);
+		
+		my $tx = CBitcoin::Transaction->deserialize($txdata) || next;
+		push(@txs,$tx);
+		#$this->tx_add_single(CBitcoin::Transaction->deserialize($txdata));
+	}
+	
+	
+	return @txs;
+	
+}
 
 
 

@@ -295,7 +295,7 @@ sub deserialize_serverrights {
 	}
 	return undef unless 0 < scalar(@ans);
 	
-	return join('|',@ans);
+	return join('|',sort @ans);
 }
 
 

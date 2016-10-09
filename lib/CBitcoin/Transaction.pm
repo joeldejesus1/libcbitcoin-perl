@@ -160,6 +160,8 @@ sub deserialize{
 	
 	delete $this->{'sha256'};
 	
+	$this->{'serialized full'} = $data;
+	
 	return $this;
 }
 
@@ -268,6 +270,9 @@ sub serialize {
 	if($raw_bool && defined $this->{'serialized raw'}){
 		return $this->{'serialized raw'};
 	}
+	elsif(!$raw_bool && defined $this->{'serialized full'}){
+		return $this->{'serialized full'};
+	}
 	
 	my $data = pack('l',$this->version);
 	
@@ -283,8 +288,12 @@ sub serialize {
 	
 	$data .= pack('L',$this->lockTime);
 	
+	# TODO: check if fixing this bug affects doing transactions!
 	if($raw_bool && !(defined $this->{'serialized raw'})){
 		$this->{'serialized raw'} = $data;
+	}
+	elsif(!$raw_bool){
+		$this->{'serialized full'} = $data;
 	}
 	
 	return $data;
