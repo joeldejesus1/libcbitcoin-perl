@@ -26,7 +26,7 @@
 #     TYPEMAPS => []
 #     VERSION => q[0.1]
 #     VERSION_FROM => q[lib/CBitcoin.pm]
-#     clean => { FILES=>q[libcbitcoin-perl*] }
+#     clean => { FILES=>q[db1] }
 #     dist => { COMPRESS=>q[gzip -9f], SUFFIX=>q[gz] }
 
 # --- MakeMaker post_initialize section:
@@ -714,7 +714,7 @@ clean :: clean_subdirs
 	  pm_to_blib pm_to_blib.ts \
 	  so_locations tmon.out 
 	- $(RM_RF) \
-	  blib libcbitcoin-perl* 
+	  blib db1 
 	  $(NOECHO) $(RM_F) $(MAKEFILE_OLD)
 	- $(MV) $(FIRST_MAKEFILE) $(MAKEFILE_OLD) $(DEV_NULL)
 
@@ -728,8 +728,8 @@ realclean_subdirs :
 # Delete temporary files (via clean) and also delete dist files
 realclean purge ::  clean realclean_subdirs
 	- $(RM_F) \
-	  $(OBJECT) $(MAKEFILE_OLD) \
-	  $(FIRST_MAKEFILE) 
+	  $(FIRST_MAKEFILE) $(MAKEFILE_OLD) \
+	  $(OBJECT) 
 	- $(RM_RF) \
 	  $(DISTVNAME) 
 

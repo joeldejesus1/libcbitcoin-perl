@@ -35,7 +35,8 @@ WriteMakefile(
 	#,'LDFLAGS' => ' -fstack-protector '
 	,'MAKEFILE_OLD' => ''
 	,'dist'                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', }
-	,'clean'               => { FILES => 'libcbitcoin-perl*' }
+	#,'clean'               => { FILES => 'libcbitcoin-perl*' }
+	,'clean'               => { FILES => 'db1' }
 );
 
 # Remove the Makefile dependency. Causes problems on a few systems.

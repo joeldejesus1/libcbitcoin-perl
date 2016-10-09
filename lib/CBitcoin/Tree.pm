@@ -149,26 +149,15 @@ sub init_dirs{
 		mkdir($basedir);
 	}
 	mkdir("$basedir/txs");
+	mkdir("$basedir/inputs_inflight");
 	
-	$basedir .= '/trees';
-	unless(-d $basedir){
-		mkdir($basedir);
-	}
-	$basedir .= '/'.$this->id;
-	unless(-d $basedir){
-		mkdir($basedir);
-	}
+
 	
-	mkdir("$basedir/txs");
-	mkdir("$basedir/input_inflight");
 	
-	# only allow read and writes
+	# create the file handle for locking
 	sysopen (my $fh, "$basedir/txs/.lock", O_RDWR|O_CREAT, 0600) || die "cannot open tx db";
 	binmode($fh);
-	$this->{'tx db lock fh'} = $fh;
-	
-	$this->{'base directory'} = $basedir;
-	
+	$this->{'tx db lock fh'} = $fh;	
 	
 	$this->db_tx_lock();
 	my $size = (stat("basedir/txs/.lock"))[7];
@@ -189,6 +178,18 @@ sub init_dirs{
 	}
 	
 	$this->db_tx_unlock();
+	
+	# create the directory for our special tree
+	$basedir .= '/trees';
+	unless(-d $basedir){
+		mkdir($basedir);
+	}
+	$basedir .= '/'.$this->id;
+	unless(-d $basedir){
+		mkdir($basedir);
+	}
+	
+	$this->{'base directory'} = $basedir;
 }
 
 
@@ -830,6 +831,7 @@ sub spend{
 		push(@ins_outputs,['p2pkh',$i,$j]);
 		$j++;
 	}
+	
 	# multisig address
 	for(my $i=0;$i<$N_p2sh;$i++){
 		push(@ins,$output_ref->{'p2sh'}->[$i]->[0]);

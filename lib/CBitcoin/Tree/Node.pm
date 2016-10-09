@@ -131,13 +131,16 @@ sub input_use{
 	my $out = {'p2pkh' => [], 'p2sh' => []};
 	foreach my $y (keys %{$this->{'output pool'}}){
 		my $ref = $this->{'output pool'}->{$y};
-		my $input_fp = $this->base_dir.join('/','input_inflight',unpack('H*',$ref->[1]->prevOutHash).$ref->[1]->prevOutIndex);
-		if(-d $input_fp){
+		# db/trees/wallet/../../inputs_inflight
+		my $input_fp = join('/',
+			$this->base_dir
+			,'..','..'
+			,'inputs_inflight'
+			,unpack('H*',$ref->[1]->prevOutHash).$ref->[1]->prevOutIndex
+		);
+		
+		if(mkdir($input_fp)){
 			# another process is already using this
-			# delete $this->{'output pool'}->{$y};
-			warn "input is being used already";
-		}
-		else{
 			$this->{'output inflight'}->{$ref->[1]->prevOutHash.$ref->[1]->prevOutIndex} = $ref;
 			#push(@{$this->{'output inflight'}},$ref);
 			if($ref->[0] eq 'p2pkh'){
@@ -147,7 +150,10 @@ sub input_use{
 			elsif($ref->[0] eq 'p2sh'){
 				die "cannot do multisig yet";
 			}
-			delete $this->{'output pool'}->{$y};	
+			delete $this->{'output pool'}->{$y};
+		}
+		else{
+			warn "input is being used already with I=$input_fp";	
 		}
 		
 
@@ -167,20 +173,30 @@ Mark an input as having been spent.
 sub input_spent {
 	my ($this,$prevHash,$prevIndex) = @_;
 	#warn "input_spent:[".unpack('H*',$prevHash)."][".$prevIndex."]\n";
-	# TODO: dont use a loop to find the input, use a %hash next time	
+	# TODO: dont use a loop to find the input, use a %hash next time
+	
 	if(defined $this->{'output inflight'}->{$prevHash.$prevIndex}){
-	#	warn "moving input from inflight to spent";
+		warn "moving input from inflight to spent";
 		$this->{'output spent'}->{$prevHash.$prevIndex} = $this->{'output inflight'}->{$prevHash.$prevIndex};
 		delete $this->{'output inflight'}->{$prevHash.$prevIndex};
 	}
 	elsif(defined $this->{'output pool'}->{$prevHash.$prevIndex}){
-	#	warn "moving input from pool to spent";
+		warn "moving input from pool to spent";
 		$this->{'output spent'}->{$prevHash.$prevIndex} = $this->{'output pool'}->{$prevHash.$prevIndex};
 		delete $this->{'output pool'}->{$prevHash.$prevIndex};		
 	}
 	else{
 	#	warn "what happened?";
 	}
+	
+	my $input_fp = join('/',
+		$this->base_dir
+		,'..','..'
+		,'inputs_inflight'
+		,unpack('H*',$prevHash).$prevIndex
+	);
+	# the directory MUST be empty before removing it
+	rmdir($input_fp);
 	
 }
 

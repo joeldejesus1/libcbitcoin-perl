@@ -31,6 +31,8 @@ die "no xprv" unless defined $xprv;
 
 $CBitcoin::network_bytes = CBitcoin::TESTNET;
 
+my @block_times = (1476017968-5*60*60,1476017968-2*60*60,1476017968-1*60*60,1476017968);
+
 
 unlink('db1');
 
@@ -55,9 +57,9 @@ $tree->max_i('+40');
 	# scan the transaction
 	my $txdata = pack('H*',File::Slurp::read_file( '.data/tx1' ));
 	#warn "hi with txdata=".length($txdata);
-	my $tx = CBitcoin::Transaction->deserialize($txdata);
 	
-	$tree->tx_add($tx);
+	
+	$tree->tx_add($block_times[0],$txdata);
 	
 	ok($tree->balance() == 30100000,'positive balance');
 	
@@ -79,7 +81,7 @@ $tree->max_i('+40');
 {
 	# register the transaction created above as if it came in off the peer to peer network
 	my $txdata = pack('H*',File::Slurp::read_file( '.data/tx2' ));
-	$tree->tx_add(CBitcoin::Transaction->deserialize($txdata));
+	$tree->tx_add($block_times[1],$txdata);
 	
 	ok(20000000 < $tree->balance && $tree->balance < 30100000, 'new balance recognized');
 	ok($tree->balance('inflight') == 0, 'inflight balance is 0');
@@ -127,7 +129,7 @@ $tree->max_i('+40');
 	
 	# receive a broadcast
 	my $txdata = pack('H*',File::Slurp::read_file( '.data/tx3' ));
-	$tree->tx_add(CBitcoin::Transaction->deserialize($txdata));
+	$tree->tx_add($block_times[2],$txdata);
 	
 	
 	
