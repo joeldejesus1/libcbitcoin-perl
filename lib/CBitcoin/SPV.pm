@@ -2042,6 +2042,70 @@ sub callback_custom_gotaddspv {
 	}	
 }
 
+=pod
+
+---++ custom_gotsetbf
+
+Got a new bloom filter, set this bloom filter and send the bloom filter to other processes. (TODO)
+
+=cut
+
+
+BEGIN{
+	$callback_mapper->{'custom command'}->{'custsetbf'} = {
+		'subroutine' => \&callback_custom_gotsetbf
+	}
+};
+
+sub callback_custom_gotsetbf {
+	my ($this,$msg) = @_;
+	$logger->debug("Got message");
+	my $payload = $msg->payload();
+	return undef unless 32 < length($payload);
+	my $hash = substr($payload,0,32);
+	my $fname = substr($payload,32);
+	$fname = lc(unpack('H*',$fname));
+	if($fname =~ m/^([0-9a-f]+)$/){
+		$fname = $1;
+	}
+	else{
+		$logger->error("file name is of bad form");
+		return undef;
+	}
+	my $fh;
+	unless(!open($fh,'<','/tmp/'.$fname.'.bf')){
+		$logger->error("bloom filter file does not exist");
+		return undef;
+	}
+	binmode($fh);
+	my ($m,$n,$bfdata) = (0,0,'');
+	while($m = sysread($fh,$bfdata,8192,$n)){
+		$n += $m;
+	}
+	close($fh);
+	unlink('/tmp/'.$fname.'.bf');
+	
+	unless(Digest::SHA::sha256($bfdata) eq $hash){
+		$logger->error("hash does not match");
+		return undef;
+	}
+	
+	my $bf = CBitcoin::BloomFilter->new({
+		'FalsePostiveRate' => 0.001,
+		'nHashFuncs' => 1000 
+	});
+	
+	$bf->set_data($bfdata);
+	
+}
+
 
 
 1;
+
+
+
+
+
+
+__END__

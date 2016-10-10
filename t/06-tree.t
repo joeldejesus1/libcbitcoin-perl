@@ -22,10 +22,14 @@ use Test::More tests => 10;
 
 Build out the default tree and set the root of the tree with the super secret xprv CBHD key.
 
+And the purpose of the Tree module is to function as a kind of wallet.  So, in effect, we are testing the wallet code.
+
+The reason that it is called the Tree module instead of a Wallet module is because the data structure of the BIP32 Hierarchial Deterministic keys reflects that of a tree.
+
 =cut
 
 
-my $xstring = File::Slurp::read_file( '.secret' );
+my $xstring = File::Slurp::read_file( 't/secret' );
 my $xprv = CBitcoin::CBHD->new($xstring);
 die "no xprv" unless defined $xprv;
 
@@ -38,7 +42,7 @@ unlink('db1');
 
 my $tree = CBitcoin::Tree->new(	
 	["ROOT/CHANNEL","ROOT/SERVERS/2/CHANNEL","ROOT/CASH"]
-	,{'base directory' => 'db1', 'id' => 'wallet'}
+	,{'base directory' => 't/db1', 'id' => 'wallet'}
 );
 
 $tree->hdkey_set("ROOT",$xprv);

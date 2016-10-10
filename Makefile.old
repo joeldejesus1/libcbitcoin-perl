@@ -26,7 +26,7 @@
 #     TYPEMAPS => []
 #     VERSION => q[0.1]
 #     VERSION_FROM => q[lib/CBitcoin.pm]
-#     clean => { FILES=>q[db1] }
+#     clean => { FILES=>q[t/db1] }
 #     dist => { COMPRESS=>q[gzip -9f], SUFFIX=>q[gz] }
 
 # --- MakeMaker post_initialize section:
@@ -714,7 +714,7 @@ clean :: clean_subdirs
 	  pm_to_blib pm_to_blib.ts \
 	  so_locations tmon.out 
 	- $(RM_RF) \
-	  blib db1 
+	  blib t/db1 
 	  $(NOECHO) $(RM_F) $(MAKEFILE_OLD)
 	- $(MV) $(FIRST_MAKEFILE) $(MAKEFILE_OLD) $(DEV_NULL)
 
@@ -728,7 +728,7 @@ realclean_subdirs :
 # Delete temporary files (via clean) and also delete dist files
 realclean purge ::  clean realclean_subdirs
 	- $(RM_F) \
-	  $(FIRST_MAKEFILE) $(MAKEFILE_OLD) \
+	  $(MAKEFILE_OLD) $(FIRST_MAKEFILE) \
 	  $(OBJECT) 
 	- $(RM_RF) \
 	  $(DISTVNAME) 
@@ -1123,7 +1123,6 @@ all ::
 	(cd blib/arch/auto/CBitcoin/ && ( [ -d TransactionInput ] || mkdir TransactionInput ) && ( [ -e TransactionInput/TransactionInput.so ] || ln -s ../CBitcoin.so TransactionInput/TransactionInput.so ) )
 	(cd blib/arch/auto/CBitcoin/ && ( [ -d TransactionOutput ] || mkdir TransactionOutput ) && ( [ -e TransactionOutput/TransactionOutput.so ] || ln -s ../CBitcoin.so TransactionOutput/TransactionOutput.so ) )
 	(cd blib/arch/auto/CBitcoin/ && ( [ -d Transaction ] || mkdir Transaction ) && ( [ -e Transaction/Transaction.so ] || ln -s ../CBitcoin.so Transaction/Transaction.so ) )
-##	(cd blib/arch/auto/CBitcoin/ && ( [ -d Message ] || mkdir Message ) && ( [ -e Message/Message.so ] || ln -s ../CBitcoin.so Message/Message.so ) )
 	(cd blib/arch/auto/CBitcoin/ && ( [ -d Block ] || mkdir Block ) && ( [ -e Block/Block.so ] || ln -s ../CBitcoin.so Block/Block.so ) )
 
 

@@ -130,6 +130,13 @@ sub init{
 	
 	
 	$this->db_tx_index();
+	
+	
+	
+	$this->{'bloom filter'} = CBitcoin::BloomFilter->new({
+		'FalsePostiveRate' => 0.001,
+		'nHashFuncs' => 1000 
+	});
 }
 
 =pod
@@ -198,6 +205,16 @@ sub init_dirs{
 ---+ getters/setters
 
 =cut
+
+=pod
+
+---++ bloomfilter
+
+=cut
+
+sub bloomfilter{
+	return shift->{'bloom filter'};
+}
 
 =pod
 
@@ -489,7 +506,36 @@ sub deposit {
 	}
 }
 
+=pod
 
+---++ bloomfilter_calculate()
+
+Create a bloom filter.  The hdkeys are 
+
+=cut
+
+sub bloomfilter_calculate{
+	my ($this) = @_;
+	
+	my $bf = CBitcoin::BloomFilter->new({
+		'FalsePostiveRate' => 0.001,
+		'nHashFuncs' => 1000 
+	});
+	
+	my @refs;
+	foreach my $p1 (keys %{$this->{'dict'}}){
+		foreach my $p2 (keys %{$this->{'dict'}->{$p1}}){
+			my $ref = $this->{'dict'}->{$p1}->{$p2};
+			my $hdkey = $ref->[0]->hdkey->deriveChild($ref->[1],$ref->[2]);
+			$bf->add_raw($hdkey->ripemdHASH160);
+			$bf->add_raw($hdkey->publickey);
+		}
+	}
+
+	$bf->bloomfilter_calculate();
+	
+	$this->{'bloom filter'} = $bf;
+}
 
 =pod
 
@@ -546,6 +592,9 @@ sub max_i {
 	else{
 		return $this->{'max i'};
 	}
+	
+	
+	$this->bloomfilter_calculate();
 }
 
 =pod
@@ -824,6 +873,7 @@ sub spend{
 	my @ins;
 	my $j = 0;
 	my ($N_p2pkh,$N_p2sh) = (scalar(@{$output_ref->{'p2pkh'}}),scalar(@{$output_ref->{'p2sh'}}));
+	return undef unless 0 < $N_p2pkh || 0 < $N_p2sh;
 	my @ins_outputs;
 	# single hdkey address
 	for(my $i=0;$i<$N_p2pkh;$i++){

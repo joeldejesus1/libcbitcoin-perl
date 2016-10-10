@@ -36,13 +36,11 @@ WriteMakefile(
 	,'MAKEFILE_OLD' => ''
 	,'dist'                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', }
 	#,'clean'               => { FILES => 'libcbitcoin-perl*' }
-	,'clean'               => { FILES => 'db1' }
+	,'clean'               => { FILES => 't/db1' }
 );
 
 # Remove the Makefile dependency. Causes problems on a few systems.
 sub MY::makefile {
-#	return qq{ };
-
 	return qq{
 all ::
 	(cd blib/arch/auto/CBitcoin/ && ( [ -d CBHD ] || mkdir CBHD ) && ([ -e CBHD/CBHD.so ] || ln -s ../CBitcoin.so CBHD/CBHD.so ) )
@@ -50,7 +48,6 @@ all ::
 	(cd blib/arch/auto/CBitcoin/ && ( [ -d TransactionInput ] || mkdir TransactionInput ) && ( [ -e TransactionInput/TransactionInput.so ] || ln -s ../CBitcoin.so TransactionInput/TransactionInput.so ) )
 	(cd blib/arch/auto/CBitcoin/ && ( [ -d TransactionOutput ] || mkdir TransactionOutput ) && ( [ -e TransactionOutput/TransactionOutput.so ] || ln -s ../CBitcoin.so TransactionOutput/TransactionOutput.so ) )
 	(cd blib/arch/auto/CBitcoin/ && ( [ -d Transaction ] || mkdir Transaction ) && ( [ -e Transaction/Transaction.so ] || ln -s ../CBitcoin.so Transaction/Transaction.so ) )
-##	(cd blib/arch/auto/CBitcoin/ && ( [ -d Message ] || mkdir Message ) && ( [ -e Message/Message.so ] || ln -s ../CBitcoin.so Message/Message.so ) )
 	(cd blib/arch/auto/CBitcoin/ && ( [ -d Block ] || mkdir Block ) && ( [ -e Block/Block.so ] || ln -s ../CBitcoin.so Block/Block.so ) )
 
 };

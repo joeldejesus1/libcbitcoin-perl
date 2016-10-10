@@ -7,6 +7,8 @@ use CBitcoin;
 use CBitcoin::SPV;
 use CBitcoin::DefaultEventLoop;
 use CBitcoin::Utilities;
+use Fcntl qw(:DEFAULT :flock SEEK_END);
+use Digest::SHA;
 use Log::Log4perl;
 
 use constant {
@@ -212,6 +214,79 @@ our $cli_mapper;
 
 =pod
 
+---++ read_cmd_bloomfilter
+
+Set a bloom filter.  All transactions that fit into the bloom filter are sent back out via an mqueue.
+
+To send the bloomfilter via the command line:<verbatim>generate-bloomfilter.pl | cbitcoin bloomfilter</verbatim>
+   * As is seen in this example, the bloom filter has to be sent in via stdin.
+
+=cut
+
+BEGIN{
+	$cli_mapper->{'cmd'}->{'bloomfilter'} = \&read_cmd_bloomfilter;
+}
+
+sub read_cmd_bloomfilter{
+	#my $options = parser(undef,@_);
+	#logging_conf($options->{'logconf'});
+	
+	my $buf;
+	my ($m,$n,$bfdata) =(0,0,'');
+	my $sha = Digest::SHA->new(256);
+	binmode(STDIN);
+	while($m = sysread(STDIN,$buf,8192)){
+		$n += $m;
+		$sha->add($buf);
+		$bfdata .= $buf;
+	}
+	# once EOF is received, then send the bloom filter out
+	my $fname;
+	open(my $fh,'<','/dev/urandom');
+	sysread($fh,$fname,8);
+	close($fh);
+	
+	# Need to store the file on disk
+	my $fname_hex = lc(unpack('H*',$fname));
+	if($fname_hex =~ m/^([0-9a-f]+)$/){
+		$fname_hex = $1;
+	}
+	
+	unless(sysopen ($fh, '/tmp/'.$fname_hex.'.bf', O_RDWR|O_CREAT, 0755)){
+		return undef;
+	}
+	
+	my $digest = $sha->digest;
+	
+	# format bfdata
+	($m,$n) = (0,length($bfdata));
+	while(0 < $n - $m){
+		$m += syswrite($fh,$bfdata,$n - $m, $m);
+	}
+	close($fh);
+	
+	my $msg = CBitcoin::Message::serialize(
+		$sha->digest.$fname,
+		'custsetbf',
+		$CBitcoin::network_bytes
+	);
+	
+	
+	my ($our_uid,$our_pid) = ($>,$$); #real uid
+	my $mqin = Kgc::MQ->new({
+		'name' => join('.','spv',$our_uid,'in')
+		,'handle type' => 'write only'
+		,'no hash' => 1
+	});
+	warn "Sending messages to the spv process with filename=$fname\n";
+	
+	$mqin->send($msg);
+	
+	return undef;
+}
+
+=pod
+
 ---++ read_cmd_spv
 
 This starts an spv process.
@@ -242,19 +317,23 @@ sub read_cmd_spv{
 	logging_conf($options->{'logconf'});
 	
 	# set up the bloom filter
-	my $bloomfilter = CBitcoin::BloomFilter->new({
-		'FalsePostiveRate' => 0.001,
-		'nHashFuncs' => 1000 
-	});
-	
-	foreach my $addr (@{$options->{'watch'}}){
-		my $script = CBitcoin::Script::address_to_script($addr);
-		die "address($addr) is not valid" unless defined $script && 0 < length($script);
-		$script = CBitcoin::Script::serialize_script($script);
-		die "address($addr) is not valid" unless defined $script && 0 < length($script);
-		$bloomfilter->add_script($script);
-		#push(@scripts,$script);
+	my $bloomfilter;
+	if(defined $options->{'watch'}){
+		$bloomfilter = CBitcoin::BloomFilter->new({
+			'FalsePostiveRate' => 0.001,
+			'nHashFuncs' => 1000 
+		});
+		
+		foreach my $addr (@{$options->{'watch'}}){
+			my $script = CBitcoin::Script::address_to_script($addr);
+			die "address($addr) is not valid" unless defined $script && 0 < length($script);
+			$script = CBitcoin::Script::serialize_script($script);
+			die "address($addr) is not valid" unless defined $script && 0 < length($script);
+			$bloomfilter->add_script($script);
+			#push(@scripts,$script);
+		}		
 	}
+
 	
 	my $eventloop_options = {
 		'timeout' => $options->{'timeout'}
@@ -272,15 +351,18 @@ sub read_cmd_spv{
 	}	
 	
 	#warn "prestart cn=".$options->{'outputfd'}."\n";
-	my $spv = CBitcoin::SPV->new({
+	my $args = {
 		'client name' => $options->{'client name'},
 		'address' => $options->{'address'},	'port' => $options->{'port'}, # this line is for the purpose of creating version messages (not related to the event loop)
 		'isLocal' => 1,
 		'read buffer size' => 8192*4, # the spv code does have access to the file handle/socket
-		'bloom filter' => $bloomfilter,
 		'db path' => $options->{'db path'},
 		'event loop' => CBitcoin::DefaultEventLoop->new($eventloop_options),
-	});
+	};
+	if(defined $bloomfilter){
+		$args->{'bloom filter'} = $bloomfilter;
+	}
+	my $spv = CBitcoin::SPV->new($args);
 	
 	# load in the addresses
 	foreach my $node (@{$options->{'node'}}){
@@ -303,7 +385,9 @@ sub read_cmd_spv{
 
 ---++ read_cmd_addwatch
 
-This starts an spv process.
+This sends a command to an spv process that is already running.
+
+cbitcoin cmd --node=122.10.95.70:8333 --node=103.208.86.32:8333
 
 =cut
 
@@ -336,13 +420,13 @@ sub read_cmd_sendcmd{
 		));		
 	}
 	
-	if(0 < scalar(@{$options->{'watch'}})){
-		push(@messages,CBitcoin::Message::serialize(
-			Encode::encode('UTF-8', join("\n",@{$options->{'watch'}}), Encode::FB_CROAK),
-			'custaddwatch',
-			$CBitcoin::network_bytes
-		));		
-	}	
+	#if(0 < scalar(@{$options->{'watch'}})){
+	#	push(@messages,CBitcoin::Message::serialize(
+	#		Encode::encode('UTF-8', join("\n",@{$options->{'watch'}}), Encode::FB_CROAK),
+	#		'custaddwatch',
+	#		$CBitcoin::network_bytes
+	#	));		
+	#}	
 
 	
 

@@ -176,12 +176,12 @@ sub input_spent {
 	# TODO: dont use a loop to find the input, use a %hash next time
 	
 	if(defined $this->{'output inflight'}->{$prevHash.$prevIndex}){
-		warn "moving input from inflight to spent";
+#		warn "moving input from inflight to spent";
 		$this->{'output spent'}->{$prevHash.$prevIndex} = $this->{'output inflight'}->{$prevHash.$prevIndex};
 		delete $this->{'output inflight'}->{$prevHash.$prevIndex};
 	}
 	elsif(defined $this->{'output pool'}->{$prevHash.$prevIndex}){
-		warn "moving input from pool to spent";
+#		warn "moving input from pool to spent";
 		$this->{'output spent'}->{$prevHash.$prevIndex} = $this->{'output pool'}->{$prevHash.$prevIndex};
 		delete $this->{'output pool'}->{$prevHash.$prevIndex};		
 	}
@@ -198,6 +198,30 @@ sub input_spent {
 	# the directory MUST be empty before removing it
 	rmdir($input_fp);
 	
+}
+
+=pod
+
+---++ bloomfilter_rawdata()->\@refs
+
+=cut
+
+sub bloomfilter_rawdata {
+	my ($this) = @_;
+	
+	my @refs;
+	
+	
+	
+	
+	foreach my $sym ('|','/'){
+		my $hardbool = ($sym eq '|') ? 1 : 0;
+		foreach my $i (keys %{$this->{'next '.$sym}}){
+			my $node = $this->{'next '.$sym}->{$i};
+			push(@refs,@{$node->bloomfilter_rawdata()});
+		}
+	}
+	return \@refs;
 }
 
 =pod

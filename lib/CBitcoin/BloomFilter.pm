@@ -14,7 +14,6 @@ Version 0.01
 =cut
 
 use CBitcoin;
-use CBitcoin::BloomFilter;
 
 require Exporter;
 *import = \&Exporter::import;
@@ -54,7 +53,7 @@ sub new {
 	my $options = shift;
 	
 	my $this = {
-		'scripts' => {}, 'prevOutPoints' => {}, 'data' => ''
+		'raw' => {},'scripts' => {}, 'prevOutPoints' => {}, 'data' => ''
 	};
 	bless($this,$package);
 	
@@ -81,6 +80,10 @@ sub prevOuts {
 
 sub scripts {
 	return shift->{'scripts'};
+}
+
+sub raw {
+	return shift->{'raw'};
 }
 
 sub data {
@@ -144,6 +147,37 @@ sub add_script {
 
 =pod
 
+---++ add_raw($rawdata)
+
+Just add data to put into the bloom filter.
+
+=cut
+
+
+sub add_raw {
+	my ($this,$raw) = @_;
+	die "no raw data" unless defined $raw && 0 < length($raw) && length($raw) < 1000;
+	$this->{'raw'}->{$raw} = 1;
+}
+
+=pod
+
+---++ set_data($data)
+
+Set data.
+
+=cut
+
+sub set_data{
+	my ($this,$data) = @_;
+	return undef unless defined $data && 0 < length($data);
+	
+	$this->{'data'} = $data;
+}
+
+
+=pod
+
 ---++ bloomfilter_calculate()
 
 Serialize the bloom filter to be used in CBitcoin::Bitcoin::deserialize_filter();
@@ -155,10 +189,12 @@ Serialize the bloom filter to be used in CBitcoin::Bitcoin::deserialize_filter()
 sub bloomfilter_calculate {
 	my ($this) = @_;
 	
-	my @values = (
-		'_randomkeyInOrdertoMakesureBloomFilterCFuncDoesNotDie',
-		keys %{$this->{'scripts'}},keys %{$this->{'prevOuts'}}
-	);
+	my @values = (keys %{$this->{'scripts'}},keys %{$this->{'prevOuts'}}, keys %{$this->{'raw'}});
+	
+	if(scalar(@values) == 0){
+		$this->{'data'} = undef;
+		return undef;
+	}
 	
 	my $bfhash = CBitcoin::Block::picocoin_bloomfilter_new(
 		\@values,
@@ -169,6 +205,8 @@ sub bloomfilter_calculate {
 	die "failed to get bloom filter" unless $bfhash->{'success'};
 	
 	$this->{'data'} = $bfhash->{'data'};
+	
+	return $this->{'data'};
 }
 
 =pod
@@ -190,32 +228,42 @@ sub tx_filter {
 	
 	my $prevOut_H = $this->{'prevOuts'};
 	my $script_H = $this->{'scripts'};
+	my $raw_H = $this->{'raw'};
 	my $txhash = {'_merkle' => []};
 	foreach my $tx_H (@{$tx_ref}){
 		#$tx_H->{'hash'};
 		#warn "tx=".Data::Dumper::Dumper($tx_H->{'vin'})."\n";
 		my $keep_bool = 0;
-		foreach my $vin (@{$tx_H->{'vin'}}){
-			#next unless defined $vin;
-			last if $keep_bool;
-			$vin->{'prevHash'} = substr($vin->{'prevHash'},0,64);
-			if(
-				$prevOut_H->{$vin->{'prevHash'}}
-				&& $prevOut_H->{$vin->{'prevHash'}}->{$vin->{'prevIndex'}}
-			){
-				$tx_H->{'matched'} = 'prevHash';
-				$keep_bool = 1;
+		if(
+			0 < scalar(keys %{$prevOut_H}) || 0 < scalar(keys %{$script_H}) || 0 < scalar(keys %{$raw_H})		
+		){
+			foreach my $vin (@{$tx_H->{'vin'}}){
+				#next unless defined $vin;
+				last if $keep_bool;
+				$vin->{'prevHash'} = substr($vin->{'prevHash'},0,64);
+				if(
+					$prevOut_H->{$vin->{'prevHash'}}
+					&& $prevOut_H->{$vin->{'prevHash'}}->{$vin->{'prevIndex'}}
+				){
+					$tx_H->{'matched'} = 'prevHash';
+					$keep_bool = 1;
+				}
 			}
-		}
-		foreach my $vout (@{$tx_H->{'vout'}}){
-			last if $keep_bool;
+			foreach my $vout (@{$tx_H->{'vout'}}){
+				last if $keep_bool;
+				
+				# script
+				if($script_H->{$vout->{'script'}}){
+					$tx_H->{'matched'} = 'script';
+					$keep_bool = 1;
+				}
+			}
 			
-			# script
-			if($script_H->{$vout->{'script'}}){
-				$tx_H->{'matched'} = 'script';
-				$keep_bool = 1;
-			}
 		}
+		else{
+			$keep_bool = 1;
+		}
+
 		$tx_H->{'hash'} = substr($tx_H->{'hash'},0,64);
 		
 		if($keep_bool){	
