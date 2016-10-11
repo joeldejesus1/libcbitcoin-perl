@@ -104,6 +104,62 @@ struct bloom* bloomfilter_create(int nElements, double nFPRate){
 	return bf;	
 }
 
+bool parse_scriptSig(cstring *script){
+	if(script->len == 0 || script->len > 10000){
+		return false;
+	}
+	
+	struct const_buffer pc = { script->str, script->len };
+	struct const_buffer pend = { script->str + script->len, 0 };
+	struct const_buffer pbegincodehash = { script->str, script->len };
+	struct bscript_op op;
+	
+	parr *stack = parr_new(0, buffer_free);
+	
+
+	
+	struct bscript_parser bp;
+	bsp_start(&bp, &pc);
+	
+	
+	
+	while(pc.p < pend.p){
+		
+		if (!bsp_getop(&op, &bp))
+			goto out;		
+	
+		
+		
+		enum opcodetype opcode = op.op;
+		
+		if (op.data.len == 20 || op.data.len == 33){
+			// bf_check(op.data,op.data.len);
+		}
+		else{
+			// go to the next item on the stack
+		}
+		
+		if (is_bsp_pushdata(opcode))
+			stack_push(stack, (struct buffer *) &op.data);
+		
+		switch (opcode) {
+		case OP_1NEGATE:
+		case OP_1NEGATE:
+		case OP_1NEGATE:
+			
+			
+		}
+		
+		//popstack(stack);
+	}
+	
+	
+out:
+	
+	return false;
+}
+
+
 ////////// extra ///////////////
 
 void copy256bithash(uint8_t *out, const bu256_t *in){
@@ -240,6 +296,10 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf
 					//SV* ans_sv = newSVpv(answer,length);
 					hv_store( rhtxin, "scriptSig", 9, newSVpv( scriptSig,  txin->scriptSig->len), 0);
 					
+					
+					if(parse_scriptSig(txin->scriptSig)){
+						add_tx_to_db = true;
+					}
 				}
 				
 				

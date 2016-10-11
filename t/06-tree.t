@@ -33,7 +33,7 @@ The reason that it is called the Tree module instead of a Wallet module is becau
 
 $CBitcoin::network_bytes = CBitcoin::TESTNET;
 
-my $xstring = File::Slurp::read_file( 't/secret' );
+my $xstring = File::Slurp::read_file( 't/secret.testnet' );
 my $xprv = CBitcoin::CBHD->new($xstring);
 
 
@@ -161,9 +161,11 @@ $tree->max_i('+40');
 	);
 	
 	$server_tree->hdkey_set("ROOT/SERVERS/2",$tree->node_get_by_path("ROOT/SERVERS/2")->hdkey);
-	my $channel_xpub = $tree->node_get_by_path("ROOT/CHANNEL")->hdkey->export_xpub();
 
-	$server_tree->hdkey_set("ROOT/CHANNEL",CBitcoin::CBHD->new($channel_xpub));
+
+	$server_tree->hdkey_set("ROOT/CHANNEL",CBitcoin::CBHD->new(
+		$tree->node_get_by_path("ROOT/CHANNEL")->hdkey->export_xpub())
+	);
 
 	#$server_tree->max_i('+40');
 	

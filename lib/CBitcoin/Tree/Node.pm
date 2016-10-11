@@ -417,7 +417,8 @@ sub max_i_update {
 		&& defined $nextmax && $nextmax =~ m/^(\d+)$/
 		&& $currentmax <= $nextmax && 0 < $currentmax;
 
-	if($this->hdkey){
+	if($this->hdkey && $this->hdkey->serialized_private){
+		# have xprv
 		for(my $i=$currentmax;$i<=$nextmax;$i++){
 			my ($hash,$p1,$p2);
 			my $ref = [$this,$this->hard,$i];
@@ -431,7 +432,25 @@ sub max_i_update {
 			($p1,$p2) = (substr($hash,0,8),substr($hash,8));
 			$dict->{$p1}->{$p2} = [] unless defined $dict->{$p1}->{$p2};
 			push(@{$dict->{$p1}->{$p2}},$ref);
-		}		
+		}
+	}
+	elsif($this->hdkey && $this->hdkey->serialized_public){
+		# only have xpub
+		for(my $i=$currentmax;$i<=$nextmax;$i++){
+			my ($hash,$p1,$p2);
+			my $ref = [$this,$this->hard,$i];
+			# store ripemd hash
+			
+			$hash = md5($this->hdkey->deriveChildPubExt($i)->ripemdHASH160());
+			($p1,$p2) = (substr($hash,0,8),substr($hash,8));
+			$dict->{$p1}->{$p2} = [] unless defined $dict->{$p1}->{$p2};
+			push(@{$dict->{$p1}->{$p2}},$ref);
+			# store publickey
+			$hash = md5($this->hdkey->deriveChildPubExt($i)->publickey());
+			($p1,$p2) = (substr($hash,0,8),substr($hash,8));
+			$dict->{$p1}->{$p2} = [] unless defined $dict->{$p1}->{$p2};
+			push(@{$dict->{$p1}->{$p2}},$ref);
+		}
 	}
 
 	
