@@ -15,7 +15,7 @@ use File::Slurp;
 
 use Data::Dumper;
 
-use Test::More tests => 11;
+use Test::More tests => 12;
 
 =pod
 
@@ -27,14 +27,17 @@ And the purpose of the Tree module is to function as a kind of wallet.  So, in e
 
 The reason that it is called the Tree module instead of a Wallet module is because the data structure of the BIP32 Hierarchial Deterministic keys reflects that of a tree.
 
+
+
 =cut
 
+$CBitcoin::network_bytes = CBitcoin::TESTNET;
 
 my $xstring = File::Slurp::read_file( 't/secret' );
 my $xprv = CBitcoin::CBHD->new($xstring);
-die "no xprv" unless defined $xprv;
 
-$CBitcoin::network_bytes = CBitcoin::TESTNET;
+
+
 
 my @block_times = (1476017968-5*60*60,1476017968-2*60*60,1476017968-1*60*60,1476017968);
 
@@ -119,6 +122,7 @@ $tree->max_i('+40');
 }
 
 {
+	
 	my $check_broadcast = 'BR_SERVER 324dd9d96c7d90ea0a84cac785937daee99bb0f5 123e4567e89b12d3a456426655440000 READMETA|WRITEMETA';
 	
 	# to receive broadcast, add callback
@@ -144,8 +148,28 @@ $tree->max_i('+40');
 {
 	# generate a bloom filter
 	my $bfdata = $tree->bloomfilter->data;
+		
+	ok( defined $bfdata && 0 < length($bfdata) && $tree->bloomfilter->nHashFuncs <  50 ,'Good bloom filter');
 	
-	ok( defined $bfdata && 0 < length($bfdata) ,'Good bloom filter');
+}
+
+
+{
+	my $server_tree = CBitcoin::Tree->new(	
+		["ROOT/CHANNEL","ROOT/SERVERS/2/CHANNEL","ROOT/CASH"]
+		,{'base directory' => 't/db1', 'id' => 'wallet'}
+	);
+	
+	$server_tree->hdkey_set("ROOT/SERVERS/2",$tree->node_get_by_path("ROOT/SERVERS/2")->hdkey);
+	my $channel_xpub = $tree->node_get_by_path("ROOT/CHANNEL")->hdkey->export_xpub();
+
+	$server_tree->hdkey_set("ROOT/CHANNEL",CBitcoin::CBHD->new($channel_xpub));
+
+	#$server_tree->max_i('+40');
+	
+	
+	ok(1,'hello');
+	
 	
 }
 

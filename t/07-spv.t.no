@@ -9,9 +9,25 @@ ok(1,'nothing to test');
 
 use CBitcoin;
 use CBitcoin::CBHD;
-use CBitcoin::BloomFilter;
 use CBitcoin::Tree;
 use CBitcoin::CLI::SPV;
+
+$CBitcoin::network_bytes = CBitcoin::MAINNET;
+
+
+{
+	my $mfp = '/dev/mqueue';
+	opendir(my $fh,$mfp);
+	my @s = readdir($fh);
+	closedir($fh);
+	foreach my $x (@s){
+		if($x =~ m/^(spv\.*)$/){
+			unlink($mfp.'/'.$1);
+		}
+	}
+}
+
+
 
 
 my @spvpids;

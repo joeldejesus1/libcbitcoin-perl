@@ -135,7 +135,7 @@ sub init{
 	
 	$this->{'bloom filter'} = CBitcoin::BloomFilter->new({
 		'FalsePostiveRate' => 0.001,
-		'nHashFuncs' => 1000 
+		'nElements' => 1000 
 	});
 }
 
@@ -519,7 +519,7 @@ sub bloomfilter_calculate{
 	
 	my $bf = CBitcoin::BloomFilter->new({
 		'FalsePostiveRate' => 0.001,
-		'nHashFuncs' => 1000 
+		'nElements' => 1000 
 	});
 	my @refs;
 	foreach my $p1 (keys %{$this->{'dict'}}){

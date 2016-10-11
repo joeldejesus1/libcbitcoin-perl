@@ -14,9 +14,17 @@
 #include <ccoin/util.h>
 #include <ccoin/hdkeys.h>
 #include <ccoin/base58.h>
+#include <ccoin/buffer.h>
+#include <ccoin/serialize.h>
 
 #define MAIN_PUBLIC 0x1EB28804
 #define MAIN_PRIVATE 0xE4AD8804
+
+
+#define BIP32_MAIN_PUBLIC 0x0488B21E
+#define BIP32_MAIN_PRIVATE 0x0488ADE4
+#define BIP32_TEST_PUBLIC 0x043587CF
+#define BIP32_TEST_PRIVATE 0x04358394
 
 ////// extra
 
@@ -24,11 +32,51 @@ struct hd_extended_key_serialized {
 	uint8_t data[78];
 };
 
+static void hd_extended_key_ser_base(const struct hd_extended_key *ek,
+				     cstring *s, uint32_t version)
+{
+	ser_u32(s, htobe32(version));
+	ser_bytes(s, &ek->depth, 1);
+	ser_bytes(s, &ek->parent_fingerprint, 4);
+	ser_u32(s, htobe32(ek->index));
+	ser_bytes(s, &ek->chaincode, 32);
+}
+
 static bool write_ek_ser_pub(struct hd_extended_key_serialized *out,
 			     const struct hd_extended_key *ek)
 {
-	cstring s = { (char *)(out->data), 0, sizeof(out->data) + 1 };
-	return hd_extended_key_ser_pub(ek, &s);
+	cstring s = { (uint8_t *)(out->data), 0, sizeof(out->data) + 1 };
+	//if(!hd_extended_key_ser_pub(ek, &s)){
+	//	return false;
+	//}
+	uint32_t version = 0;
+	if(ek->version == BIP32_MAIN_PUBLIC || ek->version == BIP32_MAIN_PRIVATE ){
+	
+		version = BIP32_MAIN_PUBLIC;
+	}
+	else if(ek->version == BIP32_TEST_PUBLIC || ek->version == BIP32_TEST_PRIVATE ){
+	
+		version = BIP32_TEST_PUBLIC;
+	}
+	else{
+		return false;
+	}
+	
+	
+	hd_extended_key_ser_base(ek, &s, version);
+
+	void *pub = NULL;
+	size_t pub_len = 0;
+	if (bp_pubkey_get(&ek->key, &pub, &pub_len)) {
+		if (33 == pub_len) {
+			ser_bytes(&s, pub, 33);
+			free(pub);
+			return true;
+		}
+	}
+	free(pub);
+	return false;
+
 }
 
 
@@ -37,7 +85,25 @@ static bool write_ek_ser_prv(struct hd_extended_key_serialized *out,
 			     const struct hd_extended_key *ek)
 {
 	cstring s = { (char *)(out->data), 0, sizeof(out->data) + 1 };
-	return hd_extended_key_ser_priv(ek, &s);
+	//return hd_extended_key_ser_priv(ek, &s);
+	uint32_t version = 0;
+	if(ek->version == BIP32_MAIN_PRIVATE ){
+		
+		version = BIP32_MAIN_PRIVATE;
+	}
+	else if(ek->version == BIP32_TEST_PRIVATE ){
+		
+		version = BIP32_TEST_PRIVATE;
+	}
+	else{
+		return false;
+	}
+	
+	hd_extended_key_ser_base(ek, &s, version);
+
+	const uint8_t zero = 0;
+	ser_bytes(&s, &zero, 1);
+	return bp_key_secret_get(s.str + s.len, 32, &ek->key);
 }
 
 
@@ -501,7 +567,8 @@ HV* picocoin_newhdkey(SV* base58x){
 	struct hd_extended_key hdkey;
 	if(!hd_extended_key_init(&hdkey)){
 		return picocoin_returnblankhdkey(rh);
-	}	
+	}
+	
 	if(!hd_extended_key_deser(&hdkey, hdkeyser.data,78)){
 		return picocoin_returnblankhdkey(rh);
 	}
@@ -512,20 +579,32 @@ HV* picocoin_newhdkey(SV* base58x){
 	return rh;
 }
 
-HV* picocoin_generatehdkeymaster(SV* seed){
+HV* picocoin_generatehdkeymaster(SV* seed,int vers){
 	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
-		
+	//fprintf(stderr,"Hi - 1\n");
+	uint32_t version = (uint32_t) vers;
+	
+	//fprintf(stderr,"Hi - 2: v=%d p=%d\n",version,0x0488ADE4);
+	if( !(version == 0x0488B21E || version == 0x0488ADE4 || version == 0x043587CF || version == 0x04358394) ){
+		return picocoin_returnblankhdkey(rh);
+	}
+	
 	STRLEN len; //calculated via SvPV
 	uint8_t * seed_raw = (uint8_t*) SvPV(seed,len);
-	
+	//fprintf(stderr,"Hi - 3\n");
 	struct hd_extended_key hdkey;
 	if(!hd_extended_key_init(&hdkey)){
 		return picocoin_returnblankhdkey(rh);
 	}
-	
+	//fprintf(stderr,"Hi - 4\n");
 	if(!hd_extended_key_generate_master(&hdkey, seed_raw, len)){
 		return picocoin_returnblankhdkey(rh);
 	}
+	
+	// check the version!!!!
+	// (mainnet: 0x0488B21E public, 0x0488ADE4 private; testnet: 0x043587CF public, 0x04358394 private)
+	hdkey.version = version;
+	//fprintf(stderr,"v=%d vs p=%d",version,0x0488ADE4);
 	picocoin_returnhdkey(rh,hdkey);
 	hd_extended_key_free(&hdkey);
 	return rh;
@@ -550,6 +629,8 @@ HV* picocoin_generatehdkeychild(SV* xpriv, int child_index){
 	if(!hd_extended_key_deser(&hdkey,xpriv_msg,len)){
 		return picocoin_returnblankhdkey(rh);
 	}
+	
+	
 	
 	// create the child key
 	struct hd_extended_key childhdkey;
@@ -578,8 +659,9 @@ picocoin_newhdkey(base58x)
 	SV* base58x
 	
 HV*
-picocoin_generatehdkeymaster(seed)
+picocoin_generatehdkeymaster(seed,vers)
 	SV* seed
+	int vers
 
 HV*
 picocoin_generatehdkeychild(xpriv,child_index)

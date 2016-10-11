@@ -2092,7 +2092,7 @@ sub callback_custom_gotsetbf {
 	
 	my $bf = CBitcoin::BloomFilter->new({
 		'FalsePostiveRate' => 0.001,
-		'nHashFuncs' => 1000 
+		'nElements' => 1000 
 	});
 	
 	$bf->set_data($bfdata);

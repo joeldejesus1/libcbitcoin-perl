@@ -58,11 +58,11 @@ sub new {
 	bless($this,$package);
 	
 	die "no options" unless defined $options && ref($options) eq 'HASH'
-		&& defined $options->{'nHashFuncs'} && $options->{'nHashFuncs'} =~ m/^\d+$/
+		&& defined $options->{'nElements'} && $options->{'nElements'} =~ m/^\d+$/
 		&& defined $options->{'FalsePostiveRate'} 
 		&& $options->{'FalsePostiveRate'} =~ m/^\d+(\.\d+)?$/
 		&& 0 < $options->{'FalsePostiveRate'} && $options->{'FalsePostiveRate'} < 1;
-	$this->{'nHashFuncs'} = $options->{'nHashFuncs'};
+	$this->{'nElements'} = $options->{'nElements'};
 	$this->{'FalsePostiveRate'} = $options->{'FalsePostiveRate'};
 
 	return $this;
@@ -175,6 +175,43 @@ sub set_data{
 	$this->{'data'} = $data;
 }
 
+=pod
+
+---++ nHashFuncs
+
+=cut
+
+sub nHashFuncs {
+	my ($this) = @_;
+	
+	unless(defined $this->{'data'}){
+		$this->bloomfilter_calculate();
+	}
+	die "no data" unless defined $this->{'data'};
+	
+	# this is the max number allowed for hash funcs by bip37
+	my $nhf_max = 50;
+	
+	my $nhf = (length($this->{'data'}) * 8)/($this->{'nElements'} * 0.6931471805599453094172321214581765680755001343602552);
+	$nhf = int($nhf);
+	
+	
+	return $nhf < $nhf_max ? $nhf : $nhf_max;
+}
+
+=pod
+
+---++ nTweak
+
+=cut
+
+sub nTweak {
+	my $this = shift;
+	my $nHashFuncs = $this->nHashFuncs;
+	
+	die "unknown how to do this yet";
+}
+
 
 =pod
 
@@ -198,7 +235,7 @@ sub bloomfilter_calculate {
 	
 	my $bfhash = CBitcoin::Block::picocoin_bloomfilter_new(
 		\@values,
-		$this->{'nHashFuncs'},
+		$this->{'nElements'},
 		$this->{'FalsePostiveRate'}
 	);
 	

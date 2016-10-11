@@ -10,6 +10,7 @@ use warnings;
 
    * [[https://github.com/bitcoin/bitcoin/blob/e9d76a161d30ee3081acf93d70a9ae668a9d6ed1/src/version.h][version]]
    * [[https://en.bitcoin.it/wiki/Protocol_documentation#sendheaders][constants]]
+   
 =cut
 
 use constant {
@@ -17,6 +18,11 @@ use constant {
 	,TESTNET => 0xDAB5BFFA
 	,TESTNET3 => 0x0709110B
 	,NAMECOIN => 0xFEB4BEF9
+	
+	,BIP32_MAINNET_PUBLIC => 0x0488B21E
+	,BIP32_MAINNET_PRIVATE => 0x0488ADE4
+	,BIP32_TESTNET_PUBLIC => 0x043587CF
+	,BIP32_TESTNET_PRIVATE => 0x04358394
 	
 	
 	,SPV_PROTOCOL_VERSION => 70014

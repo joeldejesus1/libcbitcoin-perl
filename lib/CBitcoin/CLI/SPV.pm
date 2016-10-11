@@ -316,7 +316,7 @@ sub read_cmd_spv{
 	if(defined $options->{'watch'}){
 		$bloomfilter = CBitcoin::BloomFilter->new({
 			'FalsePostiveRate' => 0.001,
-			'nHashFuncs' => 1000 
+			'nElements' => 1000 
 		});
 		
 		foreach my $addr (@{$options->{'watch'}}){

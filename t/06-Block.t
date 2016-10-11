@@ -84,7 +84,7 @@ ok( $block->{'success'} && $block->hash() eq $gen_hash, 'Genesis Block sub' );
 ############## Test Bloom Filter ############
 my $bf = CBitcoin::BloomFilter->new({
 	'FalsePostiveRate' => 0.001,
-	'nHashFuncs' => 1000 
+	'nElements' => 1000 
 });
 
 my @scripts;

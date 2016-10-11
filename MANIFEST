@@ -41,7 +41,7 @@ t/04-TransactionOutput.t
 t/05-Transaction.t
 t/05-Block.t
 t/06-tree.t
-t/07-spv.t
+t/07-spv.t.no
 t/secret
 t/blk0.ser
 t/blk120383.ser

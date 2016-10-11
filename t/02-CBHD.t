@@ -13,6 +13,18 @@ require Digest::SHA;
 require Data::Dumper;
 
 
+my $vers = 0;
+if($CBitcoin::network_bytes eq CBitcoin::MAINNET){
+	$vers = CBitcoin::BIP32_MAINNET_PRIVATE;
+}
+elsif($CBitcoin::network_bytes eq CBitcoin::TESTNET){
+	$vers = CBitcoin::BIP32_TESTNET_PRIVATE;
+}
+else{
+	die "bad network bytes";
+}
+
+
 # .........................................................
 
 my $priv = 'xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi';
@@ -50,9 +62,7 @@ $base58_pub = CBitcoin::picocoin_base58_encode(
 ok($pub eq $base58_pub,'base58 encode xpub from xpriv');
 
 # .........................................................
-
-my $parenthash = CBitcoin::CBHD::picocoin_generatehdkeymaster("my super secret seed/password");
-
+my $parenthash = CBitcoin::CBHD::picocoin_generatehdkeymaster("my super secret seed/password",$vers);
 my $privchildhash = CBitcoin::CBHD::picocoin_generatehdkeychild($parenthash->{'serialized private'},12);
 #warn "child with index=12:\n".CBitcoin::CBHD::print_to_stderr($hash);
 

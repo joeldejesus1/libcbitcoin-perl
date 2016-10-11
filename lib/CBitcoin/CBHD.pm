@@ -95,7 +95,7 @@ sub new {
 		
 	}
 	else{
-		die "bad network bytes";
+		die "bad network bytes($prefix)";
 	}
 	
 	my $this = picocoin_newhdkey($txt);
@@ -122,8 +122,20 @@ BEGIN{
 sub generate {
 	my ($package,$seed) = @_;
 	my $this = {};
+	
+	my $vers = 0;
+	if($CBitcoin::network_bytes eq CBitcoin::MAINNET){
+		$vers = CBitcoin::BIP32_MAINNET_PRIVATE;
+	}
+	elsif($CBitcoin::network_bytes eq CBitcoin::TESTNET){
+		$vers = CBitcoin::BIP32_TESTNET_PRIVATE;
+	}
+	else{
+		die "bad network bytes";
+	}
+	
 	if(defined $seed && $minimum_seed_length < length($seed) ){
-		$this = picocoin_generatehdkeymaster($seed);
+		$this = picocoin_generatehdkeymaster($seed,$vers);
 	}
 	elsif(!defined $seed){
 		# get 32 bytes from /dev/random (we might block here)
@@ -134,35 +146,17 @@ sub generate {
 			$m += sysread($fh,$seed,32,$m);
 		}
 		close($fh);
-		$this = picocoin_generatehdkeymaster($seed);
-		if($CBitcoin::network_bytes eq CBitcoin::TESTNET){
-			# need to go the long-about route to redo the key with the correct network bytes
-			# since this is perl, do it the old fashion way, regex
-			bless($this,$package);
-
-			if(defined $this->{'serialized private'}){
-				my $x = $this->export_xprv();
-				if($x =~ m/^xprv(.*)$/){
-					$this = picocoin_newhdkey('tprv'.$1);
-				}
-				else{
-					die "bad format for xprv";
-				}
-			}
-			else{
-				my $x = $this->export_xpub();
-				if($x =~ m/^xpub(.*)$/){
-					$this = picocoin_newhdkey('tpub'.$1);
-				}
-				else{
-					die "bad format for xprv";
-				}				
-			}
-		}
+		
+		
+		$this = picocoin_generatehdkeymaster($seed,$vers);
+		
 	}
 	else{
 		die "seed is too short";
 	}
+	
+	return undef unless $this->{'success'};
+	
 	bless($this,$package);
 	
 	$this->{'is soft child'} = 0;
