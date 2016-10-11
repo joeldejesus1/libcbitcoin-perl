@@ -521,14 +521,17 @@ sub bloomfilter_calculate{
 		'FalsePostiveRate' => 0.001,
 		'nHashFuncs' => 1000 
 	});
-	
 	my @refs;
 	foreach my $p1 (keys %{$this->{'dict'}}){
 		foreach my $p2 (keys %{$this->{'dict'}->{$p1}}){
-			my $ref = $this->{'dict'}->{$p1}->{$p2};
-			my $hdkey = $ref->[0]->hdkey->deriveChild($ref->[1],$ref->[2]);
-			$bf->add_raw($hdkey->ripemdHASH160);
-			$bf->add_raw($hdkey->publickey);
+			my $ref_X = $this->{'dict'}->{$p1}->{$p2};
+			next unless 0 < scalar(@{$ref_X});
+			foreach my $ref (@{$ref_X}){
+				my $hdkey = $ref->[0]->hdkey->deriveChild($ref->[1],$ref->[2]);
+				$bf->add_raw($hdkey->ripemdHASH160);
+				$bf->add_raw($hdkey->publickey);
+			}
+			
 		}
 	}
 
@@ -584,6 +587,7 @@ sub max_i {
 		else{
 			#warn "doing nothing with i=$i";
 		}
+		$this->bloomfilter_calculate();
 		return $this->{'max i'};
 	}
 	elsif(defined $i){
@@ -593,8 +597,6 @@ sub max_i {
 		return $this->{'max i'};
 	}
 	
-	
-	$this->bloomfilter_calculate();
 }
 
 =pod

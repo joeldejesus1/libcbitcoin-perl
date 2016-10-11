@@ -9,12 +9,13 @@ use CBitcoin::CBHD;
 use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
 use CBitcoin::Transaction;
+use CBitcoin::BloomFilter;
 
 use File::Slurp;
 
 use Data::Dumper;
 
-use Test::More tests => 10;
+use Test::More tests => 11;
 
 =pod
 
@@ -140,7 +141,13 @@ $tree->max_i('+40');
 	ok($check_broadcast eq $m1,'Got broadcast on correct channel');
 }
 
-
+{
+	# generate a bloom filter
+	my $bfdata = $tree->bloomfilter->data;
+	
+	ok( defined $bfdata && 0 < length($bfdata) ,'Good bloom filter');
+	
+}
 
 
 __END__

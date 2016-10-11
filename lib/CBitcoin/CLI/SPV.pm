@@ -255,23 +255,14 @@ sub read_cmd_bloomfilter{
 	unless(sysopen ($fh, '/tmp/'.$fname_hex.'.bf', O_RDWR|O_CREAT, 0755)){
 		return undef;
 	}
-	
-	my $digest = $sha->digest;
-	
+		
 	# format bfdata
 	($m,$n) = (0,length($bfdata));
 	while(0 < $n - $m){
 		$m += syswrite($fh,$bfdata,$n - $m, $m);
 	}
 	close($fh);
-	
-	my $msg = CBitcoin::Message::serialize(
-		$sha->digest.$fname,
-		'custsetbf',
-		$CBitcoin::network_bytes
-	);
-	
-	
+
 	my ($our_uid,$our_pid) = ($>,$$); #real uid
 	my $mqin = Kgc::MQ->new({
 		'name' => join('.','spv',$our_uid,'in')
@@ -280,7 +271,11 @@ sub read_cmd_bloomfilter{
 	});
 	warn "Sending messages to the spv process with filename=$fname\n";
 	
-	$mqin->send($msg);
+	$mqin->send(CBitcoin::Message::serialize(
+		$sha->digest.$fname,
+		'custsetbf',
+		$CBitcoin::network_bytes
+	));
 	
 	return undef;
 }
