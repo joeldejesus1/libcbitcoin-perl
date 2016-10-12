@@ -63,7 +63,7 @@ $tree->max_i('+40');
 {
 	# Got 0.301 sent to n1KKWuBaKw3akvUbWaYdoRYmU1receRGGT
 	# scan the transaction
-	my $txdata = pack('H*',File::Slurp::read_file( '.data/tx1' ));
+	my $txdata = pack('H*',File::Slurp::read_file( 't/data/tx1' ));
 	#warn "hi with txdata=".length($txdata);
 	
 	
@@ -88,7 +88,7 @@ $tree->max_i('+40');
 
 {
 	# register the transaction created above as if it came in off the peer to peer network
-	my $txdata = pack('H*',File::Slurp::read_file( '.data/tx2' ));
+	my $txdata = pack('H*',File::Slurp::read_file( 't/data/tx2' ));
 	$tree->tx_add($block_times[1],$txdata);
 	
 	ok(20000000 < $tree->balance && $tree->balance < 30100000, 'new balance recognized');
@@ -137,7 +137,7 @@ $tree->max_i('+40');
  	});
 	
 	# receive a broadcast
-	my $txdata = pack('H*',File::Slurp::read_file( '.data/tx3' ));
+	my $txdata = pack('H*',File::Slurp::read_file( 't/data/tx3' ));
 	$tree->tx_add($block_times[2],$txdata);
 	
 	
