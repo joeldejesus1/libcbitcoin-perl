@@ -15,12 +15,12 @@
 #include <ccoin/buint.h>
 #include <ccoin/util.h>
 #include <ccoin/buffer.h>
-#include <ccoin/script.h>
 #include <ccoin/core.h>
 #include <ccoin/mbr.h>
 #include <ccoin/message.h>
 #include <ccoin/bloom.h>
 #include <ccoin/serialize.h>
+#include <ccoin/script.h>
 //#include <ccoin/compat.h>
 /*
  * typedef struct bu256 {
@@ -104,59 +104,81 @@ struct bloom* bloomfilter_create(int nElements, double nFPRate){
 	return bf;	
 }
 
-bool parse_scriptSig(cstring *script){
+// struct const_buffer *buf
+// x->str x->len
+bool parse_bloomfilter_scriptSig(const struct bloom* bf, const cstring *script){
 	if(script->len == 0 || script->len > 10000){
 		return false;
 	}
-	
-	struct const_buffer pc = { script->str, script->len };
-	struct const_buffer pend = { script->str + script->len, 0 };
-	struct const_buffer pbegincodehash = { script->str, script->len };
+	//fprintf(stderr,"hi - 1 - len=%d\n",script->len);
 	struct bscript_op op;
 	
-	parr *stack = parr_new(0, buffer_free);
+	int cursor = 0;
 	
+	uint8_t * buf_str = script->str;
+	
+	bool response = false;
+	
+	while(cursor < script->len){
+		struct const_buffer buf = { &buf_str[cursor],1};
+		uint8_t opcode;
+		
+		if (!deser_bytes(&opcode, &buf, 1))
+			goto out;
+		cursor += 1;
+		
+		op.op = opcode;
+		
+		uint32_t data_len;
+		
+		bool next = false;
+		
+		if (opcode < ccoin_OP_PUSHDATA1){
+			data_len = opcode;
+		}
+		else if (opcode == ccoin_OP_PUSHDATA1) {
+			uint8_t v8;
+			if (!deser_bytes(&v8, &buf, 1))
+				goto out;
+			data_len = v8;
+			cursor += 1;
+		}
+		else if (opcode == ccoin_OP_PUSHDATA2) {
+			uint16_t v16;
+			if (!deser_u16(&v16, &buf))
+				goto out;
+			data_len = v16;
+			cursor += 2;
+		}
+		else if (opcode == ccoin_OP_PUSHDATA4) {
+			uint32_t v32;
+			if (!deser_u32(&v32, &buf))
+				goto out;
+			data_len = v32;
+			cursor += 4;
+		} else {
+			// not push data
+			op.data.p = NULL;
+			op.data.len = 0;
+			next = true;
+		}
+		op.data.p =  &buf_str[cursor];
+		
+		
+		
+		if (!next && 1 < op.data.len && bloom_contains(bf,op.data.p,op.data.len)){
+			// set the cursor past the end of the script  in order to exit the while loop
+			cursor += script->len * 2;
+			// mark true because we have a public key that we know of being used to sign a transaction
+			response = true;
+		}
 
-	
-	struct bscript_parser bp;
-	bsp_start(&bp, &pc);
-	
-	
-	
-	while(pc.p < pend.p){
-		
-		if (!bsp_getop(&op, &bp))
-			goto out;		
-	
-		
-		
-		enum opcodetype opcode = op.op;
-		
-		if (op.data.len == 20 || op.data.len == 33){
-			// bf_check(op.data,op.data.len);
-		}
-		else{
-			// go to the next item on the stack
-		}
-		
-		if (is_bsp_pushdata(opcode))
-			stack_push(stack, (struct buffer *) &op.data);
-		
-		switch (opcode) {
-		case OP_1NEGATE:
-		case OP_1NEGATE:
-		case OP_1NEGATE:
-			
-			
-		}
-		
-		//popstack(stack);
+		cursor += op.data.len;
 	}
-	
-	
+
 out:
 	
-	return false;
+	return response;
 }
 
 
@@ -297,7 +319,7 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf
 					hv_store( rhtxin, "scriptSig", 9, newSVpv( scriptSig,  txin->scriptSig->len), 0);
 					
 					
-					if(parse_scriptSig(txin->scriptSig)){
+					if(parse_bloomfilter_scriptSig(bf, txin->scriptSig)){
 						add_tx_to_db = true;
 					}
 				}
