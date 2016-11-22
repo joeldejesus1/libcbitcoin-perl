@@ -8,7 +8,7 @@ WriteMakefile(
 	    'TYPEMAPS' => []
 	    ,'NAME' => 'CBitcoin'
 	     ,'LIBS' => [ ' -lcrypto -lccoin -lgmp ' ]
-		,'VERSION' => '0.1'
+		,'VERSION' => '0.3'
 
 		,'AUTHOR'              => q{Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>}
 		,'VERSION_FROM'        => 'lib/CBitcoin.pm'
