@@ -24,7 +24,7 @@ require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::CBHD::VERSION = '0.1';
+$CBitcoin::CBHD::VERSION = $CBitcoin::VERSION;
 
 #XSLoader::load('CBitcoin::CBHD',$CBitcoin::CBHD::VERSION );
 DynaLoader::bootstrap CBitcoin::CBHD $CBitcoin::VERSION;
