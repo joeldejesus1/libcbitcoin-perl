@@ -22,12 +22,12 @@ Version 0.2
 
 require Exporter;
 *import = \&Exporter::import;
-require DynaLoader;
+#require DynaLoader;
 
-$CBitcoin::CBHD::VERSION = $CBitcoin::VERSION;
+#$CBitcoin::CBHD::VERSION = $CBitcoin::VERSION;
 
 #XSLoader::load('CBitcoin::CBHD',$CBitcoin::CBHD::VERSION );
-DynaLoader::bootstrap CBitcoin::CBHD $CBitcoin::VERSION;
+#DynaLoader::bootstrap CBitcoin::CBHD $CBitcoin::VERSION;
 
 @CBitcoin::CBHD::EXPORT = ();
 @CBitcoin::CBHD::EXPORT_OK = ();

@@ -1,6 +1,6 @@
 package CBitcoin::Transaction;
 
-use 5.014002;
+#use 5.014002;
 use strict;
 use warnings;
 
@@ -25,7 +25,7 @@ Version 0.01
 
 =cut
 
-use bigint;
+#use bigint;
 use CBitcoin;
 use CBitcoin::Script;
 use CBitcoin::TransactionInput;
@@ -34,11 +34,11 @@ use CBitcoin::Utilities;
 
 require Exporter;
 *import = \&Exporter::import;
-require DynaLoader;
+#require DynaLoader;
 
-$CBitcoin::Transaction::VERSION = $CBitcoin::VERSION;
+#$CBitcoin::Transaction::VERSION = $CBitcoin::VERSION;
 
-DynaLoader::bootstrap CBitcoin::Transaction $CBitcoin::VERSION;
+#DynaLoader::bootstrap CBitcoin::Transaction $CBitcoin::VERSION;
 
 @CBitcoin::Transaction::EXPORT = ();
 @CBitcoin::Transaction::EXPORT_OK = ();

@@ -28,6 +28,7 @@
 } bu256_t;
  */
 
+//#include "CBitcoin.h"
 
 
 ////// bloom filter ///////////

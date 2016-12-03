@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use CBitcoin;
+use Digest::SHA qw(sha256);
 
 =head1 NAME
 
@@ -15,15 +16,14 @@ Version 0.01
 
 =cut
 
-use Digest::SHA qw(sha256);
 
 require Exporter;
 *import = \&Exporter::import;
-require DynaLoader;
+#require DynaLoader;
 
-$CBitcoin::Script::VERSION = $CBitcoin::VERSION;
+#$CBitcoin::Script::VERSION = $CBitcoin::VERSION;
 
-DynaLoader::bootstrap CBitcoin::Script $CBitcoin::VERSION;
+#DynaLoader::bootstrap CBitcoin::Script $CBitcoin::VERSION;
 
 @CBitcoin::Script::EXPORT = ();
 @CBitcoin::Script::EXPORT_OK = ();

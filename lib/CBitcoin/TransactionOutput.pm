@@ -19,11 +19,11 @@ use CBitcoin::Utilities;
 
 require Exporter;
 *import = \&Exporter::import;
-require DynaLoader;
+#require DynaLoader;
 
-$CBitcoin::TransactionOutput::VERSION = $CBitcoin::VERSION;
+#$CBitcoin::TransactionOutput::VERSION = $CBitcoin::VERSION;
 
-DynaLoader::bootstrap CBitcoin::TransactionOutput $CBitcoin::VERSION;
+#DynaLoader::bootstrap CBitcoin::TransactionOutput $CBitcoin::VERSION;
 
 @CBitcoin::TransactionOutput::EXPORT = ();
 @CBitcoin::TransactionOutput::EXPORT_OK = ();

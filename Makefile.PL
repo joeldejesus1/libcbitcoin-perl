@@ -1,7 +1,43 @@
 #use 5.014002;
 use strict;
 use warnings;
+
+use Config;
 use ExtUtils::MakeMaker;
+use Cwd 'cwd';
+
+
+my $cwd = cwd;
+my %opts;
+@ARGV = map { /^CBitcoin_(\w+)=(.*)/ ? do { $opts{lc $1} = $2; (); } : $_ } @ARGV
+if @ARGV;
+
+my %XS = qw(
+	lib/CBitcoin.xs        lib/CBitcoin.c
+	lib/CBitcoin/Transaction.xs   lib/CBitcoin/Transaction.c
+	lib/CBitcoin/TransactionOutput.xs   lib/CBitcoin/TransactionOutput.c
+	lib/CBitcoin/TransactionInput.xs   lib/CBitcoin/TransactionInput.c
+	lib/CBitcoin/Script.xs   lib/CBitcoin/Script.c
+	lib/CBitcoin/CBHD.xs   lib/CBitcoin/CBHD.c
+	lib/CBitcoin/Block.xs   lib/CBitcoin/Block.c
+);
+my @OBJECT = values %XS;
+
+for (@OBJECT)
+{
+    s/\.c\b/\$(OBJ_EXT)/g;
+}
+
+my $OBJECT = join(' ', @OBJECT);
+
+#warn "OBJECT=$OBJECT\n";
+
+my $from;
+my %PM = map { ($from = $_) =~ s/xs$/pm/;
+($from, "\$(INST_LIBDIR)/$from"); } (keys %XS);
+
+my $CLEAN = join(' ', values %XS) . " $OBJECT";
+
 
 
 WriteMakefile(
@@ -12,13 +48,10 @@ WriteMakefile(
 
 		,'AUTHOR'              => q{Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>}
 		,'VERSION_FROM'        => 'lib/CBitcoin.pm'
-		#,'ABSTRACT_FROM'       => 'lib/CBitcoin.pm'
-		#,'MAGICXS' => 1
-		,'OBJECT'              => q/$(O_FILES)/
-		#,'OBJECT' => 'lib/CBitcoin/CBHD.so'
-		#, 'XS'      => {
-       # 	"lib/CBitcoin/CBHD.xs" => "lib/CBitcoin/CBHD.c",
-    	#}
+#		,'OBJECT'              => q/$(O_FILES)/
+		,'PM'           => \%PM
+		,'XS' => \%XS
+		,'OBJECT' => $OBJECT
 		#,'MYEXTLIB' => '/usr/lib/libcbitcoin.so.1'
 	,($ExtUtils::MakeMaker::VERSION >= 6.3002
 	      ? ('LICENSE'=> 'gpl_2')
@@ -42,16 +75,33 @@ WriteMakefile(
 # Remove the Makefile dependency. Causes problems on a few systems.
 sub MY::makefile {
 	return qq{
-all ::
-	(cd blib/arch/auto/CBitcoin/ && ( [ -d CBHD ] || mkdir CBHD ) && ([ -e CBHD/CBHD.so ] || ln -s ../CBitcoin.so CBHD/CBHD.so ) )
-	(cd blib/arch/auto/CBitcoin/ && ( [ -d Script ] || mkdir Script ) && ( [ -e Script/Script.so ] || ln -s ../CBitcoin.so Script/Script.so ) )
-	(cd blib/arch/auto/CBitcoin/ && ( [ -d TransactionInput ] || mkdir TransactionInput ) && ( [ -e TransactionInput/TransactionInput.so ] || ln -s ../CBitcoin.so TransactionInput/TransactionInput.so ) )
-	(cd blib/arch/auto/CBitcoin/ && ( [ -d TransactionOutput ] || mkdir TransactionOutput ) && ( [ -e TransactionOutput/TransactionOutput.so ] || ln -s ../CBitcoin.so TransactionOutput/TransactionOutput.so ) )
-	(cd blib/arch/auto/CBitcoin/ && ( [ -d Transaction ] || mkdir Transaction ) && ( [ -e Transaction/Transaction.so ] || ln -s ../CBitcoin.so Transaction/Transaction.so ) )
-	(cd blib/arch/auto/CBitcoin/ && ( [ -d Block ] || mkdir Block ) && ( [ -e Block/Block.so ] || ln -s ../CBitcoin.so Block/Block.so ) )
-
 };
 
+}
+
+sub MY::c_o
+{
+    package MY; # so that "SUPER" works right
+
+    my $text = shift->SUPER::c_o(@_);
+
+    $text =~ s/CCCMD.*$/$& -o \$*\$(OBJ_EXT)/gm;
+
+    $text;
+}
+
+sub MY::postamble
+{
+	my $self = shift;
+	return;
+	my @text;
+	
+    # Create per-object-file dependancy on RPM.h
+    push(@text, ('',
+                 (map { "$_: CBitcoin.h\n" } @OBJECT),
+                 ''));
+
+	join("\n", @text);
 }
 
 __END__

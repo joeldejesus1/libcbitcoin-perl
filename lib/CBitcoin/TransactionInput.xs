@@ -22,6 +22,8 @@
 
 ////// extra
 
+//#include "CBitcoin.h"
+
 
 int dummy3(int x) {
 	return x;

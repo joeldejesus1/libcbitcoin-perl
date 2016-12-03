@@ -3,6 +3,11 @@ package CBitcoin;
 #use 5.014002;
 use strict;
 use warnings;
+use subs qw(
+	bootstrap_Transaction bootstrap_TransactionOutput bootstrap_TransactionInput 
+	bootstrap_Script bootstrap_CBHD bootstrap_Block
+);
+use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
 
 =pod
 
@@ -52,16 +57,30 @@ Version 0.01
 
 =cut
 
-require Exporter;
-*import = \&Exporter::import;
+
 require DynaLoader;
+require Exporter;
+
+@ISA = qw(Exporter DynaLoader);
+
+#require Exporter;
+#*import = \&Exporter::import;
+#require DynaLoader;
 
 $CBitcoin::VERSION = '0.3';
 
-DynaLoader::bootstrap CBitcoin $CBitcoin::VERSION;
+DynaLoader::bootstrap CBitcoin;
+
+# These are stubs into the sub-module bootstraps, hacked into CBitcoin.xs
+bootstrap_Transaction();
+bootstrap_TransactionOutput();
+bootstrap_TransactionInput();
+bootstrap_Script();
+bootstrap_CBHD();
+bootstrap_Block();
 
 @CBitcoin::EXPORT = ('MAINNET', 'TESTNET', 'TESTNET3');
-@CBitcoin::EXPORT_OK = ( );
+@CBitcoin::EXPORT_OK = ( @CBitcoin::EXPORT );
 %CBitcoin::EXPORT_TAGS = (  );
 
 =item dl_load_flags

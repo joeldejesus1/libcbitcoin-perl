@@ -28,11 +28,11 @@ use Digest::SHA;
 
 require Exporter;
 *import = \&Exporter::import;
-require DynaLoader;
+#require DynaLoader;
 
-$CBitcoin::Block::VERSION = $CBitcoin::VERSION;
+#$CBitcoin::Block::VERSION = $CBitcoin::VERSION;
 
-DynaLoader::bootstrap CBitcoin::Block $CBitcoin::Block::VERSION;
+#DynaLoader::bootstrap CBitcoin::Block $CBitcoin::Block::VERSION;
 
 @CBitcoin::Block::EXPORT = ();
 @CBitcoin::Block::EXPORT_OK = ();

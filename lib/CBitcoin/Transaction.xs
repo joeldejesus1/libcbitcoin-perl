@@ -21,7 +21,7 @@
 #include <ccoin/serialize.h>
 //#include <ccoin/compat.h>
 
-
+//#include "CBitcoin.h"
 
 
 

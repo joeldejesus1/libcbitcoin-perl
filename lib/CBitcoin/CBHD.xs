@@ -26,6 +26,8 @@
 #define BIP32_TEST_PUBLIC 0x043587CF
 #define BIP32_TEST_PRIVATE 0x04358394
 
+//#include "CBitcoin.h"
+
 ////// extra
 
 struct hd_extended_key_serialized {

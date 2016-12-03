@@ -18,11 +18,11 @@ Version 0.01
 
 require Exporter;
 *import = \&Exporter::import;
-require DynaLoader;
+#require DynaLoader;
 
-$CBitcoin::TransactionInput::VERSION = $CBitcoin::VERSION;
+#$CBitcoin::TransactionInput::VERSION = $CBitcoin::VERSION;
 
-DynaLoader::bootstrap CBitcoin::TransactionInput $CBitcoin::VERSION;
+#DynaLoader::bootstrap CBitcoin::TransactionInput $CBitcoin::VERSION;
 
 @CBitcoin::TransactionInput::EXPORT = ();
 @CBitcoin::TransactionInput::EXPORT_OK = ();

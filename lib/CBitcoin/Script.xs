@@ -20,6 +20,8 @@
 #include <ccoin/message.h>
 //#include <ccoin/compat.h>
 
+//#include "CBitcoin.h"
+
 ////// extra
 
 SV* picocoin_returnblankSV(void){

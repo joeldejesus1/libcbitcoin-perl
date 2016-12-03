@@ -15,6 +15,9 @@
 #include <ccoin/cstr.h>
 
 
+//#include "CBitcoin.h"
+
+
 // just a dummy function
 int dummy(int arg){
 	return 1;
