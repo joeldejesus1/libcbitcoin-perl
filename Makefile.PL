@@ -69,7 +69,7 @@ WriteMakefile(
 	,'MAKEFILE_OLD' => ''
 	,'dist'                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', }
 	#,'clean'               => { FILES => 'libcbitcoin-perl*' }
-	,'clean'               => { FILES => 't/db1' }
+	,'clean'               => { FILES => 't/db1 lib/*.o lib/CBitcoin/*.o' }
 );
 
 # Remove the Makefile dependency. Causes problems on a few systems.
