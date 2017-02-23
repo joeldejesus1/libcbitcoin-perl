@@ -1,10 +1,9 @@
 use strict;
 use warnings;
 
+use CBitcoin; # always load this first
 use CBitcoin::Tree;
 use CBitcoin::Tree::Broadcast;
-
-use CBitcoin;
 use CBitcoin::CBHD;
 use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
