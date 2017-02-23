@@ -9,8 +9,12 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
+DEB_BUILD_HARDENING=1
+
+# --with autotools-dev
+
 %:
-	dh $@  --with autotools-dev
+	dh $@  
 
 override_dh_auto_configure:
 	perl Makefile.PL PREFIX=/usr

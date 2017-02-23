@@ -1,28 +1,28 @@
 Source: libcbitcoin-perl
-Section: extra
-Priority: extra
+Section: perl
+Priority: optional
 Maintainer: Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>
 Build-Depends: libfile-slurp-perl,libcrypt-cbc-perl, 
    libberkeleydb-perl, debhelper (>= 8.0.0), 
    libcrypt-openssl-aes-perl, libio-socket-socks-perl, 
    liblog-log4perl-perl, libmath-bigint-gmp-perl, 
    libgmp-dev,libjson-xs-perl,libconvert-base32-perl, 
-   libssl-dev, autotools-dev,
+   libssl-dev,
    libccoin-dev, libnet-ip-perl, 
    libio-epoll-perl, libev-perl,
    libdata-uuid-perl
-Standards-Version: 3.9.3
+Standards-Version: 3.9.6
 Homepage: https://github.com/favioflamingo/libcbitcoin-perl
 
 Package: libcbitcoin-perl
 Architecture: any
 Depends: libfile-slurp-perl, libcrypt-cbc-perl, 
   libnet-dns-perl (>=1.06), libberkeleydb-perl, 
-  libc6, libcrypt-openssl-aes-perl, 
+  libcrypt-openssl-aes-perl, 
   libio-socket-socks-perl, liblog-log4perl-perl, 
   libmath-bigint-gmp-perl, libconvert-base32-perl, 
   libccoin, libdigest-sha-perl,
   libnet-ip-perl,libdata-uuid-perl,
-  ${misc:Depends}
+  ${misc:Depends}, ${shlibs:Depends}
 Description: Perl modules for cbitcoin.
  Manipulate bitcoin objects in perl.

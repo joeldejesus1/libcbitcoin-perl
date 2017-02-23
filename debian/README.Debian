@@ -1,6 +1,6 @@
-libperl-cbitcoin-cbhd for Debian
+libcbitcoin-perl for Debian
 ---------------------------
 
-<possible notes regarding this package - if none, delete this file>
+Allows Perl programmers to write Bitcoin related applications
 
  -- Joel DeJesus <dejesus.joel@e-flamingo.jp>  Fri, 24 Oct 2014 14:23:17 +0900

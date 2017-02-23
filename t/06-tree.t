@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use CBitcoin; # always load this first
+use CBitcoin;
 use CBitcoin::Tree;
 use CBitcoin::Tree::Broadcast;
 use CBitcoin::CBHD;
