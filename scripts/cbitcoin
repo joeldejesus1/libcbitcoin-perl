@@ -2,8 +2,6 @@
 use strict;
 use warnings;
 
-
-
 # Untaint
 $ENV{'PATH'} = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};

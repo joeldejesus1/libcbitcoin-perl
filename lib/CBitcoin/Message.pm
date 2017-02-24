@@ -7,10 +7,6 @@ use warnings;
 
 CBitcoin::Message
 
-=head1 VERSION
-
-Version 0.01
-
 =cut
 
 use Net::IP;

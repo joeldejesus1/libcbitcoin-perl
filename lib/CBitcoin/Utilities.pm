@@ -7,6 +7,7 @@ use Net::IP;
 use Net::DNS;
 use CBitcoin;
 use Convert::Base32;
+
 use constant TORPREFIX => 'fd87d87eeb43';
 
 use Log::Log4perl;

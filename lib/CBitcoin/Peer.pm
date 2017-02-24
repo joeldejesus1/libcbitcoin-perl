@@ -3,7 +3,7 @@ package CBitcoin::Peer;
 use strict;
 use warnings;
 
-
+use CBitcoin;
 use CBitcoin::Message; 
 use CBitcoin::Utilities;
 use Log::Log4perl;

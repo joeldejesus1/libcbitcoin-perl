@@ -1,6 +1,5 @@
 package CBitcoin::Transaction;
 
-use 5.014002;
 use strict;
 use warnings;
 
@@ -17,15 +16,10 @@ use constant {
 
 =head1 NAME
 
-CBitcoin::Transaction - The great new CBitcoin::Transaction!
-
-=head1 VERSION
-
-Version 0.01
+CBitcoin::Transaction - A wrapper for transactions.
 
 =cut
 
-use bigint;
 use CBitcoin;
 use CBitcoin::Script;
 use CBitcoin::TransactionInput;
@@ -36,7 +30,7 @@ require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::Transaction::VERSION = '0.1';
+$CBitcoin::Transaction::VERSION = $CBitcoin::VERSION;
 
 DynaLoader::bootstrap CBitcoin::Transaction $CBitcoin::VERSION;
 
@@ -531,15 +525,21 @@ sub txfee{
 	return $size*$fee;
 }
 
+
+=head1 SYNOPSIS
+
+  use CBitcoin;
+  use CBitcoin::Transaction;
+  
+  
 =head1 AUTHOR
 
 Joel De Jesus, C<< <dejesus.joel at e-flamingo.jp> >>
 
 =head1 BUGS
 
-Please report any bugs or feature requests to C<bug-libperl-cbitcoin-transaction at rt.cpan.org>, or through
-the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=libperl-cbitcoin>.  I will be notified, and then you'll
-automatically be notified of progress on your bug as I make changes.
+Please report any bugs or feature requests to L<https://github.com/favioflamingo/libcbitcoin-perl>.
+I will be notified, and then you'll automatically be notified of progress on your bug as I make changes.
 
 
 
@@ -551,28 +551,9 @@ You can find documentation for this module with the perldoc command.
     perldoc CBitcoin::Transaction
 
 
-You can also look for information at:
+You can also look for information at: L<https://github.com/favioflamingo/libcbitcoin-perl>
 
 =over 4
-
-=item * RT: CPAN's request tracker (report bugs here)
-
-L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=libperl-cbitcoin>
-
-=item * AnnoCPAN: Annotated CPAN documentation
-
-L<http://annocpan.org/dist/libperl-cbitcoin>
-
-=item * CPAN Ratings
-
-L<http://cpanratings.perl.org/d/libperl-cbitcoin>
-
-=item * Search CPAN
-
-L<http://search.cpan.org/dist/libperl-cbitcoin/>
-
-=back
-
 
 =head1 ACKNOWLEDGEMENTS
 

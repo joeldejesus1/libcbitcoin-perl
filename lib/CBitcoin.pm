@@ -1,6 +1,5 @@
 package CBitcoin;
 
-#use 5.014002;
 use strict;
 use warnings;
 
@@ -44,11 +43,16 @@ use constant {
 
 =head1 NAME
 
-CBitcoin - The great new CBitcoin!
+CBitcoin - A wrapper for the Picocoin C Library
+
+=head1 SEE INSTEAD?
+
+The module L<CBitcoin> serves as a bootstrapping point for other modules to compile.
+Also, it is used to set the network to do computations off of (MAINNET, TESTNET, etc).
 
 =head1 VERSION
 
-Version 0.01
+Version 0.2
 
 =cut
 
@@ -56,7 +60,7 @@ require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::VERSION = '0.1';
+$CBitcoin::VERSION = '0.2';
 
 DynaLoader::bootstrap CBitcoin $CBitcoin::VERSION;
 
@@ -75,16 +79,18 @@ sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 
 
-=item hello
 
-just a place holder.
-
-=cut
 
 sub hello {
 	return "hello!";
 }
 
+
+=item network_bytes
+
+Set network bytes with the $network_bytes global variable.
+
+=cut
 
 our $network_bytes = 0xD9B4BEF9;
 
@@ -101,7 +107,7 @@ Joel De Jesus, C<< <dejesus.joel at e-flamingo.jp> >>
 =head1 LICENSE AND COPYRIGHT
 
 
-    CBitcoin perl modules is a wrapper for the CBitcoin library written by Matthew Mitchell.
+    CBitcoin perl modules is a wrapper for the Picocoin library written by Jeff Garzik.
     Copyright (C) 2015  Joel De Jesus
 
     This program is free software; you can redistribute it and/or modify

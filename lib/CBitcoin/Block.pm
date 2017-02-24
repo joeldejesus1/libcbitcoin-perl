@@ -1,16 +1,11 @@
 package CBitcoin::Block;
 
-#use 5.014002;
 use strict;
 use warnings;
 
 =head1 NAME
 
 CBitcoin::Block
-
-=head1 VERSION
-
-Version 0.01
 
 =cut
 

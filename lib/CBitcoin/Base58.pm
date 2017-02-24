@@ -1,8 +1,9 @@
 package CBitcoin::Base58;
 
 use strict;
-#use 5.008_001;
-our $VERSION = '0.01';
+use CBitcoin;
+
+our $VERSION = $CBitcoin::VERSION;
 
 use base qw(Exporter);
 our @EXPORT = qw( encode_base58 decode_base58 );
