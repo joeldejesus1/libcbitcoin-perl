@@ -1,7 +1,5 @@
 package CBitcoin::CBHD;
 
-#use 5.014002;
-# use bigint; # do not use this, delete on next update
 use strict;
 use warnings;
 
@@ -10,11 +8,13 @@ use CBitcoin::Script;
 
 =head1 NAME
 
-CBitcoin::CBHD - The great new CBitcoin::CBHD!
+CBitcoin::CBHD - A wrapper for Bip32 Hierarchial Deterministic Keys
 
-=head1 VERSION
+=head1 SEE INSTEAD?
 
-Version 0.2
+The module L<CBitcoin::CBHD> provides another interface for generating Bip32 Hierarchial 
+Deterministic Keys.  For most of the legwork, this wrapper relies on the picocoin
+library.
 
 =cut
 
@@ -24,7 +24,7 @@ require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::CBHD::VERSION = '0.1';
+$CBitcoin::CBHD::VERSION = $CBitcoin::VERSION;
 
 #XSLoader::load('CBitcoin::CBHD',$CBitcoin::CBHD::VERSION );
 DynaLoader::bootstrap CBitcoin::CBHD $CBitcoin::VERSION;
@@ -661,16 +661,25 @@ sub shared_secret {
 	return $kdfsub->($ss);	
 }
 
+=head1 SYNOPSIS
 
+  use CBitcoin;
+  use CBitcoin::CBHD;
+  
+  my $root1 = CBitcoin::CBHD->generate("my magic seed!");
+  my $child_hard = $root1->deriveChild(1,323);
+  my $c_1_323_0_20_priv = $child_hard->deriveChild(0,20);
+  
+  print "Root address:".$root1->address()."\n";
+  
 =head1 AUTHOR
 
 Joel De Jesus, C<< <dejesus.joel at e-flamingo.jp> >>
 
 =head1 BUGS
 
-Please report any bugs or feature requests to C<bug-libperl-cbitcoin-cbhd at rt.cpan.org>, or through
-the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=libperl-cbitcoin>.  I will be notified, and then you'll
-automatically be notified of progress on your bug as I make changes.
+Please report any bugs or feature requests to L<https://github.com/favioflamingo/libcbitcoin-perl>.
+I will be notified, and then you'll automatically be notified of progress on your bug as I make changes.
 
 
 
@@ -685,25 +694,6 @@ You can find documentation for this module with the perldoc command.
 You can also look for information at:
 
 =over 4
-
-=item * RT: CPAN's request tracker (report bugs here)
-
-L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=libperl-cbitcoin>
-
-=item * AnnoCPAN: Annotated CPAN documentation
-
-L<http://annocpan.org/dist/libperl-cbitcoin>
-
-=item * CPAN Ratings
-
-L<http://cpanratings.perl.org/d/libperl-cbitcoin>
-
-=item * Search CPAN
-
-L<http://search.cpan.org/dist/libperl-cbitcoin/>
-
-=back
-
 
 =head1 ACKNOWLEDGEMENTS
 

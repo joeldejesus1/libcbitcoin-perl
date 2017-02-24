@@ -7,11 +7,7 @@ use CBitcoin;
 
 =head1 NAME
 
-CBitcoin::Script - The great new CBitcoin::Script!
-
-=head1 VERSION
-
-Version 0.01
+CBitcoin::Script - A wrapper for handling Bitcoin Transaction Scripts
 
 =cut
 
@@ -21,7 +17,7 @@ require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::Script::VERSION = '0.1';
+$CBitcoin::Script::VERSION = $CBitcoin::VERSION;
 
 DynaLoader::bootstrap CBitcoin::Script $CBitcoin::VERSION;
 
@@ -350,15 +346,20 @@ sub multisig_p2sh_script {
 }
 
 
+=head1 SYNOPSIS
+
+  use CBitcoin;
+  use CBitcoin::Script;
+
+  
 =head1 AUTHOR
 
 Joel De Jesus, C<< <dejesus.joel at e-flamingo.jp> >>
 
 =head1 BUGS
 
-Please report any bugs or feature requests to C<bug-libperl-cbitcoin-script at rt.cpan.org>, or through
-the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=libperl-cbitcoin>.  I will be notified, and then you'll
-automatically be notified of progress on your bug as I make changes.
+Please report any bugs or feature requests to L<https://github.com/favioflamingo/libcbitcoin-perl>.
+I will be notified, and then you'll automatically be notified of progress on your bug as I make changes.
 
 
 
@@ -370,28 +371,9 @@ You can find documentation for this module with the perldoc command.
     perldoc CBitcoin::Script
 
 
-You can also look for information at:
+You can also look for information at: L<https://github.com/favioflamingo/libcbitcoin-perl>
 
 =over 4
-
-=item * RT: CPAN's request tracker (report bugs here)
-
-L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=libperl-cbitcoin>
-
-=item * AnnoCPAN: Annotated CPAN documentation
-
-L<http://annocpan.org/dist/libperl-cbitcoin>
-
-=item * CPAN Ratings
-
-L<http://cpanratings.perl.org/d/libperl-cbitcoin>
-
-=item * Search CPAN
-
-L<http://search.cpan.org/dist/libperl-cbitcoin/>
-
-=back
-
 
 =head1 ACKNOWLEDGEMENTS
 
@@ -411,42 +393,3 @@ See http://dev.perl.org/licenses/ for more information.
 
 1; # End of CBitcoin::Script
 __END__
-{
-	# We need bigint or else the addresses will get screwed up upon conversion from ripemd160
-	use bigint;
-	my @b58 = qw{
-      1 2 3 4 5 6 7 8 9
-    A B C D E F G H   J K L M N   P Q R S T U V W X Y Z
-    a b c d e f g h i j k   m n o p q r s t u v w x y z
-	};
-
-	my $b58 = qr/[@{[join '', @b58]}]/x;
-
-	sub encode_base58 { my $_ = shift; $_ < 58 ? $b58[$_] : encode_base58($_/58) . $b58[$_%58] }
-	
-	sub ripemd160ToAddress {
-		my $twentybyteHex = shift;
-		if($twentybyteHex =~ m/([0-9a-fA-F]+)/){
-			$twentybyteHex = $1;
-		}
-		else{
-			return undef;
-		}
-		$twentybyteHex = lc($twentybyteHex);
-		
-		warn "KGC::Peerer::BitcoinJ::ripemd160ToAddress($twentybyteHex)\n";
-		my @hex    = ($twentybyteHex =~ /(..)/g);
-		my @dec    = map { hex($_) } @hex;
-		my @bytes  = map { pack('C', $_) } @dec;
-		my $hash = join( '', @bytes);
-		my $checksum = substr sha256(sha256 chr(0).$hash), 0, 4;
-		my $value = 0;
-		for ( (chr(0).$hash.$checksum) =~ /./gs ) { $value = $value * 256 + ord }
-			#(sprintf "%33s", encode_base58( $value) ) =~ y/ /1/r;
-		$value = sprintf "%33s", encode_base58( $value);
-		$value =~ y/ /1/r;
-		return '1'.$value;	
-	}
-}
-
-1;

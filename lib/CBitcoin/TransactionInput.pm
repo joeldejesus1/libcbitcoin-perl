@@ -10,17 +10,13 @@ use CBitcoin::Script;
 
 CBitcoin::TransactionInput - The great new CBitcoin::TransactionInput!
 
-=head1 VERSION
-
-Version 0.01
-
 =cut
 
 require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::TransactionInput::VERSION = '0.1';
+$CBitcoin::TransactionInput::VERSION = $CBitcoin::VERSION;
 
 DynaLoader::bootstrap CBitcoin::TransactionInput $CBitcoin::VERSION;
 

@@ -8,7 +8,7 @@ use IO::Socket::Socks;
 use IO::Epoll;
 use EV;
 use Kgc::MQ;
-use  Log::Log4perl;
+use Log::Log4perl;
 
 
 my $logger = Log::Log4perl->get_logger();

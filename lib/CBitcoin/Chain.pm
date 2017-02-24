@@ -3,9 +3,8 @@ package CBitcoin::Chain;
 use strict;
 use warnings;
 use BerkeleyDB;
-
 use Math::BigInt only => 'GMP';
-
+use CBitcoin;
 use CBitcoin::Chain::Branch;
 use CBitcoin::Chain::Node;
 use CBitcoin::Utilities;

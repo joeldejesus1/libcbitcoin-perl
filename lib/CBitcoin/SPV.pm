@@ -3,7 +3,7 @@ package CBitcoin::SPV;
 use strict;
 use warnings;
 
-
+use CBitcoin;
 use CBitcoin::Message;
 use CBitcoin::Utilities;
 use CBitcoin::Peer;

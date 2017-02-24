@@ -2,17 +2,13 @@ package CBitcoin::TransactionOutput;
 
 use strict;
 use warnings;
-use bigint;
 
 =head1 NAME
 
 CBitcoin::TransactionOutput - The great new CBitcoin::TransactionOutput!
 
-=head1 VERSION
-
-Version 0.01
-
 =cut
+
 use CBitcoin;
 use CBitcoin::Script;
 use CBitcoin::Utilities;
@@ -21,7 +17,7 @@ require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::TransactionOutput::VERSION = '0.1';
+$CBitcoin::TransactionOutput::VERSION = $CBitcoin::VERSION;
 
 DynaLoader::bootstrap CBitcoin::TransactionOutput $CBitcoin::VERSION;
 
