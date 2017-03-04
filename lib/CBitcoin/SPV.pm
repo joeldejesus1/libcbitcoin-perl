@@ -266,9 +266,9 @@ sub initialize_peers {
 	}
 	
 	
-	foreach my $p (@{CBitcoin::Utilities::dns_fetch_peers()}){
-		$this->add_peer_to_inmemmory($p->[1],$p->[2],$p->[3]);
-	}
+	#foreach my $p (@{CBitcoin::Utilities::dns_fetch_peers()}){
+	#	$this->add_peer_to_inmemmory($p->[1],$p->[2],$p->[3]);
+	#}
 }
 
 =pod
@@ -1968,9 +1968,13 @@ sub callback_gotheaders {
 			next;
 		}
 		
-		#$logger->debug("($i/$num_of_headers)Got header=[".$block->hash_hex().
-		#	";".$block->transactionNum.
-		#	";".length($msg->payload())."]");
+		if($i % 500){
+			$logger->debug("($i/$num_of_headers)Got header=[".$block->hash_hex().
+				";".$block->transactionNum.
+				";".length($msg->payload())."]");			
+		}
+		
+
 			
 		$this->add_header_to_chain($peer,$block);
 		

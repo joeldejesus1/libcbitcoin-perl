@@ -464,9 +464,9 @@ sub read_cmd_readdata{
 		,'no hash' => 1
 	});
 	
-	while(my $msg_data = $mqout->receive()){
-		print STDERR "$msg_data\n++++++++++++\n";
-	}
+	#while(my $msg_data = $mqout->receive()){
+		#print STDERR "$msg_data\n++++++++++++\n";
+	#}
 	
 }
 =pod

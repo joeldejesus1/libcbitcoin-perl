@@ -46,8 +46,8 @@ for(my $i=0;$i<1;$i++){
 		
 		# testing: cbitcoin spv --address=127.0.0.1:8333 --node=gb5ypqt63du3wfhn.onion:8333 --watch=1BhT26zK7g9hXb3PDkwenkxpBeGYa6MCK1 --clientname="/BitcoinJ:0.2(iPad; U; CPU OS 3_2_1)/AndroidBuild:0.8/"
 		CBitcoin::CLI::SPV::run_cli_args('spv',
-			'--address=127.0.0.1:8333',
-			'--node=50.116.19.133:8333',
+			'--address=vps-linode03.e-flamingo.bit:8333',
+			'--node=vps-linode04.e-flamingo.bit:8333',
 			'--clientname="/BitcoinJ:0.2(iPad; U; CPU OS 3_2_1)/AndroidBuild:0.8/"',
 			'--dbpath=t/db1'
 		);	
