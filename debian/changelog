@@ -1,3 +1,11 @@
+libcbitcoin-perl (0.5-2~1.gbpb41856) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @b41856e598cddeff2405c6ac1847eebc283678b0 **
+
+  * UNRELEASED
+
+ -- Joel Manuel De Jesus (Work Account) <dejesus.joel@e-flamingo.net>  Tue, 18 Apr 2017 00:37:33 +0900
+
 libcbitcoin-perl (0.2-1) unstable; urgency=low
 
   * Initial release
