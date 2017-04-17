@@ -5,7 +5,7 @@ use warnings;
 use CBitcoin;
 use Crypt::CBC;
 use Digest::SHA;
-use Test::More tests => 18;
+use Test::More tests => 15;
 
 
 require CBitcoin::CBHD;
@@ -151,7 +151,6 @@ ok(
 
 The purpose here is to be able to encrypt/decrypt data using key pairs derived from secp256k1.
 
-=cut
 
 {
 	my $root = CBitcoin::CBHD->generate("my magic seed! 123456789012345678901234567890");
@@ -213,6 +212,7 @@ The purpose here is to be able to encrypt/decrypt data using key pairs derived f
 }
 
 
+=cut
 
 
 __END__

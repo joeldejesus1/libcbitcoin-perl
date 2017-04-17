@@ -1,6 +1,9 @@
 .project
 test.log
 Makefile.old
+MYMETA.json
+MYMETA.yml
+Makefile
 *.c
 *.o
 *.bs
