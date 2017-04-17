@@ -5,7 +5,7 @@ use JSON::XS;
 use Data::Dumper;
 
 
-use Test::More tests => 469;
+use Test::More tests => 1001;
 
 
 require CBitcoin::Script;
@@ -16,18 +16,21 @@ my $tests;
 #...........................................
 {
 	
-	open(my $fh,'<','t/scripts-valid.json') || print "Bail out!";
+	open(my $fh,'<','t/scripts.json') || print "Bail out!";
 	my $jsontxt = '';
 	while(<$fh>){
 		#warn "JSON:$jsontxt";
 		$jsontxt .= $_;
 	}
 	close($fh);
-	my $tests = JSON::XS::decode_json($jsontxt);
-	foreach my $test (@{$tests}){
-		my ($x,$script) = @{$test};
+	
+	my $tests = JSON::XS::decode_json($jsontxt) || print "Bail out!";
+	my $testnum = 0;
+	
+	my $translatesub = sub{
+		my $input = shift;
 		my @sarray;
-		foreach my $s (split(' ',$script)){
+		foreach my $s (split(' ',$input)){
 			if($s !~ m/^(\d|\'|\-|NOP)/ ){
 				push(@sarray,'OP_'.$s);
 			}
@@ -35,50 +38,32 @@ my $tests;
 				push(@sarray,$s);
 			}
 		}
-		
-		my $serialized_script = CBitcoin::Script::picocoin_script_decode(
-			CBitcoin::Script::convert_OP_to_CCOIN(join(' ',@sarray))
-		);
-		unless(defined $serialized_script){
-			$serialized_script = '' unless defined $serialized_script;
-		}
-		
-		ok(0 < length($serialized_script),'Failed at script '.join(' ',@sarray));
-		#warn "Script:".unpack('H*',$serialized_script)."\n";
-	}
+		return join(' ',@sarray);
+	};
 	
-}
+	foreach my $test (@{$tests}){
+		#warn "Ref=".ref($test)."\n";
+		my ($scriptSigEnc,$scriptPubKeyEnc,$testname,$testdesc) = @{$test};
+		$testdesc //= "";
+		#warn "($scriptSigEnc,$scriptPubKeyEnc,$testname,$testdesc)\n";
+		next unless defined $scriptSigEnc && defined $scriptPubKeyEnc;
+		
+		
+		#$scriptSigEnc = $translatesub->($scriptSigEnc);
+		#my $scriptSig = CBitcoin::Script::picocoin_script_decode(
+		#	CBitcoin::Script::convert_OP_to_CCOIN($scriptSigEnc)
+		#);
+		$scriptPubKeyEnc = $translatesub->($scriptPubKeyEnc);
+		my $scriptPubKey = CBitcoin::Script::picocoin_script_decode(
+			CBitcoin::Script::convert_OP_to_CCOIN($scriptPubKeyEnc)
+		);
 
-{
-	
-	open(my $fh,'<','t/scripts-invalid.json') || print "Bail out!";
-	my $jsontxt = '';
-	while(<$fh>){
-		#warn "JSON:$jsontxt";
-		$jsontxt .= $_;
-	}
-	close($fh);
-	my $tests = JSON::XS::decode_json($jsontxt);
-	foreach my $test (@{$tests}){
-		my ($x,$script) = @{$test};
-		my @sarray;
-		foreach my $s (split(' ',$script)){
-			if($s !~ m/^(\d|\'|\-|NOP)/ ){
-				push(@sarray,'OP_'.$s);
-			}
-			else{
-				push(@sarray,$s);
-			}
-		}
+		#my $scriptPubKey = CBitcoin::Script::picocoin_script_decode(
+		#	CBitcoin::Script::convert_OP_to_CCOIN($scriptSigEnc)
+		#);
 		
-		my $serialized_script = CBitcoin::Script::picocoin_script_decode(
-			CBitcoin::Script::convert_OP_to_CCOIN(join(' ',@sarray))
-		);
-		unless(defined $serialized_script){
-			$serialized_script = '' unless defined $serialized_script;
-		}
 		
-		ok(0 < length($serialized_script),'Failed at script '.join(' ',@sarray));
+		ok(0 < length($scriptPubKey)," $testname: $testdesc ");
 		#warn "Script:".unpack('H*',$serialized_script)."\n";
 	}
 	

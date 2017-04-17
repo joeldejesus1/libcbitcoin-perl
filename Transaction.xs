@@ -154,9 +154,7 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 	//hdkeyser->data = calloc(78*sizeof(uint8_t));
 	memcpy(hdkeyser.data, hdkey_pointer, 78);
 	struct hd_extended_key hdkey;
-	if(!hd_extended_key_init(&hdkey)){
-		return picocoin_returnblankSV();
-	}
+	hd_extended_key_init(&hdkey);
 	
 	if(!hd_extended_key_deser(&hdkey, hdkeyser.data,78)){
 		//free(hdkeyser->data);
