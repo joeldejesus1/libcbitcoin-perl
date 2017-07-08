@@ -148,21 +148,19 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 	STRLEN len_hdkey; //calculated via SvPV
 	uint8_t * hdkey_pointer = (uint8_t*) SvPV(hdkey_data,len_hdkey);
 	if(len_hdkey != 78)
-		return picocoin_returnblankSV();
+		return (SV*) picocoin_returnblankSV();
 	
 	struct hd_extended_key_serialized hdkeyser;
 	//hdkeyser->data = calloc(78*sizeof(uint8_t));
 	memcpy(hdkeyser.data, hdkey_pointer, 78);
 	struct hd_extended_key hdkey;
-	if(!hd_extended_key_init(&hdkey)){
-		return picocoin_returnblankSV();
-	}
+	hd_extended_key_init(&hdkey);
 	
 	if(!hd_extended_key_deser(&hdkey, hdkeyser.data,78)){
 		//free(hdkeyser->data);
 		//free(hdkeyser);
 		hd_extended_key_free(&hdkey);
-		return picocoin_returnblankSV();
+		return (SV*) picocoin_returnblankSV();
 	}
 	
 	///////////// import tx //////////////////
@@ -177,13 +175,13 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 	if(!deser_bp_tx(&tx,&buf)){
 		bp_tx_free(&tx);
 		hd_extended_key_free(&hdkey);
-		return picocoin_returnblankSV();
+		return (SV*) picocoin_returnblankSV();
 	}
 	
 	if(!bp_tx_valid(&tx)){
 		bp_tx_free(&tx);
 		hd_extended_key_free(&hdkey);
-		return picocoin_returnblankSV();		
+		return (SV*) picocoin_returnblankSV();		
 	}
 	
 	// for convenience reasons, change the name
@@ -191,7 +189,7 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 	if (!txTo || !txTo->vin || nIn >= txTo->vin->len){
 		bp_tx_free(&tx);
 		hd_extended_key_free(&hdkey);
-		return picocoin_returnblankSV();
+		return (SV*) picocoin_returnblankSV();
 	}
 
 	STRLEN len_frompubkey; //calculated via SvPV
@@ -213,7 +211,7 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 	if (!bp_sign(&hdkey.key, &hash, sizeof(*&hash), &sig, &siglen)){
 		bp_tx_free(&tx);
 		hd_extended_key_free(&hdkey);
-		return picocoin_returnblankSV();		
+		return (SV*) picocoin_returnblankSV();		
 	}
 	//fprintf(stderr,"Index2=%d\n",nIn);
 
@@ -236,7 +234,7 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 		bp_tx_free(&tx);
 		free(pubkey);  // is this necessary?
 		hd_extended_key_free(&hdkey);
-		return picocoin_returnblankSV();	
+		return (SV*) picocoin_returnblankSV();	
 	}
 	
 	bsp_push_data(scriptSig, pubkey, pk_len);
@@ -255,7 +253,7 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 	bp_tx_free(&tx);
 	free(sig);
 	free(pubkey);
-	return newSVpv(txanswer->str,txanswer->len);
+	return (SV*) newSVpv(txanswer->str,txanswer->len);
 	
 
 }
@@ -267,13 +265,17 @@ HV* picocoin_emptytx(HV * rh){
 }
 
 // given a full hdkey, fill in a perl hash with relevant data
-HV* picocoin_returntx(HV * rh, const struct bp_tx *tx){
+HV* picocoin_returntx(HV * rh, const struct bp_tx *tx_arg){
+	
+	struct bp_tx tx_tmp;
+	struct bp_tx *tx = &tx_tmp;
+	bp_tx_copy(tx, tx_arg);
+	bp_tx_calc_sha256(tx);
+	
 	hv_store(rh, "success", 7, newSViv((int) 1), 0);
 	
 	hv_store(rh, "version", 7, newSViv((int)tx->nVersion), 0);
 	hv_store(rh, "lockTime", 8, newSViv((int)tx->nLockTime), 0);
-	
-	bp_tx_calc_sha256(tx);
 	
 	
 	if(tx->sha256_valid){

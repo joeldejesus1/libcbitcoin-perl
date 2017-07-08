@@ -25,7 +25,7 @@
 SV* picocoin_returnblankSV(void){
 	//SV* ans_sv = newSVpv("",1);
 	//return ans_sv;
-	return &PL_sv_undef;
+	return (SV*) &PL_sv_undef;
 }
 
 

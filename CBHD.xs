@@ -130,7 +130,7 @@ void *KDF1_SHA256(const void *in, size_t inlen, void *out, size_t *outlen)
     return SHA256(in, inlen, out);
 }
 
-
+/*
 uint8_t* sharedsecret(const EC_GROUP* group,const EC_POINT * ep_pub, const BIGNUM *bn_priv, size_t * sec_len){
 	
 	int field_size = EC_GROUP_get_degree(group);
@@ -162,11 +162,12 @@ uint8_t* sharedsecret(const EC_GROUP* group,const EC_POINT * ep_pub, const BIGNU
 		return NULL;
 	}
 }
-
+*/
 
 /*
  * Given a string/offset, create a new private key and public key
  */
+/*
 SV* picocoin_offset_private_key(SV* privatekey,SV* offset) {
 	SV* returnSV = (SV*)&PL_sv_undef;
 	
@@ -264,10 +265,12 @@ err:
 	//EC_GROUP_free(group);
 	return returnSV;
 }
+*/
 
 /*
  * Given a string/offset, create a new public key
  */
+/*
 SV* picocoin_offset_public_key(SV* publickey,SV* offset) {
 	SV* returnSV = (SV*)&PL_sv_undef;
 	
@@ -349,13 +352,13 @@ err:
 	//EC_GROUP_free(group);
 	return returnSV;
 }
-
+*/
 
 
 /*
  *   Return success=0 hash (typically indicates failure to deserialize)
  */
-
+/*
 // get counter party's publickey, create ephemeral key, and 
 SV* picocoin_ecdh_encrypt(SV* publickey){
 	STRLEN len; //calculated via SvPV
@@ -426,11 +429,12 @@ SV* picocoin_ecdh_encrypt(SV* publickey){
 		return &PL_sv_undef;
 	}
 }
-
+*/
 
 /*
  * have ephemeral public key and recepient private key 
  */
+/*
 SV* picocoin_ecdh_decrypt(SV* publickey,SV* privatekey){
 	STRLEN len; //calculated via SvPV
 	uint8_t * pubkey = (uint8_t*) SvPV(publickey,len);
@@ -493,7 +497,7 @@ SV* picocoin_ecdh_decrypt(SV* publickey,SV* privatekey){
 	}
 	
 }
-
+*/
 
 HV* picocoin_returnblankhdkey(HV * rh){
 	hv_store(rh, "success", 7, newSViv((int) 0), 0);
@@ -565,9 +569,7 @@ HV* picocoin_newhdkey(SV* base58x){
 		return picocoin_returnblankhdkey(rh);
 	}
 	struct hd_extended_key hdkey;
-	if(!hd_extended_key_init(&hdkey)){
-		return picocoin_returnblankhdkey(rh);
-	}
+	hd_extended_key_init(&hdkey);
 	
 	if(!hd_extended_key_deser(&hdkey, hdkeyser.data,78)){
 		return picocoin_returnblankhdkey(rh);
@@ -593,9 +595,7 @@ HV* picocoin_generatehdkeymaster(SV* seed,int vers){
 	uint8_t * seed_raw = (uint8_t*) SvPV(seed,len);
 	//fprintf(stderr,"Hi - 3\n");
 	struct hd_extended_key hdkey;
-	if(!hd_extended_key_init(&hdkey)){
-		return picocoin_returnblankhdkey(rh);
-	}
+	hd_extended_key_init(&hdkey);
 	//fprintf(stderr,"Hi - 4\n");
 	if(!hd_extended_key_generate_master(&hdkey, seed_raw, len)){
 		return picocoin_returnblankhdkey(rh);
@@ -623,9 +623,7 @@ HV* picocoin_generatehdkeychild(SV* xpriv, int child_index){
 	//fprintf(stderr,"Child index:(%lu)\n",(uint32_t) child_index);
 	
 	struct hd_extended_key hdkey;
-	if(!hd_extended_key_init(&hdkey)){
-		return picocoin_returnblankhdkey(rh);
-	}
+	hd_extended_key_init(&hdkey);
 	if(!hd_extended_key_deser(&hdkey,xpriv_msg,len)){
 		return picocoin_returnblankhdkey(rh);
 	}
@@ -634,9 +632,7 @@ HV* picocoin_generatehdkeychild(SV* xpriv, int child_index){
 	
 	// create the child key
 	struct hd_extended_key childhdkey;
-	if(!hd_extended_key_init(&childhdkey)){
-		return picocoin_returnblankhdkey(rh);
-	}
+	hd_extended_key_init(&childhdkey);
 	if(!hd_extended_key_generate_child(&hdkey,(uint32_t) child_index,&childhdkey)){
 		return picocoin_returnblankhdkey(rh);
 	}
@@ -647,7 +643,29 @@ HV* picocoin_generatehdkeychild(SV* xpriv, int child_index){
 	hd_extended_key_free(&childhdkey);
 	return rh;
 }
+/*
+ * 
+SV*
+picocoin_ecdh_encrypt(publickey)
+	SV* publickey
 
+SV*
+picocoin_ecdh_decrypt(publickey, privatekey)
+	SV* publickey
+	SV* privatekey
+	
+SV*
+picocoin_offset_private_key(privatekey,offset)
+	SV* privatekey
+	SV* offset
+	
+SV*
+picocoin_offset_public_key(publickey,offset)
+	SV* publickey
+	SV* offset
+ * 
+ * 
+ */
 
 MODULE = CBitcoin::CBHD	PACKAGE = CBitcoin::CBHD	
 
@@ -668,21 +686,3 @@ picocoin_generatehdkeychild(xpriv,child_index)
 	SV* xpriv
 	int child_index
 	
-SV*
-picocoin_ecdh_encrypt(publickey)
-	SV* publickey
-
-SV*
-picocoin_ecdh_decrypt(publickey, privatekey)
-	SV* publickey
-	SV* privatekey
-	
-SV*
-picocoin_offset_private_key(privatekey,offset)
-	SV* privatekey
-	SV* offset
-	
-SV*
-picocoin_offset_public_key(publickey,offset)
-	SV* publickey
-	SV* offset

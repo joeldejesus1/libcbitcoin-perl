@@ -1,6 +1,8 @@
 .project
 test.log
+Makefile
 Makefile.old
+MYMETA*
 *.c
 *.o
 *.bs
