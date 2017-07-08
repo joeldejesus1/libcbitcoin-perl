@@ -5,7 +5,7 @@ use JSON::XS;
 use Data::Dumper;
 
 
-use Test::More tests => 469;
+use Test::More tests => 465;
 
 
 require CBitcoin::Script;

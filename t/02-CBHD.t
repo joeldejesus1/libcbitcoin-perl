@@ -5,7 +5,7 @@ use warnings;
 use CBitcoin;
 use Crypt::CBC;
 use Digest::SHA;
-use Test::More tests => 18;
+use Test::More tests => 15;
 
 
 require CBitcoin::CBHD;
@@ -153,6 +153,8 @@ The purpose here is to be able to encrypt/decrypt data using key pairs derived f
 
 =cut
 
+=pod
+
 {
 	my $root = CBitcoin::CBHD->generate("my magic seed! 123456789012345678901234567890");
 	
@@ -211,7 +213,7 @@ The purpose here is to be able to encrypt/decrypt data using key pairs derived f
 	
 	ok($pub eq $pub2, 'Is it possible to make a new private/public EC_Key using an arbitrary string as an offset?');
 }
-
+=cut
 
 
 
