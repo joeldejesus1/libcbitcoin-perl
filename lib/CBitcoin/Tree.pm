@@ -19,6 +19,7 @@ use constant {
 use Data::UUID;
 use List::Util qw(shuffle);
 use CBitcoin;
+use CBitcoin::Utilities;
 use CBitcoin::Script;
 use CBitcoin::Tree::Node;
 use CBitcoin::Tree::Broadcast;
