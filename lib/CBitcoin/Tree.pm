@@ -23,6 +23,7 @@ use CBitcoin::Utilities;
 use CBitcoin::Script;
 use CBitcoin::Tree::Node;
 use CBitcoin::Tree::Broadcast;
+use CBitcoin::BloomFilter;
 use Digest::MD5 qw(md5);
 use Cwd;
 
