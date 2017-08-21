@@ -16,6 +16,23 @@ use Log::Log4perl;
 
 
 
+
+sub DEFAULT_PORT{
+	if($CBitcoin::network_bytes eq CBitcoin::MAINNET){
+		return 8333;
+	}
+	elsif(CBitcoin::network_bytes eq CBitcoin::TESTNET){
+		return 18333;
+	}
+	elsif(CBitcoin::network_bytes eq CBitcoin::REGNET){
+		return 18444;
+	}
+	else{
+		return 8333;
+	}
+}
+
+
 =pod
 
 ---+ contructors/destructors
@@ -1072,7 +1089,7 @@ sub hook_peer_onreadidle {
 	$this->activate_peer();
 	
 	
-	#warn "Peer=".$peer->address().";Num of Headers=".scalar(@{$this->{'headers'}})."\n";
+	##warn "Peer=".$peer->address().";Num of Headers=".scalar(@{$this->{'headers'}})."\n";
 	$logger->debug("Peer=".$peer->address().";Num of Headers=".scalar(@{$this->{'headers'}}));
 	
 	if(0 < $this->hook_getdata_blocks_preview()){
@@ -1082,10 +1099,10 @@ sub hook_peer_onreadidle {
 	}
 	else{
 		#warn "\n";
-		$logger->debug("Need to fetch more blocks");
+		#$logger->debug("Need to fetch more blocks");
 		if($this->block_height() < $peer->block_height()){
 			#warn ."\n";
-			$logger->debug("alpha; block height diff=".( $peer->block_height() - $this->block_height() ));
+			#$logger->debug("alpha; block height diff=".( $peer->block_height() - $this->block_height() ));
 			#$peer->send_getblocks();
 			$peer->send_getheaders();
 			# if the speed is less than 10B/second, then give this to another peer
