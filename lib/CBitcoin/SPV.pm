@@ -17,22 +17,6 @@ use Log::Log4perl;
 
 
 
-sub DEFAULT_PORT{
-	if($CBitcoin::network_bytes eq CBitcoin::MAINNET){
-		return 8333;
-	}
-	elsif(CBitcoin::network_bytes eq CBitcoin::TESTNET){
-		return 18333;
-	}
-	elsif(CBitcoin::network_bytes eq CBitcoin::REGNET){
-		return 18444;
-	}
-	else{
-		return 8333;
-	}
-}
-
-
 =pod
 
 ---+ contructors/destructors
@@ -61,18 +45,19 @@ sub new {
 	bless($this,$package);
 	$this->init($options);
 
+	$logger->debug("1");
 	
 	$this->{'getblocks timeout'} = 0;
 	$this->{'callbacks nonce'} = 1;
 	
 	$this->make_directories();
-	
+	$logger->debug("2");
 	# start block chain at 0
 	$this->{'headers'} = [];
 	$this->{'transactions'} = {};
 	$this->initialize_chain();
 
-	
+	$logger->debug("3");
 	# brain
 	$this->{'inv'} = [{},{},{},{}];
 	$this->{'inv search'} = [{},{},{},{}];
@@ -83,8 +68,8 @@ sub new {
 	$this->initialize_cnc();
 	
 	
-	
-	warn "spv new done";
+	$logger->debug("4");
+	$logger->debug("spv new done");
 
 	return $this;
 	

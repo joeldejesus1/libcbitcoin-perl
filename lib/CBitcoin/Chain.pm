@@ -107,8 +107,15 @@ sub init_branches {
 	else{
 		$logger->debug("creating new database");
 		$this->init_branches_from_genesisblock($options);
+		$logger->debug("done");
 	}
 	my $branch = $this->branch_longest();
+	if(defined $branch){
+		$logger->debug("branch=".ref($branch));
+	}
+	else{
+		$logger->debug("no branch");
+	}
 	
 	die "Bad Branch Height" if $branch->height == 0;
 	
@@ -525,20 +532,29 @@ Return the longest branch.
 sub branch_longest {
 	my ($this) = @_;
 	
+	#$logger->debug("1");
 	return undef unless 0 < scalar(keys %{$this->{'branches'}});
-	
-	my $lbr;
+	#$logger->debug("2");
+	my ($lbr,$branch);
 	my ($score,$height) = (Math::BigInt->new(0),0);
+	#$logger->debug(sub{
+	#	require Data::Dumper;
+	#	return Data::Dumper::Dumper($this->{'branches'});
+	#});
 	foreach my $branch_id (keys %{$this->{'branches'}}){
-		my $branch = $this->{'branches'}->{$branch_id};
+		#$logger->debug("id=".unpack('H*',$branch_id));
+		$branch = $this->{'branches'}->{$branch_id};
+		#$logger->debug("branch=$branch");
 		if($score->bcmp($branch->score) < 0){
 			# score < branch
 			$lbr = $branch;
+			#$logger->debug("inside");
 			$score = $branch->score->copy();
 		}
 	}
 	
-	return $lbr;	
+	return $lbr if defined $lbr;
+	return $branch;
 }
 
 

@@ -18,8 +18,6 @@ use CBitcoin::TransactionOutput;
 use CBitcoin::Transaction;
 use Digest::SHA;
 
-use constant MAINNET    => 0xd9b4bef9, TESTNET => pack('L',0xdab5bffa), TESTNET3 => pack('L',0x0709110b), NAMECOIN => pack('L',0xfeb4bef9), REGNET => pack('L',CBitcoin::REGNET) ;
-
 require Exporter;
 *import = \&Exporter::import;
 #require DynaLoader;

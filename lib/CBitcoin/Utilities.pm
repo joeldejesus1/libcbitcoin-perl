@@ -7,6 +7,7 @@ use Net::IP;
 use Net::DNS;
 use CBitcoin;
 use Convert::Base32;
+use CBitcoin;
 
 use constant TORPREFIX => 'fd87d87eeb43';
 
@@ -20,6 +21,27 @@ my $logger = Log::Log4perl->get_logger();
 
 
 =cut
+
+=pod
+
+---++ DEFAULT_PORT
+
+=cut
+
+sub DEFAULT_PORT{
+	if( $CBitcoin::network_bytes eq CBitcoin::MAINNET){
+		return 8333;
+	}
+	elsif($CBitcoin::network_bytes eq CBitcoin::TESTNET){
+		return 18333;
+	}
+	elsif($CBitcoin::network_bytes eq CBitcoin::REGNET){
+		return 18444;
+	}
+	else{
+		return 8333;
+	}
+}
 
 =pod
 
@@ -591,20 +613,21 @@ sub dns_fetch_peers{
 	
 	return $node_seeds->[1] if time() - $node_seeds->[0] < 5*60*60  && 0 < scalar(@{$node_seeds->[1]});
 	
-	my $port;
+	my $port = DEFAULT_PORT;
 	$dest = undef unless defined $dest && ref($dest) eq 'ARRAY' && 0 < scalar(@{$dest});
 	if($CBitcoin::network_bytes == CBitcoin::MAINNET){
-		$port  = 8333;
 		$dest //= [
 			"seed.breadwallet.com", "seed.bitcoin.sipa.be", "dnsseed.bluematt.me", "dnsseed.bitcoin.dashjr.org",
 			"seed.bitcoinstats.com", "bitseed.xf2.org", "seed.bitcoin.jonasschnelli.ch"
 		];
 	}
-	elsif($CBitcoin::network_bytes == CBitcoin::TESTNET){
-		$port = 18333;
+	elsif($CBitcoin::network_bytes == CBitcoin::TESTNET3){
 		$dest //= [
 			"test.seed.breadwallet.com"
 		];
+	}
+	elsif($CBitcoin::network_bytes == CBitcoin::REGNET){
+		$dest //= [];
 	}
 	else{
 		die "bad network bytes";
