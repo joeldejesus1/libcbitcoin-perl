@@ -366,6 +366,10 @@ sub read_cmd_spv{
 	# activate only one peer, and let the $spv figure out how many peers to activate later on
 	$spv->activate_peer();
 	
+	if($ENV{'RETURNSPV'}){
+		return $spv;
+	}
+	
 	$spv->loop();
 	
 	return undef;

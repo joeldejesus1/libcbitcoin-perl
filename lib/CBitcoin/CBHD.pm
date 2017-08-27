@@ -126,11 +126,15 @@ sub generate {
 	my $this = {};
 	
 	my $vers = 0;
-	if($CBitcoin::network_bytes eq CBitcoin::MAINNET){
-		$vers = CBitcoin::BIP32_MAINNET_PRIVATE;
-	}
-	elsif($CBitcoin::network_bytes eq CBitcoin::TESTNET){
-		$vers = CBitcoin::BIP32_TESTNET_PRIVATE;
+	my $map = {
+		CBitcoin::MAINNET => CBitcoin::BIP32_MAINNET_PRIVATE
+		,CBitcoin::TESTNET => CBitcoin::BIP32_TESTNET_PRIVATE
+		,CBitcoin::TESTNET3 => CBitcoin::BIP32_TESTNET_PRIVATE
+		,CBitcoin::REGNET => CBitcoin::BIP32_TESTNET_PRIVATE
+	};
+	
+	if(defined $map->{$CBitcoin::network_bytes}){
+		$vers = $map->{$CBitcoin::network_bytes};
 	}
 	else{
 		die "bad network bytes";

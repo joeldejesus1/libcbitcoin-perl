@@ -114,11 +114,15 @@ sub prefix {
 	
 	my $mapper;
 
-	if($CBitcoin::network_bytes eq CBitcoin::MAINNET){
-		$mapper = $mapper_mainnet;
-	}
-	elsif($CBitcoin::network_bytes eq CBitcoin::TESTNET){
-		$mapper = $mapper_testnet;
+	my $x = {
+		CBitcoin::MAINNET => $mapper_mainnet
+		,CBitcoin::TESTNET => $mapper_testnet
+		,CBitcoin::TESTNET3 => $mapper_testnet
+		,CBitcoin::REGNET => $mapper_testnet
+	};
+
+	if(defined $x->{$CBitcoin::network_bytes}){
+		$mapper = $x->{$CBitcoin::network_bytes};
 	}
 	else{
 		die "bad network bytes";

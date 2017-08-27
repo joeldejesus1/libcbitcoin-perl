@@ -511,6 +511,24 @@ sub deposit {
 
 =pod
 
+---++ deposit_node($path)
+
+Joel made this specifically in order to feed the public key into Regtest.
+
+=cut
+
+sub deposit_node {
+	my $this = shift;
+	my $path = shift;
+	
+	my $node = $this->node_get_by_path($path);
+	my $hdkey = $node->hdkey;
+	return $hdkey->deriveChild($node->hard,$node->sub_index(-1));
+}
+
+
+=pod
+
 ---++ bloomfilter_calculate()
 
 Create a bloom filter.  The hdkeys are 

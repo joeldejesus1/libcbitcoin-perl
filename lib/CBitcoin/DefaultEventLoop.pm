@@ -599,7 +599,7 @@ sub cncstdio_add {
 		while(my $msg = $spv2->cnc_send_message_data('cnc out',$t1->{'cnc out'}->{'mark off'})){
 			last unless defined $msg && 0 < length($msg);
 #			$logger->debug("sending message=[$msg]");
-			$mqout2->send($msg);
+		#	$mqout2->send($msg);
 		}
 		#$logger->debug("sending message on callback cnc out:[fd=".$mqout2->file_descriptor()."][$msg]");
 		#$spv2->receive_message($mqout2->receive());

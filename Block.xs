@@ -201,7 +201,7 @@ HV* picocoin_returnblankblock(HV * rh){
 }
 
 
-// given a full hdkey, fill in a perl hash with relevant data
+// 
 HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf){
 	//fprintf(stderr,"hi - 4\n");
 	hv_store(rh, "version", 7, newSViv( block->nVersion), 0);
@@ -262,11 +262,14 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf
 		return rh;
 	}
 	
-	//fprintf(stderr,"txs %d\n",block->vtx->len);
+    fprintf(stderr,"txs %d\n",block->vtx->len);
 	
 	int i;
 	AV* avTX = (AV *) sv_2mortal ((SV *) newAV ());
 	for(i=0;i<block->vtx->len;i++){
+		
+		
+		
 		struct bp_tx *tx;
 		tx = parr_idx(block->vtx, i);
 		
@@ -280,6 +283,10 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf
 			hv_store( rhSingleTX, "hash", 4, newSVpv( txhash,  BU256_STRSZ), 0);
 		}
 
+		if(i == 0){
+			fprintf(stderr,"coinbase tx\n");
+		}
+		
 		
 		bool add_tx_to_db = false;
 		//tx->vin tx->vout
@@ -321,6 +328,9 @@ HV* picocoin_returnblock(HV * rh, const struct bp_block *block, struct bloom* bf
 					
 					if(parse_bloomfilter_scriptSig(bf, txin->scriptSig)){
 						add_tx_to_db = true;
+					}
+					else{
+						fprintf(stderr,"bloom filter broken?\n");
 					}
 				}
 				
