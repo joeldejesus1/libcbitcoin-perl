@@ -67,7 +67,7 @@ $CBitcoin::VERSION = '0.2';
 
 DynaLoader::bootstrap CBitcoin $CBitcoin::VERSION;
 
-@CBitcoin::EXPORT = ('MAINNET', 'TESTNET', 'TESTNET3');
+@CBitcoin::EXPORT = ('MAINNET', 'TESTNET', 'TESTNET3','REGNET');
 @CBitcoin::EXPORT_OK = ( );
 %CBitcoin::EXPORT_TAGS = (  );
 

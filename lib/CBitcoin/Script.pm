@@ -272,6 +272,9 @@ sub whatTypeOfScript {
 	elsif($s[0] eq 'OP_RETURN'){
 		return 'return';
 	}
+	elsif(scalar(@s) == 2 && $s[-1] eq 'OP_CHECKSIG'){
+		return 'p2p';
+	}
 	else{
 		die "bad script type";
 	}

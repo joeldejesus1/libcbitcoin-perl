@@ -122,20 +122,41 @@ output = {value, script}
 =cut
 
 sub deserialize{
-	my ($package,$data) = @_;
+	my ($package,$data,$script_pubs) = @_;
+	
+	$script_pubs //= [];
 	
 	my $this = picocoin_tx_des($data);
 	bless($this,$package);
 	
 	$this->{'inputs'} = [];
+	my $i = 0;
 	foreach my $in (@{$this->{'vin'}}){
 		$in->{'prevHash'} = join '', reverse split /(..)/, substr($in->{'prevHash'},0,64);
-		push(@{$this->{'inputs'}},CBitcoin::TransactionInput->new({
-			'prevOutHash' => pack('H*',$in->{'prevHash'})
-			,'prevOutIndex' => $in->{'prevIndex'}
-			,'scriptSig' => $in->{'scriptSig'}
-		}));
+		
+		my $input;
+		
+		# must have script_pub
+		if(defined $in->{'ScriptSig'}){
+			warn "scriptsig=".unpack('H*',$in->{'ScriptSig'})."\n";
+			$input = CBitcoin::TransactionInput->new({
+				'prevOutHash' => pack('H*',$in->{'prevHash'})
+				,'prevOutIndex' => $in->{'prevIndex'}
+				,'scriptSig' => $in->{'scriptSig'}
+			});
+		}
+		else{
+			$input = CBitcoin::TransactionInput->new({
+				'prevOutHash' => pack('H*',$in->{'prevHash'})
+				,'prevOutIndex' => $in->{'prevIndex'}
+				,'script' => $script_pubs->[$i]
+			})
+		}
+		
+		push(@{$this->{'inputs'}},$input);
+		$i+=1;
 	}
+
 	delete $this->{'vin'};
 	
 	$this->{'outputs'} = [];
