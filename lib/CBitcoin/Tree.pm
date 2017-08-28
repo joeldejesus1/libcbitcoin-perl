@@ -1233,6 +1233,18 @@ sub db_tx_index{
 }
 
 
+=pod
+
+---+ paper wallet
+
+=cut
+
+=pod
+
+---++
+
+=cut
+
 
 1;
 

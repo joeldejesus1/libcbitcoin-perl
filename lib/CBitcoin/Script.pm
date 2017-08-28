@@ -353,6 +353,71 @@ sub multisig_p2sh_script {
 }
 
 
+=pod
+
+---+ extraction
+
+=cut
+
+=pod
+
+---++ p2p_publickey
+
+Get public key from script.
+
+=cut
+
+sub p2p_publickey($){
+	my $x = shift;
+	return undef unless whatTypeOfScript($x) eq 'p2p';
+	my $y = chunks($x);
+	die "no chunks" unless defined $y;
+	if($y->[0] =~ m/^0[x]([0-9a-fA-F]+)/){
+		return pack('H*',$1);
+	}
+	else{
+		return undef;
+	}
+}
+
+=pod
+
+---++ p2pkh_ripemd
+
+Get ripemd hash from script.
+
+=cut
+
+sub p2pkh_ripemd($){
+	my $x = shift;
+	return undef unless whatTypeOfScript($x) eq 'p2pkh';
+	my $y = chunks($x);
+	die "no chunks" unless defined $y;
+	#  OP_DUP OP_HASH160 0x14 0x3dbcec384e5b32bb426cc011382c4985990a1895 OP_EQUALVERIFY OP_CHECKSIG
+	# 0x14 may or may not be there, so start index fromo the end, not beginning.
+	if($y->[-3] =~ m/^0[x]([0-9a-fA-F]+)/){
+		return pack('H*',$1);
+	}
+	else{
+		return undef;
+	}
+}
+
+=pod
+
+---++ chunks($script)->[]
+
+Return an array with 0x21438 hex values in binary form.
+
+=cut
+
+sub chunks($){
+	my $x = shift;
+	die "no script" unless defined $x;
+	my @y = split(/\s+/,$x);
+	return \@y;
+}
+
 =head1 SYNOPSIS
 
   use CBitcoin;

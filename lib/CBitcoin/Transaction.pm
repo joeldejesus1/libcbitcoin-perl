@@ -106,7 +106,7 @@ sub new {
 
 =pod
 
----++ deserialize($serialized_tx)
+---++ deserialize($serialized_tx,\@scriptPubs)
 
 
 Get a hash back, not a blessed object.
@@ -118,6 +118,9 @@ locktime
 
 input = {prevHash, prevIndex, script, sequence}
 output = {value, script}
+
+If deserializing a raw transaction, please provide @scriptPubs that correspond with the inputs.
+
 
 =cut
 
@@ -347,6 +350,7 @@ SCRIPT_VERIFY_NONE -> 1
 SCRIPT_VERIFY_STRICTENC -> 2
 SCRIPT_VERIFY_P2SH -> 3
 SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC -> 4
+
 =cut
 
 sub validate_sigs {
@@ -495,6 +499,36 @@ sub assemble_p2pkh {
 	
 }
 
+=pod
+
+---++ assemble_p2p($i,$key)
+
+=cut
+
+sub assemble_p2p {
+	my ($this,$i,$key,$txraw) = @_;
+	# do some testing
+	die "bad index" unless defined $i && 0 <= $i && $i < $this->numOfInputs();
+	
+	die "no key" unless defined $key;
+	my $txdata;
+	if(defined $txraw){
+		$txdata = $txraw;
+	}
+	else{
+		$txdata = $this->serialize();
+	}
+
+	$txraw = picocoin_tx_sign_p2p(
+		$key->serialized_private(),
+		CBitcoin::Script::serialize_script($this->input($i)->script()),
+		$txdata,
+		$i,
+		SIGHASH_ALL
+	);
+	die "bad signature" unless defined $txraw && 0 < length($txraw);
+	return $txraw;
+}
 
 =pod
 
