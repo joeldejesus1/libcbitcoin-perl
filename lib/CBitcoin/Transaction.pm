@@ -12,7 +12,9 @@ use constant {
 	OP_PUSHDATA1 => 0x4c,
 	OP_PUSHDATA2 => 0x4d,
 	OP_PUSHDATA4 => 0x4e
+	
 };
+
 
 =head1 NAME
 
@@ -106,7 +108,7 @@ sub new {
 
 =pod
 
----++ deserialize($serialized_tx)
+---++ deserialize($serialized_tx,\@scriptPubs)
 
 
 Get a hash back, not a blessed object.
@@ -119,31 +121,55 @@ locktime
 input = {prevHash, prevIndex, script, sequence}
 output = {value, script}
 
+If deserializing a raw transaction, please provide @scriptPubs that correspond with the inputs.
+
+
 =cut
 
 sub deserialize{
-	my ($package,$data) = @_;
+	my ($package,$data,$script_pubs) = @_;
+	
+	$script_pubs //= [];
 	
 	my $this = picocoin_tx_des($data);
 	bless($this,$package);
 	
 	$this->{'inputs'} = [];
+	my $i = 0;
+	
 	foreach my $in (@{$this->{'vin'}}){
-		$in->{'prevHash'} = join '', reverse split /(..)/, substr($in->{'prevHash'},0,64);
-		push(@{$this->{'inputs'}},CBitcoin::TransactionInput->new({
-			'prevOutHash' => pack('H*',$in->{'prevHash'})
-			,'prevOutIndex' => $in->{'prevIndex'}
-			,'scriptSig' => $in->{'scriptSig'}
-		}));
+		$in->{"prevHash"} = join '', reverse split /(..)/, substr($in->{"prevHash"},0,64);
+		
+		my $input;
+		
+		# must have script_pub
+		if(defined $in->{"scriptSig"}){
+			$input = CBitcoin::TransactionInput->new({
+				'prevOutHash' => pack('H*',$in->{"prevHash"})
+				,'prevOutIndex' => $in->{"prevIndex"}
+				,'scriptSig' => $in->{"scriptSig"}
+			});
+		}
+		else{
+			$input = CBitcoin::TransactionInput->new({
+				'prevOutHash' => pack('H*',$in->{"prevHash"})
+				,'prevOutIndex' => $in->{"prevIndex"}
+				,'script' => $script_pubs->[$i]
+			})
+		}
+		
+		push(@{$this->{'inputs'}},$input);
+		$i+=1;
 	}
+
 	delete $this->{'vin'};
 	
 	$this->{'outputs'} = [];
 	
 	foreach my $in (@{$this->{'vout'}}){
 		push(@{$this->{'outputs'}},CBitcoin::TransactionOutput->new({
-			'script' => CBitcoin::Script::deserialize_script($in->{'script'}) 
-			,'value' => $in->{'value'}
+			'script' => CBitcoin::Script::deserialize_script($in->{"script"}) 
+			,'value' => $in->{"value"}
 		}));
 	}
 	delete $this->{'vout'};
@@ -206,6 +232,34 @@ sub add_redeem_script {
 }
 
 
+=pod
+
+---++ add_output($tx_out)
+
+=cut
+
+sub add_output($$){
+	my ($this,$output) = @_;
+	die "no output" unless defined $output && ref($output) =~ m/Output/;
+	$this->{'outputs'} //= [];
+	push(@{$this->{'outputs'}},$output);
+	return scalar(@{$this->{'outputs'}});
+}
+
+=pod
+
+---++ randomize()
+
+To preserve privacy, randomize outputs so people cannot gues which output is change and which is sending money.
+
+=cut
+
+sub randomize($){
+	my $this = shift;
+	CBitcoin::Utilities::fisher_yates_shuffle($this->{'inputs'});
+	CBitcoin::Utilities::fisher_yates_shuffle($this->{'outputs'});
+}
+
 =item numOfInputs
 
 ---++ numOfInputs
@@ -254,17 +308,19 @@ sub output {
 
 =pod
 
----++ serialize($raw_bool)
+---++ serialize($raw_bool,$flush_bool)
+
+Raw means there are no script sigs.  Flush means to force reserialization.
 
 =cut
 
 sub serialize {
-	my ($this,$raw_bool) = @_;
+	my ($this,$raw_bool,$flush_bool) = @_;
 	
-	if($raw_bool && defined $this->{'serialized raw'}){
+	if($raw_bool && !$flush_bool && defined $this->{'serialized raw'}){
 		return $this->{'serialized raw'};
 	}
-	elsif(!$raw_bool && defined $this->{'serialized full'}){
+	elsif(!$raw_bool && !$flush_bool && defined $this->{'serialized full'}){
 		return $this->{'serialized full'};
 	}
 	
@@ -277,6 +333,7 @@ sub serialize {
 	
 	$data .= CBitcoin::Utilities::serialize_varint($this->numOfOutputs);
 	for(my $i=0;$i<$this->numOfOutputs;$i++){
+		#warn "serialization output value=".$this->output($i)->value."\n";
 		$data .= $this->output($i)->serialize();
 	}
 	
@@ -326,6 +383,7 @@ SCRIPT_VERIFY_NONE -> 1
 SCRIPT_VERIFY_STRICTENC -> 2
 SCRIPT_VERIFY_P2SH -> 3
 SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC -> 4
+
 =cut
 
 sub validate_sigs {
@@ -474,6 +532,37 @@ sub assemble_p2pkh {
 	
 }
 
+=pod
+
+---++ assemble_p2p($i,$key)
+
+=cut
+
+sub assemble_p2p {
+	my ($this,$i,$key,$txraw) = @_;
+	# do some testing
+	die "bad index" unless defined $i && 0 <= $i && $i < $this->numOfInputs();
+	
+	die "no key" unless defined $key;
+	my $txdata;
+	if(defined $txraw){
+		$txdata = $txraw;
+	}
+	else{
+		$txdata = $this->serialize();
+	}
+	
+
+	$txraw = picocoin_tx_sign_p2p(
+		$key->serialized_private(),
+		CBitcoin::Script::serialize_script($this->input($i)->script()),
+		$txdata,
+		$i,
+		SIGHASH_ALL
+	);
+	die "bad signature" unless defined $txraw && 0 < length($txraw);
+	return $txraw;
+}
 
 =pod
 

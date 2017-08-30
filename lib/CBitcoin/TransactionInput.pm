@@ -51,6 +51,7 @@ sub new {
 	my $this = bless({}, $package);
 
 	my $x = shift;
+	 
 	unless(
 		defined $x && ref($x) eq 'HASH' 
 		&& ($x->{'script'} || $x->{'scriptSig'} ) && defined $x->{'prevOutHash'} 
@@ -92,7 +93,11 @@ AKA scriptPubKey
 =cut
 
 sub script {
-	return shift->{'script'};
+	my ($this,$script) = @_;
+	if(defined $script){
+		$this->{'script'} = $script;
+	}
+	return $this->{'script'};
 }
 
 =pod

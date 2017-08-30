@@ -82,21 +82,23 @@ sub new {
 	
 	# Check the network bytes
 	my $prefix = substr($txt,0,4);
-	if(
-		( $prefix eq 'xprv' || $prefix eq 'xpub' )
-		&& $CBitcoin::network_bytes eq CBitcoin::MAINNET
+	
+	
+	
+	my %mainnet = map {$_ => 1} (CBitcoin::MAINNET);
+	my %alltestnet = map {$_ => 1}  (CBitcoin::TESTNET,CBitcoin::TESTNET3,CBitcoin::REGNET);
+	my $map = {
+		'xprv' => \%mainnet, 'xpub' => \%mainnet,
+		'tprv' => \%alltestnet, 'tpub' => \%alltestnet
+	};
+	
+	unless(
+		defined $map->{$prefix}
+		&& defined $map->{$prefix}->{$CBitcoin::network_bytes}
 	){
-		
+		die "bad network bytes";
 	}
-	elsif(
-		( $prefix eq 'tprv' || $prefix eq 'tpub' )
-		&& $CBitcoin::network_bytes eq CBitcoin::TESTNET
-	){
-		
-	}
-	else{
-		die "bad network bytes($prefix)";
-	}
+	
 	
 	my $this = picocoin_newhdkey($txt);
 	
@@ -124,11 +126,15 @@ sub generate {
 	my $this = {};
 	
 	my $vers = 0;
-	if($CBitcoin::network_bytes eq CBitcoin::MAINNET){
-		$vers = CBitcoin::BIP32_MAINNET_PRIVATE;
-	}
-	elsif($CBitcoin::network_bytes eq CBitcoin::TESTNET){
-		$vers = CBitcoin::BIP32_TESTNET_PRIVATE;
+	my $map = {
+		CBitcoin::MAINNET => CBitcoin::BIP32_MAINNET_PRIVATE
+		,CBitcoin::TESTNET => CBitcoin::BIP32_TESTNET_PRIVATE
+		,CBitcoin::TESTNET3 => CBitcoin::BIP32_TESTNET_PRIVATE
+		,CBitcoin::REGNET => CBitcoin::BIP32_TESTNET_PRIVATE
+	};
+	
+	if(defined $map->{$CBitcoin::network_bytes}){
+		$vers = $map->{$CBitcoin::network_bytes};
 	}
 	else{
 		die "bad network bytes";

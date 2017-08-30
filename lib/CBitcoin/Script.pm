@@ -114,11 +114,15 @@ sub prefix {
 	
 	my $mapper;
 
-	if($CBitcoin::network_bytes eq CBitcoin::MAINNET){
-		$mapper = $mapper_mainnet;
-	}
-	elsif($CBitcoin::network_bytes eq CBitcoin::TESTNET){
-		$mapper = $mapper_testnet;
+	my $x = {
+		CBitcoin::MAINNET => $mapper_mainnet
+		,CBitcoin::TESTNET => $mapper_testnet
+		,CBitcoin::TESTNET3 => $mapper_testnet
+		,CBitcoin::REGNET => $mapper_testnet
+	};
+
+	if(defined $x->{$CBitcoin::network_bytes}){
+		$mapper = $x->{$CBitcoin::network_bytes};
 	}
 	else{
 		die "bad network bytes";
@@ -268,6 +272,9 @@ sub whatTypeOfScript {
 	elsif($s[0] eq 'OP_RETURN'){
 		return 'return';
 	}
+	elsif(scalar(@s) == 2 && $s[-1] eq 'OP_CHECKSIG'){
+		return 'p2p';
+	}
 	else{
 		die "bad script type";
 	}
@@ -345,6 +352,71 @@ sub multisig_p2sh_script {
 	return "OP_$m ".join(' ',@pubs)." OP_$n OP_CHECKMULTISIG";
 }
 
+
+=pod
+
+---+ extraction
+
+=cut
+
+=pod
+
+---++ p2p_publickey
+
+Get public key from script.
+
+=cut
+
+sub p2p_publickey($){
+	my $x = shift;
+	return undef unless whatTypeOfScript($x) eq 'p2p';
+	my $y = chunks($x);
+	die "no chunks" unless defined $y;
+	if($y->[0] =~ m/^0[x]([0-9a-fA-F]+)/){
+		return pack('H*',$1);
+	}
+	else{
+		return undef;
+	}
+}
+
+=pod
+
+---++ p2pkh_ripemd
+
+Get ripemd hash from script.
+
+=cut
+
+sub p2pkh_ripemd($){
+	my $x = shift;
+	return undef unless whatTypeOfScript($x) eq 'p2pkh';
+	my $y = chunks($x);
+	die "no chunks" unless defined $y;
+	#  OP_DUP OP_HASH160 0x14 0x3dbcec384e5b32bb426cc011382c4985990a1895 OP_EQUALVERIFY OP_CHECKSIG
+	# 0x14 may or may not be there, so start index fromo the end, not beginning.
+	if($y->[-3] =~ m/^0[x]([0-9a-fA-F]+)/){
+		return pack('H*',$1);
+	}
+	else{
+		return undef;
+	}
+}
+
+=pod
+
+---++ chunks($script)->[]
+
+Return an array with 0x21438 hex values in binary form.
+
+=cut
+
+sub chunks($){
+	my $x = shift;
+	die "no script" unless defined $x;
+	my @y = split(/\s+/,$x);
+	return \@y;
+}
 
 =head1 SYNOPSIS
 

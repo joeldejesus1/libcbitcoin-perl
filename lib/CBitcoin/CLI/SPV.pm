@@ -115,44 +115,43 @@ sub validate_filepath {
 sub parser {
 	my $ref = shift;
 	my $options;
+	#warn "p - 1\n";
 	if(ref($ref) eq 'HASH'){
 		$options  = $ref ;
 	}
 	else{
 		$options = {'node' => [],'watch' => []};
 	}
-	
+	#warn "p - 2\n";
 	foreach my $arg (@_){
+		#warn "p - pre looping arg=$arg\n";
 		if($arg =~ m/^\-\-node\=([0-9a-zA-Z]+\.onion|[0-9\.]+)\:(\d+)$/){
 			push(@{$options->{'node'}},[$1,$2]);
 		}
 		elsif($arg =~ m/^\-\-node\=(.*)$/){
+			#warn "bad formatting for node($1)\n";
 			die "bad formatting for node\n";
 		}
-		
 		elsif($arg =~ m/^\-\-watch\=([0-9a-zA-Z]+)$/){
 			push(@{$options->{'watch'}},$1);
 		}
 		elsif($arg =~ m/^\-\-watch\=(.*)$/){
 			die "bad formatting for watch\n";
 		}
-		
-		
 		elsif($arg =~ m/^\-\-address\=([0-9a-zA-Z]+\.onion|[0-9\.]+)\:(\d+)$/){
+			#warn "address=($1,$2)\n";
 			$options->{'address'} = $1;
 			$options->{'port'} = $2;
 		}
 		elsif($arg =~ m/^\-\-address\=(.*)$/){
 			die "bad formatting for address\n";
 		}
-		
 		elsif($arg =~ m/^\-\-timeout\=(\d+)$/){
 			$options->{'timeout'} = $1;
 		}
 		elsif($arg =~ m/^\-\-timeout\=(.*)$/){
 			die "bad formatting for timeout\n";
 		}
-		
 		elsif($arg =~ m/^\-\-clientname\=\"(.*)\"$/){
 			#warn "parse client name=[$1][$arg]\n";
 			$options->{'client name'} = $1;
@@ -160,7 +159,6 @@ sub parser {
 		elsif($arg =~ m/^\-\-clientname\=(.*)$/){
 			die "bad formatting for clientname, did you forget quotes? \"\"\n";
 		}
-		
 		elsif(validate_filepath($arg,'--logconf=')){
 			#warn "logconf ARG=$arg\n";
 			$options->{'logconf'} = validate_filepath($arg,'--logconf=');
@@ -168,16 +166,13 @@ sub parser {
 		elsif($arg =~ m/^\-\-logconf\=(.*)$/){
 			die "bad formatting for log conf file\n";
 		}
-		
 		elsif(validate_filepath($arg,'--dbpath=')){
 		#	warn "dbpath ARG=$arg\n";
 			$options->{'db path'} = validate_filepath($arg,'--dbpath=');
 		}
 		elsif($arg =~ m/^\-\-dbpath\=(.*)$/){
 			die "bad formatting for dbpath\n";
-		}
-		
-		
+		}		
 		elsif($arg =~ m/^\-\-inputfd\=(\d+)$/){
 #			warn "Got xyz inputfd=$1";
 			$options->{'inputfd'} = $1;
@@ -193,7 +188,7 @@ sub parser {
 		elsif($arg =~ m/^\-\-outputfd\=(.*)$/){
 			die "bad file descriptor";
 		}
-		
+		#warn "p - post looping arg=$arg\n";
 	}
 	
 	#warn "Got xyz Both[".$options->{'inputfd'}."][".$options->{'outputfd'}."]\n";
@@ -298,7 +293,7 @@ BEGIN{
 sub read_cmd_spv{
 	
 	$0 = 'CBitcoin::SPV';
-	
+	#warn "hi - 1\n";
 	my $options = {
 		'node' => [],'watch' => []
 		,'address' => '127.0.0.1'
@@ -309,8 +304,9 @@ sub read_cmd_spv{
 	};
 
 	$options = parser($options,@_);
+	#warn "hi - 1.2\n";
 	logging_conf($options->{'logconf'});
-	
+	#warn "hi - 2\n";
 	# set up the bloom filter
 	my $bloomfilter;
 	if(defined $options->{'watch'}){
@@ -329,7 +325,7 @@ sub read_cmd_spv{
 		}		
 	}
 
-	
+	#warn "hi - 3\n";
 	my $eventloop_options = {
 		'timeout' => $options->{'timeout'}
 	};
@@ -344,7 +340,7 @@ sub read_cmd_spv{
 		#warn "setting outputfd=".$options->{'outputfd'};
 		$eventloop_options->{'outputfd'} = $options->{'outputfd'};
 	}	
-	
+	#warn "hi - 4\n";
 	#warn "prestart cn=".$options->{'outputfd'}."\n";
 	my $args = {
 		'client name' => $options->{'client name'},
@@ -363,12 +359,16 @@ sub read_cmd_spv{
 	foreach my $node (@{$options->{'node'}}){
 		$spv->add_peer_to_inmemmory(pack('Q',1),$node->[0],$node->[1]);
 	}
-	
+	#warn "hi - 5\n";
 	$SIG{'PIPE'} = 'IGNORE';
 	
 	
 	# activate only one peer, and let the $spv figure out how many peers to activate later on
 	$spv->activate_peer();
+	
+	if($ENV{'RETURNSPV'}){
+		return $spv;
+	}
 	
 	$spv->loop();
 	

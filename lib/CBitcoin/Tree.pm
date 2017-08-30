@@ -134,6 +134,10 @@ sub init{
 	
 	$this->db_tx_index();
 	
+	$this->{'defaults'} = {
+		'minimum amount' => int(0.050 * 100000000)
+		,'maximum input output' => 8
+	};
 	
 	
 	$this->{'bloom filter'} = CBitcoin::BloomFilter->new({
@@ -476,6 +480,8 @@ sub export {
 
 Make multisignature address.
 
+For a single payout address, $hdkey->deriveChild($path).
+
 =cut
 
 sub deposit {
@@ -508,6 +514,24 @@ sub deposit {
 		);
 	}
 }
+
+=pod
+
+---++ deposit_node($path)
+
+Joel made this specifically in order to feed the public key into Regtest.
+
+=cut
+
+sub deposit_node {
+	my $this = shift;
+	my $path = shift;
+	
+	my $node = $this->node_get_by_path($path);
+	my $hdkey = $node->hdkey;
+	return $hdkey->deriveChild($node->hard,$node->sub_index(-1));
+}
+
 
 =pod
 
@@ -1214,6 +1238,170 @@ sub db_tx_index{
 	
 }
 
+
+=pod
+
+---+ paper wallet
+
+=cut
+
+=pod
+
+---++ paper_spend($fee,$input_balance,$raw_tx,\@script_pubs)->$signed_tx
+
+Given a raw transaction created by an online SPV wallet, sign the transaction and return the raw data.
+
+=cut
+
+sub paper_spend($$$$$$){
+	my ($this,$path,$fee,$total_in,$raw_tx,$script_pubs) = @_;
+	
+	unless(defined $fee && $fee =~ m/^(\d+)$/){
+		die "bad fee";
+	}
+	unless(defined $total_in && $total_in =~ m/^(\d+)$/){
+		die "bad balance";
+	}
+	unless(defined $raw_tx && 0 < length($raw_tx)){
+		die "no raw tx";
+	}
+	
+	unless(defined $script_pubs && ref($script_pubs) eq 'ARRAY' && 0 < scalar(@{$script_pubs})){
+		die "bad script pubs";
+	}
+	
+	
+	my $tx = CBitcoin::Transaction->deserialize($raw_tx,$script_pubs);
+	die "no transaction" unless defined $tx;
+
+	my $sum = 0;
+	for(my $i=0;$i<$tx->numOfOutputs;$i++){
+		$sum += $tx->output($i)->value();
+	}
+	die "insufficient funds" unless $fee + $sum <= $total_in;
+	
+	$this->_paper_spend_mix($path,$tx,$total_in,$fee);
+	
+	# do one last check of the fee
+	$sum = 0;
+	for(my $i=0;$i<$tx->numOfOutputs;$i++){
+		$sum += $tx->output($i)->value();
+		#warn "sum value=".$tx->output($i)->value()."\n";
+	}
+	die "bad fee" unless $fee + $sum == $total_in;
+
+	return $this->_paper_spend_sign($tx);	
+}
+
+# add outputs, mix and randomize amounts to preserve privacy
+sub _paper_spend_mix($$$$$){
+	my ($this,$path,$tx,$total_in,$fee) = @_;
+	
+	my $c_in = $tx->numOfInputs();
+	my $c_out = $tx->numOfOutputs();
+	
+	my $total_out = 0;
+	for(my $i=0;$i<$tx->numOfOutputs;$i++){
+		$total_out += $tx->output($i)->value;
+	}
+	
+	die "insufficient funds" unless $total_out + $fee <= $total_in;
+	
+	my $left_over  = $total_in - $total_out - $fee;
+	my $min_amt = $this->{'default'}->{'minimum amount'};
+	$min_amt //= 10*$fee;
+	my $c_max = $this->{'default'}->{'maximum input output'};
+	$c_max //= 8;
+	
+	my $c_leftover = 1;
+	if($c_in + $c_out < $c_max){
+		$c_leftover = $c_max - ( $c_in + $c_out );
+	}
+	my $avg = 1.0*$left_over/$c_leftover;
+	
+	my @amounts;
+	while(0 < $left_over){
+		my $diff = $min_amt + int(rand($avg));
+		my $pl = $left_over - $diff;
+		if($pl < 0 && $min_amt <= $left_over){
+			# not dust, have separate output
+			push(@amounts,$left_over);
+			$left_over = 0;
+		}
+		elsif($pl < 0 && 0 < scalar(@amounts)){
+			# dust, group this in with last item in array
+			$amounts[-1] //= 0;
+			$amounts[-1] += $left_over;
+			$left_over = 0;
+		}
+		elsif($pl < 0 && scalar(@amounts) == 0){
+			die "dust problem";
+		}
+		else{
+			push(@amounts,$diff);
+			$left_over = $pl;
+		}
+	}
+	my $sum = 0;
+	map { $sum += $_ } @amounts;
+	die "bad amount" unless $sum == $total_in - $total_out - $fee;
+	
+	
+	# need to figure out how to divide up $left_over into $c_leftover additional outputs
+	foreach my $amt (@amounts){
+		my $script = CBitcoin::Script::address_to_script($this->deposit($path));
+		die "no script" unless defined $script;
+		my $output = CBitcoin::TransactionOutput->new({
+			'script' => $script 
+			,'value' => $amt
+		});
+		
+		$tx->add_output($output);
+	}
+	
+	
+	$tx->randomize();
+	
+	# get full transaction and make sure not to used cached raw tax
+	my $rt = $tx->serialize(0,1);
+	#warn "real tx=".unpack('H*',$rt);
+	return $rt;
+}
+
+
+sub _paper_spend_sign($$){
+	my ($this,$tx) = @_;
+	my $txdata;
+	for(my $i=0;$i<$tx->numOfInputs;$i++){
+		my $tx_in = $tx->input($i);
+		my $type = CBitcoin::Script::whatTypeOfScript($tx_in->script);
+		
+		if($type eq 'p2p'){
+			# got a public key
+			my $publickey = CBitcoin::Script::p2p_publickey($tx_in->script);
+			my $hd = $this->dict_node($publickey);
+			die "no corresponding key" unless defined $hd;
+			# [$node,$hardbool,$index]
+			$txdata = $tx->assemble_p2p($i,$hd->[0]->hdkey,$txdata);
+		}
+		elsif($type eq 'p2pkh'){
+			# got a ripemd hash
+			my $hash160 = CBitcoin::Script::p2pkh_ripemd($tx_in->script);
+			my $hd = $this->dict_node($hash160);
+			die "no corresponding key" unless defined $hd;
+			$txdata = $tx->assemble_p2pkh($i,$hd->[0]->hdkey,$txdata);
+		}
+		else{
+			die "bad transaction";
+		}
+	}
+	if($tx->validate_sigs($txdata)){
+		return $txdata;
+	}
+	else{
+		die "bad tx";
+	}
+}
 
 
 1;

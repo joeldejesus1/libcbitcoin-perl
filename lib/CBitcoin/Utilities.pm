@@ -7,6 +7,9 @@ use Net::IP;
 use Net::DNS;
 use CBitcoin;
 use Convert::Base32;
+use MIME::Base64;
+use CBitcoin;
+use Image::PNG::QRCode 'qrpng';
 
 use constant TORPREFIX => 'fd87d87eeb43';
 
@@ -20,6 +23,27 @@ my $logger = Log::Log4perl->get_logger();
 
 
 =cut
+
+=pod
+
+---++ DEFAULT_PORT
+
+=cut
+
+sub DEFAULT_PORT{
+	if( $CBitcoin::network_bytes eq CBitcoin::MAINNET){
+		return 8333;
+	}
+	elsif($CBitcoin::network_bytes eq CBitcoin::TESTNET){
+		return 18333;
+	}
+	elsif($CBitcoin::network_bytes eq CBitcoin::REGNET){
+		return 18444;
+	}
+	else{
+		return 8333;
+	}
+}
 
 =pod
 
@@ -226,6 +250,29 @@ sub network_address_deserialize {
 		die "port did not untaint";
 	}
 	return $ans;
+}
+
+
+sub generate_random_filename{
+	my $length = shift;
+	if(defined $length && $length =~ m/^(\d+)$/){
+		$length = $1;
+	}
+	elsif(defined $length){
+		die "bad length";
+	}
+	else{
+		$length = 16;
+	}
+	
+	my $string = join('', map +(0..9,'a'..'z','A'..'Z')[rand(10+26*2)], 1..$length);
+	if($string =~ m/^([0-9a-zA-Z]+)$/){
+		$string = $1;
+	}
+	else{
+		die "bad string";
+	}
+	return $string;
 }
 
 
@@ -591,20 +638,21 @@ sub dns_fetch_peers{
 	
 	return $node_seeds->[1] if time() - $node_seeds->[0] < 5*60*60  && 0 < scalar(@{$node_seeds->[1]});
 	
-	my $port;
+	my $port = DEFAULT_PORT;
 	$dest = undef unless defined $dest && ref($dest) eq 'ARRAY' && 0 < scalar(@{$dest});
 	if($CBitcoin::network_bytes == CBitcoin::MAINNET){
-		$port  = 8333;
 		$dest //= [
 			"seed.breadwallet.com", "seed.bitcoin.sipa.be", "dnsseed.bluematt.me", "dnsseed.bitcoin.dashjr.org",
 			"seed.bitcoinstats.com", "bitseed.xf2.org", "seed.bitcoin.jonasschnelli.ch"
 		];
 	}
-	elsif($CBitcoin::network_bytes == CBitcoin::TESTNET){
-		$port = 18333;
+	elsif($CBitcoin::network_bytes == CBitcoin::TESTNET3){
 		$dest //= [
 			"test.seed.breadwallet.com"
 		];
+	}
+	elsif($CBitcoin::network_bytes == CBitcoin::REGNET){
+		$dest //= [];
 	}
 	else{
 		die "bad network bytes";
@@ -640,8 +688,93 @@ sub dns_fetch_peers{
 
 
 
+=pod
 
+---++ binary_to_qrcodes($binary)->$dir
 
+Split a serialized binary blob into qr code readable chunks.
+
+Format of data: [qr_total, 1B][data, ?B]
+
+Per qr code: [qr_i, 1B][data, ?B]
+
+=cut
+
+sub binary_to_qrcodes{
+	my ($data,$basedir) = @_;
+	unless(defined $data && 4 < length($data)){
+		die "bad data";
+	}
+	
+	if(defined $basedir && $basedir =~ validate_filepath($basedir)){
+		$basedir = validate_filepath($basedir);
+	}
+	elsif(defined $basedir){
+		die "bad base directory";
+	}
+	else{
+		$basedir = '/tmp';
+	}
+
+	$basedir .= '/'.generate_random_filename(12);
+	mkdir($basedir) || die "failed to make directory (d=$basedir)";
+	
+	
+	my $ans = [];
+	
+	return $ans unless defined $data && 0 < length($data);
+	
+	my $max_bytes = 160;
+	
+	my ($m,$n) = (0,length($data));
+	my $i = 0;
+	# find out total number of qr codes needed
+	while(0 < $n - $m){
+		die "too many qr codes" unless $i < 16;
+		my $k = $max_bytes;
+		if($n - $m - $k < 0){
+			$k = $n - $m;
+		}
+		#push(@{$ans},MIME::Base64::encode(pack('C',$i).substr($data,$m,$k)));
+		$i += 1;
+		$m += $k;
+	}
+	
+	# define sub to write qr code file
+	my $writesub = sub{
+		my $qr_data = shift;
+		my $qr_num = shift;
+		qrpng (text => $qr_data, out => $basedir.'/'.$qr_num.'.png');
+	};
+	
+	# split the binary blob here
+	($m,$n) = (0,length($data));
+	my $j = $i - 1;
+	$i = 0;
+	while(0 < $n - $m){
+		die "too many qr codes" unless $i < 16;
+		my $k = $max_bytes;
+		if($n - $m - $k < 0){
+			$k = $n - $m;
+		}
+		if($i == 0){
+			$writesub->(
+				MIME::Base64::encode(pack('C',$i).pack('C',$j).substr($data,$m,$k))
+				,$i
+			);
+		}
+		else{
+			$writesub->(
+				MIME::Base64::encode(pack('C',$i).substr($data,$m,$k))
+				,$i
+			);
+		}
+		$i += 1;
+		$m += $k;
+	}
+	
+	return $basedir;
+}
 
 
 

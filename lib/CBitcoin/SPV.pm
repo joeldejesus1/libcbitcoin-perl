@@ -16,6 +16,7 @@ use Log::Log4perl;
 
 
 
+
 =pod
 
 ---+ contructors/destructors
@@ -44,18 +45,19 @@ sub new {
 	bless($this,$package);
 	$this->init($options);
 
+	$logger->debug("1");
 	
 	$this->{'getblocks timeout'} = 0;
 	$this->{'callbacks nonce'} = 1;
 	
 	$this->make_directories();
-	
+	$logger->debug("2");
 	# start block chain at 0
 	$this->{'headers'} = [];
 	$this->{'transactions'} = {};
 	$this->initialize_chain();
 
-	
+	$logger->debug("3");
 	# brain
 	$this->{'inv'} = [{},{},{},{}];
 	$this->{'inv search'} = [{},{},{},{}];
@@ -66,8 +68,8 @@ sub new {
 	$this->initialize_cnc();
 	
 	
-	
-	warn "spv new done";
+	$logger->debug("4");
+	$logger->debug("spv new done");
 
 	return $this;
 	
@@ -329,12 +331,14 @@ In the directory:
 
 sub add_header_to_chain {
 	my ($this,$peer, $block_header) = @_;
+	
 	die "header is null" unless defined $block_header;
 	
 	#$this->add_header_to_inmemory_chain($peer, $block_header);
 
 	if($this->chain->block_append($block_header)){
 		$this->chain->block_orphan_save();
+#		$logger->debug("save");
 		$this->add_header_to_db($block_header);
 	}
 	else{
@@ -652,12 +656,17 @@ See callback_gotblock to see how the bloom filter is used.
 =cut
 
 sub add_bloom_filter {
-	my ($this,$bf) = @_;
+	my ($this,$bf,$timestamp) = @_;
 	die "not a bloom filter" unless defined $bf && ref($bf) =~ m/BloomFilter/;
+	
+	$timestamp //= 0;
+	
 	# calculates the bloom filter, dies if we have bad stuff.
 	$bf->data();
 	
 	$this->{'bloom filter'} = $bf;
+	$this->{'bloom filter timestamp'} = $timestamp;
+	
 }
 
 
@@ -671,7 +680,7 @@ Find a peer in a pool, and turn it on
 
 sub activate_peer {
 	my $this = shift;
-	$logger->debug("activating peer - 0");
+#	$logger->debug("activating peer - 0");
 	
 	my $connect_sub = $this->{'connect sub'};
 	# if we are maxed out on connections, then exit
@@ -683,7 +692,7 @@ sub activate_peer {
 	my $dir_pending = $this->db_path().'/peers/pending';
 	my $dir_banned = $this->db_path().'/peers/banned';
 	
-	$logger->debug("activating peer - 2");
+	#$logger->debug("activating peer - 2");
 	opendir(my $fh,$dir_pool) || die "cannot open directory";
 	my @files = sort grep { $_ ne '.' && $_ ne '..' } readdir $fh;
 	closedir($fh);
@@ -710,7 +719,7 @@ sub activate_peer {
 	
 	
 	my ($latest,$socket);
-	$logger->debug("activating peer - 3");
+	#$logger->debug("activating peer - 3");
 	
 	while(scalar(@peer_files)>0){
 		$latest = shift(@peer_files);
@@ -970,8 +979,10 @@ sub peer_hook_handshake_finished{
 	#$peer->send_getaddr();
 	if($this->block_height() < $peer->block_height()){
 		$logger->debug("alpha; block height diff=".( $peer->block_height() - $this->block_height() ));
+		
+		$this->peer_hook_blocks($peer);
 		#$peer->send_getblocks();
-		$peer->send_getheaders();
+		#$peer->send_getheaders();
 	}
 	else{
 		$logger->debug("beta; block height diff=".( $peer->block_height() - $this->block_height() ));
@@ -983,6 +994,20 @@ sub peer_hook_handshake_finished{
 	}
 	
 	#$peer->send_getblocks();
+}
+
+sub peer_hook_blocks{
+	my ($this,$peer) = @_;
+	
+	
+	if($this->bloom_filter){
+		$logger->debug("have bloom filter, getting blocks");
+		$peer->send_getblocks();
+	}
+	else{
+		$logger->debug("getting headers, no bloom filter");
+		$peer->send_getheaders();
+	}
 }
 
 
@@ -1072,7 +1097,7 @@ sub hook_peer_onreadidle {
 	$this->activate_peer();
 	
 	
-	#warn "Peer=".$peer->address().";Num of Headers=".scalar(@{$this->{'headers'}})."\n";
+	##warn "Peer=".$peer->address().";Num of Headers=".scalar(@{$this->{'headers'}})."\n";
 	$logger->debug("Peer=".$peer->address().";Num of Headers=".scalar(@{$this->{'headers'}}));
 	
 	if(0 < $this->hook_getdata_blocks_preview()){
@@ -1082,10 +1107,10 @@ sub hook_peer_onreadidle {
 	}
 	else{
 		#warn "\n";
-		$logger->debug("Need to fetch more blocks");
+		#$logger->debug("Need to fetch more blocks");
 		if($this->block_height() < $peer->block_height()){
 			#warn ."\n";
-			$logger->debug("alpha; block height diff=".( $peer->block_height() - $this->block_height() ));
+			#$logger->debug("alpha; block height diff=".( $peer->block_height() - $this->block_height() ));
 			#$peer->send_getblocks();
 			$peer->send_getheaders();
 			# if the speed is less than 10B/second, then give this to another peer
@@ -1099,6 +1124,7 @@ sub hook_peer_onreadidle {
 			#warn "we are caught up with peer=$peer";
 			$logger->debug("we are caught up with peer=$peer");
 			#$peer->send_getaddr();
+			
 		}
 		
 		if($this->peer_pool_count() < 20){
@@ -1848,14 +1874,17 @@ BEGIN{
 sub callback_gotblock {
 	my ($this,$msg,$peer) = @_;
 	
+	
+	
 	# deserialize_filter for when you have a wallet
 	my $block = CBitcoin::Block->deserialize_filtered($msg->payload(),$this->bloom_filter());
-	#my $block = CBitcoin::Block->deserialize($msg->payload());
+	#my $block2 = CBitcoin::Block->deserialize($msg->payload());
+	
 	
 	return undef unless $block->{'success'};
 	
 	# TODO: Fix the faulty prevBlockHash (returning bogus hash....)
-	
+	$logger->debug("height=".$this->chain()->height);
 	$logger->debug("Got block=[".$block->hash_hex().
 		";".$block->transactionNum.
 		";".length($msg->payload())."]");
@@ -1884,7 +1913,11 @@ sub callback_gotblock {
 
 
 	if($block->transactionNum_bf()){
+		$logger->debug("tx with bf");
 		$this->callback_gotblock_withtx($block);
+	}
+	else{
+		$logger->debug("tx without bf");
 	}
 	
 	
@@ -1957,20 +1990,23 @@ sub callback_gotheaders {
 	my $num_of_headers = CBitcoin::Utilities::deserialize_varint($fh);
 	$logger->debug("number of headers=$num_of_headers");
 	return undef unless 0 < $num_of_headers;
+	$logger->debug("1");
 	my $x = CBitcoin::Utilities::serialize_varint($num_of_headers);
 	$x = length($x);
-	
+	$logger->debug("2");
 	
 	for(my $i=0;$i<$num_of_headers;$i++){
 		my $block = CBitcoin::Block->deserialize(substr($payload, $x+ 81*$i, 81));
+		#$logger->debug("2 - i=$i");
+		#$logger->debug("previous hash=".$block->prevBlockHash_hex);
 		if(!$block->success()){
 			$logger->debug("got bad header");
 			next;
 		}
 		
 		#$logger->debug("($i/$num_of_headers)Got header=[".$block->hash_hex().
-		#	";".$block->transactionNum.
-		#	";".length($msg->payload())."]");
+		#	";".$block->prevBlockHash_hex().';'.$block->transactionNum.
+	#		";".length($msg->payload())."]");
 			
 		$this->add_header_to_chain($peer,$block);
 		

@@ -11,13 +11,12 @@ CBitcoin::Message
 
 use Net::IP;
 
+use CBitcoin;
 use CBitcoin::Script;
 use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
 use CBitcoin::Transaction;
 use Digest::SHA;
-
-use constant MAINNET    => 0xd9b4bef9, TESTNET => pack('L',0xdab5bffa), TESTNET3 => pack('L',0x0709110b), NAMECOIN => pack('L',0xfeb4bef9) ;
 
 require Exporter;
 *import = \&Exporter::import;
@@ -107,7 +106,7 @@ sub command {
 
 ---++ net_magic
 
-Are we on mainnet, testnet or namecoin?
+Are we on mainnet, testnet or namecoin?  Use the global variable setting to determin that.
 
 =cut
 
@@ -115,8 +114,13 @@ Are we on mainnet, testnet or namecoin?
 sub net_magic {
 	my $x = shift;
 	$x = 'MAINNET' unless defined $x; # did this to avoid warnings about inititialized values
-	my $netmapper = {'MAINNET' => 0xd9b4bef9, 'TESTNET' => 0xdab5bffa,'TESTNET3' => 0x0709110b,'NAMECOIN' => 0xfeb4bef9};
+	my $netmapper = {
+		'MAINNET' => CBitcoin::MAINNET, 'TESTNET' => CBitcoin::TESTNET,
+		'TESTNET3' => CBitcoin::TESTNET3,'NAMECOIN' => CBitcoin::NAMECOIN,
+		'REGNET' => CBitcoin::REGNET
+	};
 	return $netmapper->{$x} if defined $netmapper->{$x};
+	
 	return $netmapper->{'MAINNET'};
 }
 
@@ -138,8 +142,10 @@ namecoin, 0xfeb4bef9
 sub serialize {
 	my $payload = shift;
 	my $command = shift;
-	my $magic = shift;
-	$magic = pack('L',net_magic($magic));
+	#my $magic = shift;
+	#$magic = pack('L',net_magic());
+	
+	my $magic = pack('L',$CBitcoin::network_bytes);
 	
 	
 	#die "payload is 0" unless length($payload) > 0;
@@ -202,6 +208,8 @@ sub deserialize {
 	$n = read($fh,$buf,4);
 	die "cannot read network bytes" unless $n == 4;
 	my $magic = unpack('L',$buf);
+	
+	die "bad magic bytes" unless $magic eq $CBitcoin::network_bytes;
 	
 	
 	$n = read($fh,$buf,12);

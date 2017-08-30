@@ -107,8 +107,15 @@ sub init_branches {
 	else{
 		$logger->debug("creating new database");
 		$this->init_branches_from_genesisblock($options);
+		$logger->debug("done");
 	}
 	my $branch = $this->branch_longest();
+	if(defined $branch){
+		$logger->debug("branch=".ref($branch));
+	}
+	else{
+		$logger->debug("no branch");
+	}
 	
 	die "Bad Branch Height" if $branch->height == 0;
 	
@@ -393,12 +400,14 @@ sub block_append {
 	my ($this,$block) = @_;
 	die "no block" unless defined $block;
 	
+	#$logger->debug("1");
 	
 	my $node = CBitcoin::Chain::Node->new($block);
-	
+	#$logger->debug("(block hash) id=".unpack('H*',$node->id));
+	#$logger->debug("(prev hash) id=".unpack('H*',$block->prevBlockHash));
 	my $othernode = CBitcoin::Chain::Node->load($this,$node->id);
 	return 0 if defined $othernode;
-	
+	#$logger->debug("2");
 	my $branch = $this->branch_find($node->prev);
 	#return 0 unless defined $branch;
 	unless(defined $branch){
@@ -408,7 +417,7 @@ sub block_append {
 		
 #		my $timediff = $timestamp - unpack('l',$block->timestamp());
 		# check if new block is too old		
-		
+		$logger->debug("orphaned block");
 		$this->block_orphan_add($block);
 		return 0;
 	}
@@ -425,7 +434,7 @@ sub block_append {
 	$this->put('chain','head',$branch->id());
 	$lock->cds_unlock();
 	#}
-	
+	#$logger->debug("saved");
 	return 1;
 }
 
@@ -483,6 +492,7 @@ sub block_orphan_save {
 		my $data = $this->get('data','o='.$hash);
 		next unless defined $data;
 		
+		#$logger->debug("\n".unpack('H*',$data)."\n");
 		
 		my $block = CBitcoin::Block->deserialize($data.pack('C',0));
 		$this->block_append($block);
@@ -525,20 +535,29 @@ Return the longest branch.
 sub branch_longest {
 	my ($this) = @_;
 	
+	#$logger->debug("1");
 	return undef unless 0 < scalar(keys %{$this->{'branches'}});
-	
-	my $lbr;
+	#$logger->debug("2");
+	my ($lbr,$branch);
 	my ($score,$height) = (Math::BigInt->new(0),0);
+	#$logger->debug(sub{
+	#	require Data::Dumper;
+	#	return Data::Dumper::Dumper($this->{'branches'});
+	#});
 	foreach my $branch_id (keys %{$this->{'branches'}}){
-		my $branch = $this->{'branches'}->{$branch_id};
+		#$logger->debug("id=".unpack('H*',$branch_id));
+		$branch = $this->{'branches'}->{$branch_id};
+		#$logger->debug("branch=$branch");
 		if($score->bcmp($branch->score) < 0){
 			# score < branch
 			$lbr = $branch;
+			#$logger->debug("inside");
 			$score = $branch->score->copy();
 		}
 	}
 	
-	return $lbr;	
+	return $lbr if defined $lbr;
+	return $branch;
 }
 
 
