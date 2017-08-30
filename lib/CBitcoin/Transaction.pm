@@ -141,7 +141,7 @@ sub deserialize{
 		
 		# must have script_pub
 		if(defined $in->{'ScriptSig'}){
-			warn "scriptsig=".unpack('H*',$in->{'ScriptSig'})."\n";
+			#warn "scriptsig=".unpack('H*',$in->{'ScriptSig'})."\n";
 			$input = CBitcoin::TransactionInput->new({
 				'prevOutHash' => pack('H*',$in->{'prevHash'})
 				,'prevOutIndex' => $in->{'prevIndex'}
@@ -230,6 +230,34 @@ sub add_redeem_script {
 }
 
 
+=pod
+
+---++ add_output($tx_out)
+
+=cut
+
+sub add_output($$){
+	my ($this,$output) = @_;
+	die "no output" unless defined $output && ref($output) =~ m/Output/;
+	$this->{'outputs'} //= [];
+	push(@{$this->{'outputs'}},$output);
+	return scalar(@{$this->{'outputs'}});
+}
+
+=pod
+
+---++ randomize()
+
+To preserve privacy, randomize outputs so people cannot gues which output is change and which is sending money.
+
+=cut
+
+sub randomize($){
+	my $this = shift;
+	CBitcoin::Utilities::fisher_yates_shuffle($this->{'inputs'});
+	CBitcoin::Utilities::fisher_yates_shuffle($this->{'outputs'});
+}
+
 =item numOfInputs
 
 ---++ numOfInputs
@@ -278,17 +306,19 @@ sub output {
 
 =pod
 
----++ serialize($raw_bool)
+---++ serialize($raw_bool,$flush_bool)
+
+Raw means there are no script sigs.  Flush means to force reserialization.
 
 =cut
 
 sub serialize {
-	my ($this,$raw_bool) = @_;
+	my ($this,$raw_bool,$flush_bool) = @_;
 	
-	if($raw_bool && defined $this->{'serialized raw'}){
+	if($raw_bool && !$flush_bool && defined $this->{'serialized raw'}){
 		return $this->{'serialized raw'};
 	}
-	elsif(!$raw_bool && defined $this->{'serialized full'}){
+	elsif(!$raw_bool && !$flush_bool && defined $this->{'serialized full'}){
 		return $this->{'serialized full'};
 	}
 	
@@ -301,6 +331,7 @@ sub serialize {
 	
 	$data .= CBitcoin::Utilities::serialize_varint($this->numOfOutputs);
 	for(my $i=0;$i<$this->numOfOutputs;$i++){
+		#warn "serialization output value=".$this->output($i)->value."\n";
 		$data .= $this->output($i)->serialize();
 	}
 	
@@ -518,6 +549,7 @@ sub assemble_p2p {
 	else{
 		$txdata = $this->serialize();
 	}
+	
 
 	$txraw = picocoin_tx_sign_p2p(
 		$key->serialized_private(),

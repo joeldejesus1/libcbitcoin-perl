@@ -7,6 +7,7 @@ use Net::IP;
 use Net::DNS;
 use CBitcoin;
 use Convert::Base32;
+use MIME::Base64;
 use CBitcoin;
 
 use constant TORPREFIX => 'fd87d87eeb43';
@@ -663,8 +664,66 @@ sub dns_fetch_peers{
 
 
 
+=pod
 
+---++ binary_to_qrcodes($binary)
 
+Split a serialized binary blob into qr code readable chunks.
+
+Format of data: [qr_total, 1B][data, ?B]
+
+Per qr code: [qr_i, 1B][data, ?B]
+
+=cut
+
+sub binary_to_qrcodes($){
+	my $data = shift;
+	
+	my $ans = [];
+	
+	return $ans unless defined $data && 0 < length($data);
+	
+	my $max_bytes = 160;
+	
+	my ($m,$n) = (0,length($data));
+	my $i = 0;
+	# find out total number of qr codes needed
+	while(0 < $n - $m){
+		die "too many qr codes" unless $i < 16;
+		my $k = $max_bytes;
+		if($n - $m - $k < 0){
+			$k = $n - $m;
+		}
+		#push(@{$ans},MIME::Base64::encode(pack('C',$i).substr($data,$m,$k)));
+		$i += 1;
+		$m += $k;
+	}
+	
+	# split the binary blob here
+	($m,$n) = (0,length($data));
+	my $j = $i - 1;
+	$i = 0;
+	while(0 < $n - $m){
+		die "too many qr codes" unless $i < 16;
+		my $k = $max_bytes;
+		if($n - $m - $k < 0){
+			$k = $n - $m;
+		}
+		if($i == 0){
+			push(@{$ans},
+				MIME::Base64::encode(pack('C',$i).pack('C',$j).substr($data,$m,$k))
+			);
+		}
+		else{
+			push(@{$ans},MIME::Base64::encode(pack('C',$i).substr($data,$m,$k)));
+		}
+		$i += 1;
+		$m += $k;
+	}
+	
+	
+	return $ans;
+}
 
 
 
