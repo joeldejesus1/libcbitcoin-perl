@@ -12,7 +12,9 @@ use constant {
 	OP_PUSHDATA1 => 0x4c,
 	OP_PUSHDATA2 => 0x4d,
 	OP_PUSHDATA4 => 0x4e
+	
 };
+
 
 =head1 NAME
 
@@ -134,24 +136,24 @@ sub deserialize{
 	
 	$this->{'inputs'} = [];
 	my $i = 0;
+	
 	foreach my $in (@{$this->{'vin'}}){
-		$in->{'prevHash'} = join '', reverse split /(..)/, substr($in->{'prevHash'},0,64);
+		$in->{"prevHash"} = join '', reverse split /(..)/, substr($in->{"prevHash"},0,64);
 		
 		my $input;
 		
 		# must have script_pub
-		if(defined $in->{'ScriptSig'}){
-			#warn "scriptsig=".unpack('H*',$in->{'ScriptSig'})."\n";
+		if(defined $in->{"scriptSig"}){
 			$input = CBitcoin::TransactionInput->new({
-				'prevOutHash' => pack('H*',$in->{'prevHash'})
-				,'prevOutIndex' => $in->{'prevIndex'}
-				,'scriptSig' => $in->{'scriptSig'}
+				'prevOutHash' => pack('H*',$in->{"prevHash"})
+				,'prevOutIndex' => $in->{"prevIndex"}
+				,'scriptSig' => $in->{"scriptSig"}
 			});
 		}
 		else{
 			$input = CBitcoin::TransactionInput->new({
-				'prevOutHash' => pack('H*',$in->{'prevHash'})
-				,'prevOutIndex' => $in->{'prevIndex'}
+				'prevOutHash' => pack('H*',$in->{"prevHash"})
+				,'prevOutIndex' => $in->{"prevIndex"}
 				,'script' => $script_pubs->[$i]
 			})
 		}
@@ -166,8 +168,8 @@ sub deserialize{
 	
 	foreach my $in (@{$this->{'vout'}}){
 		push(@{$this->{'outputs'}},CBitcoin::TransactionOutput->new({
-			'script' => CBitcoin::Script::deserialize_script($in->{'script'}) 
-			,'value' => $in->{'value'}
+			'script' => CBitcoin::Script::deserialize_script($in->{"script"}) 
+			,'value' => $in->{"value"}
 		}));
 	}
 	delete $this->{'vout'};

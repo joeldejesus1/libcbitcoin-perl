@@ -9,6 +9,7 @@ use CBitcoin;
 use Convert::Base32;
 use MIME::Base64;
 use CBitcoin;
+use Image::PNG::QRCode 'qrpng';
 
 use constant TORPREFIX => 'fd87d87eeb43';
 
@@ -249,6 +250,29 @@ sub network_address_deserialize {
 		die "port did not untaint";
 	}
 	return $ans;
+}
+
+
+sub generate_random_filename{
+	my $length = shift;
+	if(defined $length && $length =~ m/^(\d+)$/){
+		$length = $1;
+	}
+	elsif(defined $length){
+		die "bad length";
+	}
+	else{
+		$length = 16;
+	}
+	
+	my $string = join('', map +(0..9,'a'..'z','A'..'Z')[rand(10+26*2)], 1..$length);
+	if($string =~ m/^([0-9a-zA-Z]+)$/){
+		$string = $1;
+	}
+	else{
+		die "bad string";
+	}
+	return $string;
 }
 
 
@@ -666,7 +690,7 @@ sub dns_fetch_peers{
 
 =pod
 
----++ binary_to_qrcodes($binary)
+---++ binary_to_qrcodes($binary)->$dir
 
 Split a serialized binary blob into qr code readable chunks.
 
@@ -676,8 +700,25 @@ Per qr code: [qr_i, 1B][data, ?B]
 
 =cut
 
-sub binary_to_qrcodes($){
-	my $data = shift;
+sub binary_to_qrcodes{
+	my ($data,$basedir) = @_;
+	unless(defined $data && 4 < length($data)){
+		die "bad data";
+	}
+	
+	if(defined $basedir && $basedir =~ validate_filepath($basedir)){
+		$basedir = validate_filepath($basedir);
+	}
+	elsif(defined $basedir){
+		die "bad base directory";
+	}
+	else{
+		$basedir = '/tmp';
+	}
+
+	$basedir .= '/'.generate_random_filename(12);
+	mkdir($basedir) || die "failed to make directory (d=$basedir)";
+	
 	
 	my $ans = [];
 	
@@ -699,6 +740,13 @@ sub binary_to_qrcodes($){
 		$m += $k;
 	}
 	
+	# define sub to write qr code file
+	my $writesub = sub{
+		my $qr_data = shift;
+		my $qr_num = shift;
+		qrpng (text => $qr_data, out => $basedir.'/'.$qr_num.'.png');
+	};
+	
 	# split the binary blob here
 	($m,$n) = (0,length($data));
 	my $j = $i - 1;
@@ -710,19 +758,22 @@ sub binary_to_qrcodes($){
 			$k = $n - $m;
 		}
 		if($i == 0){
-			push(@{$ans},
+			$writesub->(
 				MIME::Base64::encode(pack('C',$i).pack('C',$j).substr($data,$m,$k))
+				,$i
 			);
 		}
 		else{
-			push(@{$ans},MIME::Base64::encode(pack('C',$i).substr($data,$m,$k)));
+			$writesub->(
+				MIME::Base64::encode(pack('C',$i).substr($data,$m,$k))
+				,$i
+			);
 		}
 		$i += 1;
 		$m += $k;
 	}
 	
-	
-	return $ans;
+	return $basedir;
 }
 
 

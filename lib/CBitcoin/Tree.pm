@@ -1290,7 +1290,7 @@ sub paper_spend($$$$$$){
 	}
 	die "bad fee" unless $fee + $sum == $total_in;
 
-	return $this->_paper_spend_sign($tx);
+	return $this->_paper_spend_sign($tx);	
 }
 
 # add outputs, mix and randomize amounts to preserve privacy
