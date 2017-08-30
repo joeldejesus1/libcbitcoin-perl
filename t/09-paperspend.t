@@ -7,11 +7,11 @@ use CBitcoin::CBHD;
 use CBitcoin::Transaction;
 use CBitcoin::Script;
 use CBitcoin::Tree;
-use Image::PNG::QRCode 'qrpng';
+use CBitcoin::Utilities::QRCodeTransfer;
 use MIME::Base64;
 use Crypt::CBC;
 use Digest::SHA;
-use Test::More tests => 1;
+use Test::More tests => 7;
 
 $CBitcoin::network_bytes = CBitcoin::REGNET;
 
@@ -80,7 +80,13 @@ else{
 my $tx = CBitcoin::Transaction->deserialize($raw_tx,\@scriptPubs);
 
 my $signed_tx = $tree->paper_spend('ROOT/CASH',$fee,$total_in,$raw_tx,\@scriptPubs);
-my $dir = CBitcoin::Utilities::binary_to_qrcodes($signed_tx,'./t');
+
+my $qr_transfer = CBitcoin::Utilities::QRCodeTransfer->new($signed_tx);
+
+# store qr chunks here
+my $qr_chunks = [];
+
+my $dir = $qr_transfer->qrcode_write('./t',$qr_chunks);
 if(opendir(my $fhdir,$dir)){
 	foreach my $fn (readdir($fhdir)){
 		next if $fn eq '.' || $fn eq '..';
@@ -98,6 +104,29 @@ else{
 }
 
 rmdir($dir);
+
+my $receive_transfer = CBitcoin::Utilities::QRCodeTransfer->new();
+
+{
+	$receive_transfer->scan($qr_chunks->[2]);
+	ok('0/0 X' eq $receive_transfer->scan_status,'checking');
+}
+
+
+{
+	$receive_transfer->scan('fdf0923.....');
+	ok('0/0 X' eq $receive_transfer->scan_status,'checking');
+}
+
+my @correct = (
+	'1/4 O','2/4 O','3/4 O','4/4 O'
+);
+my $k=0;
+foreach my $chunk (@{$qr_chunks}){
+	$receive_transfer->scan($chunk);
+	ok($correct[$k] eq $receive_transfer->scan_status,'checking');
+	$k += 1;
+}
 
 ok($tx->validate_sigs($signed_tx),'tx validated');
 
