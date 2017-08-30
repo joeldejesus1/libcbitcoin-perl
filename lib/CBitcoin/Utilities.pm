@@ -700,84 +700,47 @@ Per qr code: [qr_i, 1B][data, ?B]
 
 =cut
 
-sub binary_to_qrcodes{
-	my ($data,$basedir) = @_;
-	unless(defined $data && 4 < length($data)){
-		die "bad data";
-	}
-	
-	if(defined $basedir && $basedir =~ validate_filepath($basedir)){
-		$basedir = validate_filepath($basedir);
-	}
-	elsif(defined $basedir){
-		die "bad base directory";
-	}
-	else{
-		$basedir = '/tmp';
-	}
 
-	$basedir .= '/'.generate_random_filename(12);
-	mkdir($basedir) || die "failed to make directory (d=$basedir)";
-	
-	
-	my $ans = [];
-	
-	return $ans unless defined $data && 0 < length($data);
-	
-	my $max_bytes = 160;
-	
-	my ($m,$n) = (0,length($data));
-	my $i = 0;
-	# find out total number of qr codes needed
-	while(0 < $n - $m){
-		die "too many qr codes" unless $i < 16;
-		my $k = $max_bytes;
-		if($n - $m - $k < 0){
-			$k = $n - $m;
-		}
-		#push(@{$ans},MIME::Base64::encode(pack('C',$i).substr($data,$m,$k)));
-		$i += 1;
-		$m += $k;
-	}
-	
-	# define sub to write qr code file
-	my $writesub = sub{
-		my $qr_data = shift;
-		my $qr_num = shift;
-		qrpng (text => $qr_data, out => $basedir.'/'.$qr_num.'.png');
-	};
-	
-	# split the binary blob here
-	($m,$n) = (0,length($data));
-	my $j = $i - 1;
-	$i = 0;
-	while(0 < $n - $m){
-		die "too many qr codes" unless $i < 16;
-		my $k = $max_bytes;
-		if($n - $m - $k < 0){
-			$k = $n - $m;
-		}
-		if($i == 0){
-			$writesub->(
-				MIME::Base64::encode(pack('C',$i).pack('C',$j).substr($data,$m,$k))
-				,$i
-			);
-		}
-		else{
-			$writesub->(
-				MIME::Base64::encode(pack('C',$i).substr($data,$m,$k))
-				,$i
-			);
-		}
-		$i += 1;
-		$m += $k;
-	}
-	
-	return $basedir;
+
+
+=pod
+
+---++ qrcodes_to_binary($binary)->$sub
+
+Split a serialized binary blob into qr code readable chunks.
+
+Format of data: [qr_total, 1B][data, ?B]
+
+Per qr code: [qr_i, 1B][data, ?B]
+
+With the sub:<verbatim>
+my ($scanner_sub,$reader_sub) = qrcodes_to_binary();
+
+my $newly_scanned_content = shift;
+if($scanner_sub->($newly_scanned_content)){
+	# when completed,
+	return $reader_sub->();
 }
 
 
 
+=cut
+
+sub qrcodes_to_binary{
+	my $ref = [];
+	return sub{
+		my $content = shift;
+		my $qrcodes = $ref;
+		return _qrcodes_to_binary_sub($content,$qrcodes);
+	};
+}
+
+sub _qrcodes_to_binary_sub($$){
+	my ($content,$qrcodes) = @_;
+	die "bad qrcodes ref" unless defined $qrcodes && ref($qrcodes) eq 'ARRAY';
+	
+	
+}
 
 
 

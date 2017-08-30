@@ -9,17 +9,9 @@ WriteMakefile(
 	    ,'NAME' => 'CBitcoin'
 	     ,'LIBS' => [ ' -lcrypto -lccoin -lgmp ' ]
 		,'VERSION' => '0.1'
-
 		,'AUTHOR'              => q{Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>}
 		,'VERSION_FROM'        => 'lib/CBitcoin.pm'
-		#,'ABSTRACT_FROM'       => 'lib/CBitcoin.pm'
-		#,'MAGICXS' => 1
 		,'OBJECT'              => q/$(O_FILES)/
-		#,'OBJECT' => 'lib/CBitcoin/CBHD.so'
-		#, 'XS'      => {
-       # 	"lib/CBitcoin/CBHD.xs" => "lib/CBitcoin/CBHD.c",
-    	#}
-		#,'MYEXTLIB' => '/usr/lib/libcbitcoin.so.1'
 	,($ExtUtils::MakeMaker::VERSION >= 6.3002
 	      ? ('LICENSE'=> 'gpl_2')
 	      : ())
