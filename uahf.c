@@ -10,6 +10,36 @@ int uahf_test(int x){
 }
 
 
+void uahf_bp_tx_sighash(bu256_t *hash, const cstring *scriptCode,
+		   const struct bp_tx *txTo, unsigned int nIn,
+		   int nHashType)
+{
+	if (nIn >= txTo->vin->len) {
+		//  nIn out of range
+		bu256_set_u64(hash, 1);
+		return;
+	}
+
+	// Check for invalid use of SIGHASH_SINGLE
+	if ((nHashType & 0x1f) == SIGHASH_SINGLE) {
+		if (nIn >= txTo->vout->len) {
+			//  nOut out of range
+			bu256_set_u64(hash, 1);
+			return;
+		}
+	}
+
+	cstring *s = cstr_new_sz(512);
+
+	// Serialize only the necessary parts of the transaction being signed
+	bp_tx_sigserializer(s, scriptCode, txTo, nIn, nHashType);
+
+	ser_s32(s, nHashType);
+	bu_Hash((unsigned char *) hash, s->str, s->len);
+
+	cstr_free(s, true);
+}
+
 
 SV* uahf_picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType){
 
@@ -182,8 +212,8 @@ SV* uahf_picocoin_tx_sign_p2p(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,in
 	cstring frompubkey = { fromPubKey_pointer, len_frompubkey};
 
 	bu256_t hash;
-	//fprintf(stderr,"Hash Type=%d\n",nHashType);
-	bp_tx_sighash(&hash, &frompubkey, txTo, nIn, nHashType);
+
+	uahf_bp_tx_sighash(&hash, &frompubkey, txTo, nIn, nHashType);
 
 	struct bp_txin *txin = parr_idx(txTo->vin, nIn);
 	// find the input
@@ -241,3 +271,8 @@ SV* uahf_picocoin_tx_sign_p2p(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,in
 
 
 }
+
+
+
+// extra functions copied from picocoin library
+
