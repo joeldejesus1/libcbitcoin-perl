@@ -20,6 +20,12 @@
 #include <ccoin/key.h>
 #include <ccoin/serialize.h>
 
+#include "standard.h"
+
+/**
+ * transaction related functions that comply with network rules of the uahf fork
+ */
+
 #ifndef uahf_h_   /* Include guard */
 #define uahf_h_
 
