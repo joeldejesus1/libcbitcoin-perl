@@ -19,6 +19,7 @@
 #include <ccoin/hdkeys.h>
 #include <ccoin/key.h>
 #include <ccoin/serialize.h>
+#include "src/uahf.h"
 //#include <ccoin/compat.h>
 
 
