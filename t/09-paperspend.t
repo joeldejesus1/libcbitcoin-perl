@@ -50,7 +50,7 @@ if($qr_i == 0){
 	$qr_count = unpack('C',substr($data,0,1));
 	#warn "hex fee=".unpack('H*',substr($raw_tx,1,4));
 	$fee = unpack('V',substr($data,1,4));
-	$total_in = unpack('Q',substr($data,1+4,8));
+	#$total_in = unpack('Q',substr($data,1+4,8));
 	
 	my $raw_tx_len = unpack('v',substr($data,1+4+8,2));
 	#warn "raw tx len=$raw_tx_len";

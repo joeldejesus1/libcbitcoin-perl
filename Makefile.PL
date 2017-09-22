@@ -24,7 +24,7 @@ WriteMakefile(
 		'scripts/cbitcoin'	
 	]
 	#,'LDDLFLAGS' => ' -fstack-protector '
-	#,'LDFLAGS' => ' -fstack-protector '
+	#,'LDFLAGS' => ' -fstack-protector -Wint-to-pointer-cast'
 	,'MAKEFILE_OLD' => ''
 	,'dist'                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', }
 	#,'clean'               => { FILES => 'libcbitcoin-perl*' }

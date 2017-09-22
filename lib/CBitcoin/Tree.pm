@@ -308,7 +308,7 @@ Fetch the node that corresponds to the item.
 
 sub dict_node{
 	my ($this,$item) = @_;
-	return 0 unless $this->dict_check($item);
+	return undef unless $this->dict_check($item);
 	
 	my $h = md5($item);
 	my ($p1,$p2) = (substr($h,0,8),substr($h,8));
