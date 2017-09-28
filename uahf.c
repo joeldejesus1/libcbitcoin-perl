@@ -1,15 +1,8 @@
 #include "uahf.h"
 #include "standard.h"
 
-/**
- * test function
- * int x
- */
-int uahf_test(int x){
-	return x;
-}
 
-
+/*
 void uahf_bp_tx_sighash(bu256_t *hash, const cstring *scriptCode,
 		   const struct bp_tx *txTo, unsigned int nIn,
 		   int nHashType)
@@ -39,7 +32,7 @@ void uahf_bp_tx_sighash(bu256_t *hash, const cstring *scriptCode,
 
 	cstr_free(s, true);
 }
-
+*/
 
 SV* uahf_picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType){
 
@@ -213,7 +206,7 @@ SV* uahf_picocoin_tx_sign_p2p(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,in
 
 	bu256_t hash;
 
-	uahf_bp_tx_sighash(&hash, &frompubkey, txTo, nIn, nHashType);
+	uahf_bp_tx_sighash(&hash, &frompubkey, txTo, nIn, nHashType,0);
 
 	struct bp_txin *txin = parr_idx(txTo->vin, nIn);
 	// find the input
