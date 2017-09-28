@@ -8,7 +8,7 @@ Build-Depends: libfile-slurp-perl,libcrypt-cbc-perl,
    liblog-log4perl-perl, libmath-bigint-gmp-perl, 
    libgmp-dev,libjson-xs-perl,libconvert-base32-perl, 
    libssl-dev,
-   libccoin-dev, libnet-ip-perl,
+   libccoin-dev (>=0.5), libnet-ip-perl,
    libio-epoll-perl, libev-perl,
    libdata-uuid-perl,
    libimage-png-qrcode-perl
