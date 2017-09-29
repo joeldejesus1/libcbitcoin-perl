@@ -18,7 +18,8 @@ WriteMakefile(
 	,'PL_FILES'            => {}
 	,'PREREQ_PM' => {
 		'Test::More' => 0,
-		'BerkeleyDB' => 0
+		'BerkeleyDB' => 0,
+		'JSON::XS' => 0
 	}
 	,'EXE_FILES' => [
 		'scripts/cbitcoin'	

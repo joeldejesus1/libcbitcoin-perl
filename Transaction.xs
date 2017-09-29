@@ -22,7 +22,6 @@
 //#include <ccoin/compat.h>
 
 #include "standard.h"
-#include "uahf.h"
 
 
 
@@ -45,39 +44,23 @@ picocoin_tx_validate_input(index,scriptPubKey_data,txdata,sigvalidate,nHashType)
 	int nHashType
 
 SV*	
-picocoin_tx_sign_p2pkh(hdkey_data,fromPubKey_data,txdata,index,HashType)
+picocoin_tx_sign_p2pkh(hdkey_data,fromPubKey_data,txdata,index,HashType,amount)
 	SV* hdkey_data
 	SV* fromPubKey_data
 	SV* txdata
 	int index
 	int HashType
+	int amount
 	
 SV*	
-picocoin_tx_sign_p2p(hdkey_data,fromPubKey_data,txdata,index,HashType)
+picocoin_tx_sign_p2p(hdkey_data,fromPubKey_data,txdata,index,HashType,amount)
 	SV* hdkey_data
 	SV* fromPubKey_data
 	SV* txdata
 	int index
 	int HashType
+	int amount
 	
 HV*	
 picocoin_tx_des(tx_data)
 	SV* tx_data
-	
-	
-	
-SV*	
-uahf_picocoin_tx_sign_p2pkh(hdkey_data,fromPubKey_data,txdata,index,HashType)
-	SV* hdkey_data
-	SV* fromPubKey_data
-	SV* txdata
-	int index
-	int HashType
-
-SV*	
-uahf_picocoin_tx_sign_p2p(hdkey_data,fromPubKey_data,txdata,index,HashType)
-	SV* hdkey_data
-	SV* fromPubKey_data
-	SV* txdata
-	int index
-	int HashType

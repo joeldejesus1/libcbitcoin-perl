@@ -490,7 +490,8 @@ sub assemble_multisig_p2sh {
 			CBitcoin::Script::serialize_script($this->input($i)->script()),
 			$txdata,
 			$i,
-			SIGHASH_ALL
+			SIGHASH_ALL,
+			0
 		);
 		die "bad signature" unless defined $txraw && 0 < length($txraw);
 		
@@ -525,7 +526,8 @@ sub assemble_p2pkh {
 		CBitcoin::Script::serialize_script($this->input($i)->script()),
 		$txdata,
 		$i,
-		SIGHASH_ALL
+		SIGHASH_ALL,
+		0
 	);
 	die "bad signature" unless defined $txraw && 0 < length($txraw);
 	return $txraw;
@@ -558,7 +560,8 @@ sub assemble_p2p {
 		CBitcoin::Script::serialize_script($this->input($i)->script()),
 		$txdata,
 		$i,
-		SIGHASH_ALL
+		SIGHASH_ALL,
+		0
 	);
 	die "bad signature" unless defined $txraw && 0 < length($txraw);
 	return $txraw;

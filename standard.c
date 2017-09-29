@@ -111,7 +111,7 @@ int picocoin_tx_validate_input (
 }
 
 
-SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType){
+SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType, int amount){
 
 	////////////// import hdkey ////////////////////////////
 	STRLEN len_hdkey; //calculated via SvPV
@@ -167,7 +167,7 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 
 	bu256_t hash;
 	//fprintf(stderr,"Hash Type=%d\n",nHashType);
-	bp_tx_sighash(&hash, &frompubkey, txTo, nIn, nHashType);
+	bp_tx_sighash_with_value(&hash, &frompubkey, txTo, nIn, nHashType,amount);
 
 	struct bp_txin *txin = parr_idx(txTo->vin, nIn);
 	// find the input
@@ -227,7 +227,7 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 
 }
 
-SV* picocoin_tx_sign_p2p(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType){
+SV* picocoin_tx_sign_p2p(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType, int amount){
 
 	////////////// import hdkey ////////////////////////////
 	STRLEN len_hdkey; //calculated via SvPV
@@ -283,7 +283,7 @@ SV* picocoin_tx_sign_p2p(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIn
 
 	bu256_t hash;
 	//fprintf(stderr,"Hash Type=%d\n",nHashType);
-	bp_tx_sighash(&hash, &frompubkey, txTo, nIn, nHashType);
+	bp_tx_sighash_with_value(&hash, &frompubkey, txTo, nIn, nHashType,amount);
 
 	struct bp_txin *txin = parr_idx(txTo->vin, nIn);
 	// find the input

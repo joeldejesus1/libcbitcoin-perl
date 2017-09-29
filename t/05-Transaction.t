@@ -7,6 +7,7 @@ use CBitcoin::TransactionInput;
 use CBitcoin::TransactionOutput;
 use CBitcoin::Transaction;
 
+use JSON::XS;
 use Test::More tests => 1;
 
 $CBitcoin::network_bytes = TESTNET;
@@ -123,10 +124,29 @@ my @outputs;
 	ok($tx->validate_sigs($txdata),'good tx');
 }
 
+{
+	my $fh;
+	unless(open($fh,'<','t/tx_valid.json')){
+		print "Bailout!";
+		return;
+	}
+	my $json_text = '';
+	while(<$fh>){ $json_text .= $_}	
+	close($fh);
+	
+	my $data = JSON::XS::decode_json($json_text);
+	my $header = shift(@{$data});
+	# ["raw_transaction, script, input_index, hashType, signature_hash (result)"],
+	foreach my $row (@{$data}){
+		my $tx_raw = $row->[0];
+		my $scriptpub = $row->[1];
+		my $index = $row->[2];
+		my $hashType = $row->[3];
+		my $sighash = $row->[4];
+		#warn "raw=$tx_raw\n";
+	}
+}
 
-
-
-__END__
 
 
 __END__
