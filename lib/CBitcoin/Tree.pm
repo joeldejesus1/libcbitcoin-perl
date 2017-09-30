@@ -1247,14 +1247,14 @@ sub db_tx_index{
 
 =pod
 
----++ paper_spend($fee,$input_balance,$raw_tx,\@script_pubs)->$signed_tx
+---++ paper_spend($fee,$input_balance,$raw_tx,\@script_pubs,\@input_amounts)->$signed_tx
 
 Given a raw transaction created by an online SPV wallet, sign the transaction and return the raw data.
 
 =cut
 
-sub paper_spend($$$$$$){
-	my ($this,$path,$fee,$total_in,$raw_tx,$script_pubs) = @_;
+sub paper_spend($$$$$$$){
+	my ($this,$path,$fee,$total_in,$raw_tx,$script_pubs,$input_amounts) = @_;
 	
 	unless(defined $fee && $fee =~ m/^(\d+)$/){
 		die "bad fee";
@@ -1270,8 +1270,21 @@ sub paper_spend($$$$$$){
 		die "bad script pubs";
 	}
 	
+	if(
+		defined $input_amounts && ref($input_amounts) eq 'ARRAY' 
+		&& scalar(@{$input_amounts}) == scalar(@{$script_pubs})
+	){
+		
+	}
+	elsif(defined $input_amounts){
+		die "bad script pubs";
+	}
+	else{
+		$input_amounts = [];
+	}
 	
-	my $tx = CBitcoin::Transaction->deserialize($raw_tx,$script_pubs);
+	
+	my $tx = CBitcoin::Transaction->deserialize($raw_tx,$script_pubs,$input_amounts);
 	die "no transaction" unless defined $tx;
 
 	my $sum = 0;

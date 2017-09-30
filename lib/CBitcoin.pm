@@ -19,13 +19,15 @@ use constant {
 	,NAMECOIN => 0xFEB4BEF9
 	,REGNET => 0xFABFB5DA
 	
+	,CHAIN_LEGACY => 0
+	,CHAIN_UAHF => 1
+	
 	,BIP32_MAINNET_PUBLIC => 0x0488B21E
 	,BIP32_MAINNET_PRIVATE => 0x0488ADE4
 	,BIP32_TESTNET_PUBLIC => 0x043587CF
 	,BIP32_TESTNET_PRIVATE => 0x04358394
 	,BIP32_REGNET_PUBLIC => 0x043587CF
 	,BIP32_REGNET_PRIVATE => 0x04358394
-		
 	
 	,SPV_PROTOCOL_VERSION => 70014
 	,SPV_INIT_PROTO_VERSION => 209
@@ -81,21 +83,14 @@ Don't worry about this.
 sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 
-
-
-
-sub hello {
-	return "hello!";
-}
-
-
 =item network_bytes
 
 Set network bytes with the $network_bytes global variable.
 
 =cut
 
-our $network_bytes = 0xD9B4BEF9;
+our $network_bytes = MAINNET;
+our $chain = CHAIN_LEGACY;
 
 
 =head1 AUTHOR

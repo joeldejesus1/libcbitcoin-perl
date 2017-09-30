@@ -55,6 +55,8 @@ sub new {
 		$this->{'script'} = $x->{'script'};
 	}
 	else{
+		require Data::Dumper;
+		warn "options=".Data::Dumper::Dumper($x);
 		die "no arguments to create Transaction::Output";
 	}
 		

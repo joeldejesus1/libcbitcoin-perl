@@ -7,6 +7,7 @@ use constant {
 	SIGHASH_ALL => 0x00000001, # <--- this is the default
 	SIGHASH_NONE => 0x00000002,
 	SIGHASH_SINGLE => 0x00000003,
+	SIGHASH_FORKID_UAHF => 0x00000040,
 	SIGHASH_ANYONECANPAY => 0x00000080,
 	
 	OP_PUSHDATA1 => 0x4c,
@@ -49,6 +50,9 @@ sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 our $default_version = 1;
 our $default_locktime = 0;
+
+
+our $PARAM_UAHF_BOOL = 'uahf boolean';
 
 =item new
 
@@ -102,13 +106,18 @@ sub new {
 	$this->{'lockTime'} = $default_locktime unless defined $this->{'lockTime'};
 	$this->{'version'} = $default_version unless defined $this->{'version'};
 	
+	if(defined $options->{'chain_type'} && $options->{'chain_type'} eq 'uahf'){
+		$this->{$PARAM_UAHF_BOOL} = 1;
+	}
+	
+	
 	
 	return $this;
 }
 
 =pod
 
----++ deserialize($serialized_tx,\@scriptPubs)
+---++ deserialize($serialized_tx,\@scriptPubs,\@amounts,'uahf')
 
 
 Get a hash back, not a blessed object.
@@ -127,12 +136,30 @@ If deserializing a raw transaction, please provide @scriptPubs that correspond w
 =cut
 
 sub deserialize{
-	my ($package,$data,$script_pubs) = @_;
-	
+	my ($package,$data,$script_pubs,$input_amounts,$chain_type) = @_;
+		
 	$script_pubs //= [];
+	if(
+		defined $input_amounts && ref($input_amounts) eq 'ARRAY'
+		&& scalar(@{$script_pubs}) != scalar(@{$input_amounts})
+	){
+		die "input amounts not equal to script pubs";
+	}
+	elsif(defined $input_amounts  && ref($input_amounts) ne 'ARRAY'){
+		die "input amounts not an array";
+	}
+	else{
+		$input_amounts = [];
+	}
+
+	
 	
 	my $this = picocoin_tx_des($data);
 	bless($this,$package);
+	
+	if(defined $chain_type && $chain_type eq 'uahf'){
+		$this->{$PARAM_UAHF_BOOL} = 1;
+	}
 	
 	$this->{'inputs'} = [];
 	my $i = 0;
@@ -150,12 +177,20 @@ sub deserialize{
 				,'scriptSig' => $in->{"scriptSig"}
 			});
 		}
+		elsif(0 < scalar(@{$input_amounts})){
+			$input = CBitcoin::TransactionInput->new({
+				'prevOutHash' => pack('H*',$in->{"prevHash"})
+				,'prevOutIndex' => $in->{"prevIndex"}
+				,'script' => $script_pubs->[$i]
+				,'input_amount' => $input_amounts->[$i]
+			});
+		}
 		else{
 			$input = CBitcoin::TransactionInput->new({
 				'prevOutHash' => pack('H*',$in->{"prevHash"})
 				,'prevOutIndex' => $in->{"prevIndex"}
 				,'script' => $script_pubs->[$i]
-			})
+			});			
 		}
 		
 		push(@{$this->{'inputs'}},$input);
@@ -186,8 +221,6 @@ sub deserialize{
 }
 
 
-
-
 =item lockTime
 
 ---++ lockTime
@@ -216,6 +249,24 @@ sub version {
 
 sub hash {
 	return shift->{'hash'};
+}
+
+=item hash_type
+
+---++ hash_type(SIGHASH_ALL)
+
+Figure out if we are on a fork, if so, provide the fork id.
+
+=cut
+
+sub hash_type($$){
+	my ($this,$sigtype) = @_;
+	
+	my $ans = $sigtype;
+	if($this->{$PARAM_UAHF_BOOL}){
+		$ans = $ans | SIGHASH_FORKID_UAHF;
+	}
+	return $ans;
 }
 
 =pod
@@ -406,49 +457,14 @@ sub validate_sigs {
 			, $this->input($i)->script() # scriptPubKey
 			, $txdata  # includes scriptSig
 			, 0 # sigvalidate
-			, SIGHASH_ALL # default;
+			, $this->hash_type(SIGHASH_ALL) # default;
+			,0
 		);
 		return 0 unless $bool;
 	}
 	return 1;
 }
 
-=pod
-
----++ calculate_signature($key,$index)
-
-https://en.bitcoin.it/wiki/OP_CHECKSIG - has the hash type explanantion
-| SIGHASH_ALL | 0x00000001 |
-| SIGHASH_NONE | 0x00000002 |
-| SIGHASH_SINGLE | 0x00000003 |
-| SIGHASH_ANYONECANPAY | 0x00000080 | 
-
-=cut
-
-
-
-sub calculate_signature {
-	my ($this,$i,$cbhdkey) = @_;
-	
-	die "bad key" unless defined $cbhdkey && ref($cbhdkey) =~ m/CBHD/;
-	
-	my $xpriv = $cbhdkey->serialized_private();
-	die "bad key" unless defined $xpriv && length($xpriv) == 78;
-	
-	die "bad index" unless defined $i && 0 <= $i && $i < $this->numOfInputs();
-	
-	# SV* fromPubKey_data, SV* txdata,int nIndex, int HashType
-	my $script = CBitcoin::Script::serialize_script($this->input($i)->script());
-	my $data = $this->serialize(1); # 1 for raw_bool=TRUE
-	
-	return picocoin_tx_sign(
-		$xpriv,
-		$script,
-		$data,
-		$i,
-		SIGHASH_ALL
-	);
-}
 
 
 =pod
@@ -483,15 +499,14 @@ sub assemble_multisig_p2sh {
 	# grab all the sigs
 	#my @sigs;
 	foreach my $key (@keys){
-		#push(@sigs,$this->calculate_signature($i,$key));
 		#die "bad signature" unless defined $sigs[-1] && 0 < length($sigs[-1]);
 		$txraw = picocoin_tx_sign_p2pkh(
 			$key->serialized_private(),
 			CBitcoin::Script::serialize_script($this->input($i)->script()),
 			$txdata,
 			$i,
-			SIGHASH_ALL,
-			0
+			$this->hash_type(SIGHASH_ALL),
+			$this->input($i)->input_amount
 		);
 		die "bad signature" unless defined $txraw && 0 < length($txraw);
 		
@@ -526,8 +541,8 @@ sub assemble_p2pkh {
 		CBitcoin::Script::serialize_script($this->input($i)->script()),
 		$txdata,
 		$i,
-		SIGHASH_ALL,
-		0
+		$this->hash_type(SIGHASH_ALL),
+		$this->input($i)->input_amount()
 	);
 	die "bad signature" unless defined $txraw && 0 < length($txraw);
 	return $txraw;
@@ -555,13 +570,14 @@ sub assemble_p2p {
 	}
 	
 
+
 	$txraw = picocoin_tx_sign_p2p(
 		$key->serialized_private(),
 		CBitcoin::Script::serialize_script($this->input($i)->script()),
 		$txdata,
 		$i,
-		SIGHASH_ALL,
-		0
+		$this->hash_type(SIGHASH_ALL),
+		$this->input($i)->input_amount()
 	);
 	die "bad signature" unless defined $txraw && 0 < length($txraw);
 	return $txraw;

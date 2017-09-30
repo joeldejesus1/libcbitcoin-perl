@@ -36,12 +36,13 @@ picocoin_tx_validate(txdata)
 	SV* txdata
 	
 int 
-picocoin_tx_validate_input(index,scriptPubKey_data,txdata,sigvalidate,nHashType)
+picocoin_tx_validate_input(index,scriptPubKey_data,txdata,sigvalidate,nHashType,amount)
 	int index
 	SV* scriptPubKey_data
 	SV* txdata
 	int sigvalidate
 	int nHashType
+	int amount
 
 SV*	
 picocoin_tx_sign_p2pkh(hdkey_data,fromPubKey_data,txdata,index,HashType,amount)

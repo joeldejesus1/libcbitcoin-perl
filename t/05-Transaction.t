@@ -8,7 +8,7 @@ use CBitcoin::TransactionOutput;
 use CBitcoin::Transaction;
 
 use JSON::XS;
-use Test::More tests => 1;
+use Test::More tests => 2;
 
 $CBitcoin::network_bytes = TESTNET;
 
@@ -125,26 +125,56 @@ my @outputs;
 }
 
 {
-	my $fh;
-	unless(open($fh,'<','t/tx_valid.json')){
-		print "Bailout!";
-		return;
-	}
-	my $json_text = '';
-	while(<$fh>){ $json_text .= $_}	
-	close($fh);
+	# TESTING UAHF
 	
-	my $data = JSON::XS::decode_json($json_text);
-	my $header = shift(@{$data});
-	# ["raw_transaction, script, input_index, hashType, signature_hash (result)"],
-	foreach my $row (@{$data}){
-		my $tx_raw = $row->[0];
-		my $scriptpub = $row->[1];
-		my $index = $row->[2];
-		my $hashType = $row->[3];
-		my $sighash = $row->[4];
-		#warn "raw=$tx_raw\n";
-	}
+	# got these from a block explorer, but we have to reverse the bytes
+	my @hashes = (
+		'6105e342232a9e67e4fa4ee0651eb8efd146dc0d7d346c788f45d8ad591c4577',
+		'da16a3ea5101e9f2ff975ec67a4ad85767dd306c27b94ef52500c26bc88af5c9'
+	);
+	
+	@ins = (
+		# mwUaFw3zQ8M4iaeuhFiiGWy4QbTphAeSxh 0.01394
+		CBitcoin::TransactionInput->new({
+			'prevOutHash' => pack('H*',join('',reverse($hashes[0] =~ m/([[:xdigit:]]{2})/g) )  ) #should be 32 byte hash
+			,'prevOutIndex' => 1
+			,'script' =>  CBitcoin::Script::address_to_script($root->deriveChild(1,1)->address()) # scriptPubKey
+			,'input_amount' => int(0.01394 * 100_000_000)
+		}),
+		# ms2Kt13CEL5jTMs98qXMAD15WpmnsK5ZGg 0.01408
+		CBitcoin::TransactionInput->new({
+			'prevOutHash' => pack('H*',join('',reverse($hashes[1] =~ m/([[:xdigit:]]{2})/g) ) ) #should be 32 byte hash
+			,'prevOutIndex' => 1
+			,'script' =>  CBitcoin::Script::address_to_script($root->deriveChild(1,2)->address()) # scriptPubKey
+			,'input_amount' => int(0.01408 * 100_000_000)
+		})	
+	);
+	my $balance = int( (0.01394 + 0.01408) * 100_000_000);
+	my $fee = int(0.0001 * 100_000_000);
+	
+	#warn "Address:".$root->export_xpriv()."\n";
+	#warn "Address:".$root->deriveChild(1,1)->address()."\n";
+	#warn "Address:".$root->deriveChild(1,2)->address()."\n";
+	#warn "Address:".$root->deriveChild(1,3)->address()."\n";
+	
+	@outs = (CBitcoin::TransactionOutput->new({
+		'script' => CBitcoin::Script::address_to_script($root->deriveChild(1,3)->address())
+		,'value' => ($balance - $fee)
+	}));
+	
+	# mi5W6CfThYwzTDsJg8Swu223dmyPPXDc8w
+	# mi5W6CfThYwzTDsJg8Swu223dmyPPXDc8w
+	
+	my $tx = CBitcoin::Transaction->new({
+		'inputs' => \@ins, 'outputs' => \@outs, 'chain_type' => 'uahf'
+	});
+	
+	my $txdata = $tx->assemble_p2pkh(0,$root->deriveChild(1,1));
+	#warn "Txdata:".unpack('H*',$txdata)."\n";
+	$txdata = $tx->assemble_p2pkh(1,$root->deriveChild(1,2),$txdata);
+	
+	#warn "TX:".unpack('H*',$txdata )."\n";
+	ok($tx->validate_sigs($txdata),'good tx with uahf');
 }
 
 

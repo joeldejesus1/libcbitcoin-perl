@@ -60,7 +60,7 @@ int picocoin_tx_validate ( SV* txdata){
 
 
 int picocoin_tx_validate_input (
-		int index, SV* scriptPubKey_data, SV* txdata,int sigvalidate, int nHashType
+		int index, SV* scriptPubKey_data, SV* txdata,int sigvalidate, int nHashType, int amount
 ){
 	// deserialize scriptPubKey (from txFrom->vout)
 	STRLEN len_spk;
