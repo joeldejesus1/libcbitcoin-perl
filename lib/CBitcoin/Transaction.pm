@@ -458,7 +458,7 @@ sub validate_sigs {
 			, $txdata  # includes scriptSig
 			, 0 # sigvalidate
 			, $this->hash_type(SIGHASH_ALL) # default;
-			,0
+			, pack('q',$this->input($i)->input_amount())
 		);
 		return 0 unless $bool;
 	}

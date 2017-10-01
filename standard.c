@@ -60,7 +60,7 @@ int picocoin_tx_validate ( SV* txdata){
 
 
 int picocoin_tx_validate_input (
-		int index, SV* scriptPubKey_data, SV* txdata,int sigvalidate, int nHashType, int amount
+		int index, SV* scriptPubKey_data, SV* txdata,int sigvalidate, int nHashType, SV* amount_scalar
 ){
 	// deserialize scriptPubKey (from txFrom->vout)
 	STRLEN len_spk;
@@ -72,20 +72,21 @@ int picocoin_tx_validate_input (
 	struct const_buffer buf = { txdata_pointer, len };
 	struct bp_tx tx;
 	bp_tx_init(&tx);
+	int result = 0;
+
+	fprintf(stderr,"hello dude - 1\n");
 
 	if(!deser_bp_tx(&tx,&buf)){
-		bp_tx_free(&tx);
-		cstr_free(scriptPubKey,true);
-		return 0;
+		result = 0;
+		goto out;
 	}
-
+	fprintf(stderr,"hello dude - 2\n");
 	if(!bp_tx_valid(&tx)){
-		bp_tx_free(&tx);
-		cstr_free(scriptPubKey,true);
-		return 0;
+		result = 0;
+		goto out;
 	}
 	unsigned int nIn = (unsigned int) index;
-
+	fprintf(stderr,"hello dude - 3\n");
 
 	unsigned int flags;
 	if(sigvalidate == 1){
@@ -100,14 +101,37 @@ int picocoin_tx_validate_input (
 	else{
 		flags = SCRIPT_VERIFY_NONE;
 	}
-	// bp_script_verify(txin->scriptSig, txout->scriptPubKey,txTo, nIn, flags, nHashType)
+
+	//STRLEN len; //calculated via SvPV
+	uint8_t * amt_pointer = (uint8_t*) SvPV(amount_scalar,len);
+	fprintf(stderr,"hello dude - 4\n");
+
+
+	if(len != 8){
+		result = 0;
+		goto out;
+	}
+
+	fprintf(stderr,"hello dude - 5\n");
+
+	int64_t amount = 0;
+	memcpy(&amount,amount,len);
 	struct bp_txin *txin = parr_idx(tx.vin, nIn);
 
+	fprintf(stderr,"amount=%d\n",amount);
+
+	//(const cstring *scriptSig, const cstring *scriptPubKey,
+    // const struct bp_tx *txTo, unsigned int nIn,
+    // unsigned int flags, int nHashType, int64_t amount)
 
 
+	if(bp_script_verify_with_value(txin->scriptSig, scriptPubKey, &tx, nIn, flags, nHashType,amount))
+		result = 1;
+
+out:
 	bp_tx_free(&tx);
 	cstr_free(scriptPubKey,true);
-	return 1;
+	return result;
 }
 
 

@@ -42,7 +42,7 @@ picocoin_tx_validate_input(index,scriptPubKey_data,txdata,sigvalidate,nHashType,
 	SV* txdata
 	int sigvalidate
 	int nHashType
-	int amount
+	SV* amount
 
 SV*	
 picocoin_tx_sign_p2pkh(hdkey_data,fromPubKey_data,txdata,index,HashType,amount)

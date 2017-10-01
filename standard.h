@@ -35,7 +35,7 @@ struct hd_extended_key_serialized {
 
 int picocoin_tx_validate ( SV* txdata);
 int picocoin_tx_validate_input (
-		int index, SV* scriptPubKey_data, SV* txdata,int sigvalidate, int nHashType, int amount
+		int index, SV* scriptPubKey_data, SV* txdata,int sigvalidate, int nHashType, SV* amount
 );
 SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType, int amount);
 SV* picocoin_tx_sign_p2p(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType, int amount);
