@@ -1,4 +1,4 @@
-#include "standard.h"
+#include "tx.h"
 
 
 ////////// picocoin
@@ -60,7 +60,7 @@ int picocoin_tx_validate ( SV* txdata){
 
 
 int picocoin_tx_validate_input (
-		int index, SV* scriptPubKey_data, SV* txdata,int sigvalidate, int nHashType
+		int index, SV* scriptPubKey_data, SV* txdata,int flags, int nHashType, SV* amount_scalar
 ){
 	// deserialize scriptPubKey (from txFrom->vout)
 	STRLEN len_spk;
@@ -72,46 +72,67 @@ int picocoin_tx_validate_input (
 	struct const_buffer buf = { txdata_pointer, len };
 	struct bp_tx tx;
 	bp_tx_init(&tx);
+	int result = 0;
+
+	//fprintf(stderr,"hello dude - 1\n");
 
 	if(!deser_bp_tx(&tx,&buf)){
-		bp_tx_free(&tx);
-		cstr_free(scriptPubKey,true);
-		return 0;
+		result = 0;
+		goto out;
 	}
-
+	//fprintf(stderr,"hello dude - 2\n");
 	if(!bp_tx_valid(&tx)){
-		bp_tx_free(&tx);
-		cstr_free(scriptPubKey,true);
-		return 0;
+		result = 0;
+		goto out;
 	}
 	unsigned int nIn = (unsigned int) index;
+	//fprintf(stderr,"hello dude - 3\n");
 
 
-	unsigned int flags;
-	if(sigvalidate == 1){
-		flags = SCRIPT_VERIFY_STRICTENC;
+	//STRLEN len; //calculated via SvPV
+	uint8_t * amt_pointer = (uint8_t*) SvPV(amount_scalar,len);
+	//fprintf(stderr,"hello dude - 4\n");
+
+
+	if(len != 8){
+		result = 0;
+		goto out;
 	}
-	else if(sigvalidate == 2){
-		flags = SCRIPT_VERIFY_P2SH;
-	}
-	else if(sigvalidate == 3){
-		flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC;
-	}
-	else{
-		flags = SCRIPT_VERIFY_NONE;
-	}
-	// bp_script_verify(txin->scriptSig, txout->scriptPubKey,txTo, nIn, flags, nHashType)
+
+	//fprintf(stderr,"hello dude - 5\n");
+
+	int64_t amount = 0;
+	memcpy(&amount,amt_pointer,len);
 	struct bp_txin *txin = parr_idx(tx.vin, nIn);
 
+	/*
+	if(nHashType & SIGHASH_FORKID_UAHF){
+		fprintf(stderr,"sighash fork id uahf, amount=%d\n",amount);
+	}
+
+	if(flags & SCRIPT_ENABLE_SIGHASH_FORKID){
+		fprintf(stderr,"validate - sighash fork id uahf, amount=%d\n",amount);
+	}*/
+
+	//fprintf(stderr,"flags=%d\n",flags);
+	if(bp_script_verify_with_value(txin->scriptSig, scriptPubKey, &tx, nIn, flags, nHashType,amount))
+		result = 1;
 
 
+	//if(bp_script_verify(txin->scriptSig, scriptPubKey, &tx, nIn, sigvalidate, nHashType))
+	//	result = 1;
+
+	//fprintf(stderr,"hello dude - 7 - result=%d\n",result);
+
+out:
 	bp_tx_free(&tx);
 	cstr_free(scriptPubKey,true);
-	return 1;
+	//fprintf(stderr,"amount=%d result=%d\n",amount,result);
+	return result;
 }
 
 
-SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType){
+SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType, int amount){
 
 	////////////// import hdkey ////////////////////////////
 	STRLEN len_hdkey; //calculated via SvPV
@@ -166,8 +187,14 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 	cstring frompubkey = { fromPubKey_pointer, len_frompubkey};
 
 	bu256_t hash;
-	//fprintf(stderr,"Hash Type=%d\n",nHashType);
-	bp_tx_sighash(&hash, &frompubkey, txTo, nIn, nHashType);
+
+	/*
+	if(nHashType & SIGHASH_FORKID_UAHF){
+		fprintf(stderr,"signp2pkh - sighash fork id uahf, amount=%d\n",amount);
+	}*/
+
+	bp_tx_sighash_with_value(&hash, &frompubkey, txTo, nIn, nHashType, amount);
+
 
 	struct bp_txin *txin = parr_idx(txTo->vin, nIn);
 	// find the input
@@ -183,7 +210,6 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 		return picocoin_returnblankSV();
 	}
 	//fprintf(stderr,"Index2=%d\n",nIn);
-
 
 
 	uint8_t ch = (uint8_t) nHashType;
@@ -227,7 +253,7 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 
 }
 
-SV* picocoin_tx_sign_p2p(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType){
+SV* picocoin_tx_sign_p2p(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType, int amount){
 
 	////////////// import hdkey ////////////////////////////
 	STRLEN len_hdkey; //calculated via SvPV
@@ -277,13 +303,18 @@ SV* picocoin_tx_sign_p2p(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIn
 		return picocoin_returnblankSV();
 	}
 
+	if(nHashType & SIGHASH_FORKID_UAHF){
+		fprintf(stderr,"1 - sighash fork id uahf, amount=%d\n",amount);
+	}
+	fprintf(stderr,"signing with hashtype=%d\n",nHashType);
+
 	STRLEN len_frompubkey; //calculated via SvPV
 	uint8_t * fromPubKey_pointer = (uint8_t*) SvPV(fromPubKey_data,len_frompubkey);
 	cstring frompubkey = { fromPubKey_pointer, len_frompubkey};
 
 	bu256_t hash;
 	//fprintf(stderr,"Hash Type=%d\n",nHashType);
-	bp_tx_sighash(&hash, &frompubkey, txTo, nIn, nHashType);
+	bp_tx_sighash_with_value(&hash, &frompubkey, txTo, nIn, nHashType,amount);
 
 	struct bp_txin *txin = parr_idx(txTo->vin, nIn);
 	// find the input

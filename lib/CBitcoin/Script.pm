@@ -276,7 +276,7 @@ sub whatTypeOfScript {
 		return 'p2p';
 	}
 	else{
-		die "bad script type";
+		return 'unknown';
 	}
 	
 	

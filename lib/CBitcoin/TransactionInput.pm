@@ -41,6 +41,7 @@ $info = {
 	'prevOutHash' => 0x84320230,
 	'prevOutIndex' => 32,
 	'script' => 'OP_HASH160 ...'
+	'input_amount' => 0
 };
 
 =cut
@@ -48,7 +49,8 @@ $info = {
 
 sub new {
 	my $package = shift;
-	my $this = bless({}, $package);
+	my $this = {};
+	bless($this, $package);
 
 	my $x = shift;
 	 
@@ -61,6 +63,16 @@ sub new {
 	}
 	foreach my $col ('script','prevOutHash','prevOutIndex','scriptSig'){
 		$this->{$col} = $x->{$col};
+	}
+	
+	if(defined $x->{'input_amount'} && $x->{'input_amount'} =~ m/^(\d+)$/){
+		$this->{'input_amount'} = $1;
+	}
+	elsif(defined $x->{'input_amount'}){
+		die "bad input amount";
+	}
+	else{
+		$this->{'input_amount'} = 0;
 	}
 	
 	
@@ -82,6 +94,17 @@ sub new {
 
 	
 	return $this;
+}
+
+
+=pod
+
+---++ input_amount
+
+=cut
+
+sub input_amount {
+	return shift->{'input_amount'};
 }
 
 =pod
