@@ -21,7 +21,7 @@
 #include <ccoin/serialize.h>
 //#include <ccoin/compat.h>
 
-#include "standard.h"
+#include "tx.h"
 
 
 
@@ -36,11 +36,11 @@ picocoin_tx_validate(txdata)
 	SV* txdata
 	
 int 
-picocoin_tx_validate_input(index,scriptPubKey_data,txdata,sigvalidate,nHashType,amount)
+picocoin_tx_validate_input(index,scriptPubKey_data,txdata,flags,nHashType,amount)
 	int index
 	SV* scriptPubKey_data
 	SV* txdata
-	int sigvalidate
+	int flags
 	int nHashType
 	SV* amount
 
