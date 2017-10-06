@@ -334,10 +334,21 @@ sub flag_type{
 
 This adds the redeem script to the end of the stack. (scriptSig in picocoin parlance)
 
+The redeem script is in human readable format (deserialized), not serialized binary format.
+
 =cut
 
-sub add_redeem_script {
-	my $this = shift;
+sub add_redeem_script($$$){
+	my ($this,$nIndex,$redeem_script) = @_;
+	
+	die "bad index" unless defined $nIndex && $nIndex =~ m/^(\d+)$/
+		&& 0 <= $nIndex && $nIndex < $this->numOfInputs;
+	
+	die "no script" unless defined $redeem_script && 0 < length($redeem_script);
+	
+	my $input = $this->input($nIndex);
+		
+	$this->input($nIndex)->redeem_script($redeem_script);
 	
 }
 
@@ -536,6 +547,8 @@ sub validate_sigs {
 
 ---++ assemble_multisig_p2sh($i,$n,@keys,$txraw)
 
+The keys are in binary form, as is the transaction data.
+
 =cut
 
 sub assemble_multisig_p2sh {
@@ -557,12 +570,15 @@ sub assemble_multisig_p2sh {
 		$txdata = $this->serialize();
 	}
 	
+	my $PARAM_MULTISIG = 'checked multisig redeem script';
+	unless(defined $this->{$PARAM_MULTISIG}){
+		
+		
+		$this->{$PARAM_MULTISIG} = 1;
+	}
+	
 	
 
-	
-	
-	# grab all the sigs
-	#my @sigs;
 	foreach my $key (@keys){
 		#die "bad signature" unless defined $sigs[-1] && 0 < length($sigs[-1]);
 		$txraw = picocoin_tx_sign_p2pkh(
@@ -577,7 +593,6 @@ sub assemble_multisig_p2sh {
 		
 	}
 	return $txraw;
-	# OP_PUSHDATA1
 }
 
 

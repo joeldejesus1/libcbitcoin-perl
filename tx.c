@@ -131,7 +131,10 @@ out:
 	return result;
 }
 
-
+/*
+ * Pushes a signature and public key onto scriptSig for a given input (nIndex)
+ * This is used when doing both pay to key hash and multisig pay to script transactions.
+ */
 SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType, int amount){
 
 	////////////// import hdkey ////////////////////////////
@@ -218,7 +221,10 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 	siglen++;
 
 
-	cstring * scriptSig = cstr_new_sz(64);
+	cstring * scriptSig = txin->scriptSig;
+	if(scriptSig == NULL){
+		scriptSig = cstr_new_sz(64);
+	}
 	bsp_push_data(scriptSig, sig, siglen);
 
 	// append public key
@@ -234,10 +240,10 @@ SV* picocoin_tx_sign_p2pkh(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int n
 
 	bsp_push_data(scriptSig, pubkey, pk_len);
 
-	if (txin->scriptSig)
-		cstr_free(txin->scriptSig, true);
-	txin->scriptSig = scriptSig;
-	scriptSig = NULL;
+	//if (txin->scriptSig)
+	//	cstr_free(txin->scriptSig, true);
+	//txin->scriptSig = scriptSig;
+	//scriptSig = NULL;
 
 	cstring *txanswer = cstr_new_sz(bp_tx_ser_size(&tx));
 
@@ -372,6 +378,44 @@ SV* picocoin_tx_sign_p2p(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIn
 
 
 }
+
+SV*	picocoin_tx_add_redeem_script(int nIndex,SV* tx_data,SV* redeem_script){
+	////////////// import hdkey ////////////////////////////
+	STRLEN len_redeem_script; //calculated via SvPV
+	uint8_t * redeem_script_pointer = (uint8_t*) SvPV(redeem_script,len_redeem_script);
+	if(len_redeem_script < 1)
+		return picocoin_returnblankSV();
+
+
+	///////////// import tx //////////////////
+	uint32_t nIn = (uint32_t) nIndex;
+	//fprintf(stderr,"Index1=%d\n",nIn);
+	STRLEN len; //calculated via SvPV
+	uint8_t * txdata_pointer = (uint8_t*) SvPV(tx_data,len);
+	struct const_buffer buf = { txdata_pointer, len };
+	struct bp_tx tx;
+	bp_tx_init(&tx);
+	// validate the transaction
+	if(!deser_bp_tx(&tx,&buf)){
+		bp_tx_free(&tx);
+		return picocoin_returnblankSV();
+	}
+
+	if(!bp_tx_valid(&tx)){
+		bp_tx_free(&tx);
+		return picocoin_returnblankSV();
+	}
+
+/*
+	struct bp_txin *txin = parr_idx(txTo->vin, nIn);
+
+	bsp_push_data(scriptSig, pubkey, pk_len);
+*/
+	bp_tx_free(&tx);
+	return picocoin_returnblankSV();
+}
+
+
 
 HV* picocoin_emptytx(HV * rh){
 	hv_store(rh, "success", 7, newSViv((int) 0), 0);

@@ -21,8 +21,8 @@
 #include <ccoin/serialize.h>
 
 
-#ifndef standard_h_   /* Include guard */
-#define standard_h_
+#ifndef tx_h_   /* Include guard */
+#define tx_h_
 
 /**
  * transaction related functions that comply with network rules prior to segwit2x and uahf forks
@@ -42,6 +42,7 @@ SV* picocoin_tx_sign_p2p(SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIn
 HV* picocoin_emptytx(HV * rh);
 HV* picocoin_returntx(HV * rh, const struct bp_tx *tx);
 HV* picocoin_tx_des(SV* tx_data);
+SV*	picocoin_tx_add_redeem_script(int nIndex,SV* tx_data,SV* redeem_script);
 
 
-#endif // standard_h_
+#endif // tx_h_

@@ -111,7 +111,7 @@ sub input_amount {
 
 ---++ script
 
-AKA scriptPubKey
+AKA scriptPub
 
 =cut
 
@@ -121,6 +121,39 @@ sub script {
 		$this->{'script'} = $script;
 	}
 	return $this->{'script'};
+}
+
+=pod
+
+---++ redeem_script
+
+The redeem script is for when the scriptPub is of p2sh type.
+
+=cut
+
+sub redeem_script {
+	my ($this,$redeem_script) = @_;
+	if(defined $redeem_script){
+		die "not p2sh" unless CBitcoin::Script::whatTypeOfScript($this->script) eq 'p2sh';
+		
+		# check to see if redeem script matches hash160
+		my $serialized_redeem_script = CBitcoin::Script::serialize_script($redeem_script);
+		my @s = split(' ',$this->script);
+		# OP_HASH160 0x34432..ff3 OP_EQUAL
+		my $hash160;
+		if($s[1] =~ m/^0x([0-9a-fA-F]+)$/){
+			$hash160 = pack('H*',lc($1));
+		}
+		else{
+			die "bad hash160 for p2sh";
+		}
+		my $hash160_calc = CBitcoin::picocoin_ripemd_hash160($serialized_redeem_script);
+		
+		die "redeem script does not match" unless $hash160 eq $hash160;
+		
+		$this->{'redeem script'} = $redeem_script;
+	}
+	return $this->{'redeem script'};
 }
 
 =pod
@@ -212,6 +245,7 @@ sub add_cbhdkey {
 	$this->{'cbhd key'} = $cbhdkey;
 	return $cbhdkey;
 }
+
 
 
 =pod

@@ -62,6 +62,13 @@ picocoin_tx_sign_p2p(hdkey_data,fromPubKey_data,txdata,index,HashType,amount)
 	int HashType
 	int amount
 	
+SV*	
+picocoin_tx_add_redeem_script(nIndex,tx_data,redeem_script)
+	int nIndex
+	SV* tx_data
+	SV* redeem_script
+	
+	
 HV*	
 picocoin_tx_des(tx_data)
 	SV* tx_data

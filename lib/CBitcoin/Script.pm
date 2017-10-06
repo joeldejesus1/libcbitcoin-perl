@@ -332,6 +332,8 @@ sub deserialize_scriptSig {
 
 ---++ multisig_p2sh_script($m,$n,@pubksy)
 
+Public keys must be in binary form (between 32 and 34 bytes long).
+
 =cut
 
 sub multisig_p2sh_script {

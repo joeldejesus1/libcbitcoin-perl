@@ -298,6 +298,87 @@ sub test_uahf{
 test_uahf();
 
 
+
+sub test_multisig_uahf{
+	# TESTING UAHF
+	$CBitcoin::chain = CBitcoin::CHAIN_UAHF;
+	
+	# going to have 2 of 2 multisig for the first input
+	
+	# going to have 1 of 2 multisig for first output
+	
+	
+	# got these from a block explorer, but we have to reverse the bytes
+	my @hashes = (
+		'6105e342232a9e67e4fa4ee0651eb8efd146dc0d7d346c788f45d8ad591c4577',
+		'da16a3ea5101e9f2ff975ec67a4ad85767dd306c27b94ef52500c26bc88af5c9'
+	);
+	
+	# multisig_p2sh_script($m,$n,@pubksy)
+	my $multisig_input = CBitcoin::Script::multisig_p2sh_script(2,2,
+		$root->deriveChild(1,1)->publickey(),
+		$root->deriveChild(1,2)->publickey()
+	);
+	warn "M1=$multisig_input\n";
+	#warn "address:".CBitcoin::Script::script_to_address($multisig_input)."\n";
+	
+	my $multisig_output = CBitcoin::Script::multisig_p2sh_script(1,3,
+		$root->deriveChild(1,3)->publickey(),
+		$root->deriveChild(1,4)->publickey(),
+		$root->deriveChild(1,5)->publickey()
+	);
+	#warn "address:".CBitcoin::Script::script_to_address($multisig_output)."\n";
+	
+	@ins = (
+		# 2N5LRdEGUAR2DePoxnzidVbhJoUjR8YhzMS 0.01394
+		CBitcoin::TransactionInput->new({
+			'prevOutHash' => pack('H*',join('',reverse($hashes[0] =~ m/([[:xdigit:]]{2})/g) )  ) 
+			,'prevOutIndex' => 1
+			,'script' =>  $multisig_input 
+			,'input_amount' => int(0.01394 * 100_000_000)
+		}),
+		# ms2Kt13CEL5jTMs98qXMAD15WpmnsK5ZGg 0.01408
+		CBitcoin::TransactionInput->new({
+			'prevOutHash' => pack('H*',join('',reverse($hashes[1] =~ m/([[:xdigit:]]{2})/g) ) ) 
+			,'prevOutIndex' => 1
+			,'script' =>  $multisig_output
+			,'input_amount' => int(0.01408 * 100_000_000)
+		})	
+	);
+	my $balance = int( (0.01394 + 0.01408) * 100_000_000);
+	my $fee = int(0.0001 * 100_000_000);
+
+	#warn "Address:".$root->export_xpriv()."\n";
+	#warn "Address:".$root->deriveChild(1,1)->address()."\n";
+	#warn "Address:".$root->deriveChild(1,2)->address()."\n";
+	#warn "Address:".$root->deriveChild(1,3)->address()."\n";
+	
+	@outs = (CBitcoin::TransactionOutput->new({
+		'script' => CBitcoin::Script::address_to_script($root->deriveChild(1,3)->address())
+		,'value' => ($balance - $fee)
+	}));
+	
+	my $tx = CBitcoin::Transaction->new({
+		'inputs' => \@ins, 'outputs' => \@outs
+	});
+	$tx->add_redeem_script(0,$multisig_input);
+
+	#warn "p2pkh - 1\n";
+	#my $txdata = $tx->assemble_multisig_p2sh(0,$root->deriveChild(1,1));
+
+
+=pod	
+	#warn "p2pkh - 2\n";
+	#warn "Txdata:".unpack('H*',$txdata)."\n";
+	$txdata = $tx->assemble_p2pkh(1,$root->deriveChild(1,2),$txdata);
+	
+	#warn "TX:".unpack('H*',$txdata )."\n";
+	#warn "validate sigs\n";
+	ok($tx->validate_sigs($txdata),'good tx with multisig uahf');
+=cut
+}
+test_multisig_uahf();
+
 __END__
 
 
