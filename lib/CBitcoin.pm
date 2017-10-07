@@ -3,9 +3,28 @@ package CBitcoin;
 use strict;
 use warnings;
 
-=pod
 
----+ Constants
+=head1 NAME
+
+CBitcoin - A wrapper for the Picocoin C Library
+
+=head1 SEE INSTEAD?
+
+The module L<CBitcoin> serves as a bootstrapping point for other modules to compile.
+Also, it is used to set the network to do computations off of (MAINNET, TESTNET, etc).
+
+THe documentation is still work in progress.  More complete documentation is available at https://github.com/favioflamingo/libcbitcoin-perl and https://github.com/favioflamingo/picocoin
+
+The picocoin library needs to be compiled and installed before this module can be used.
+
+=head1 VERSION
+
+Version 0.6
+
+=cut
+
+
+=item Constants
 
    * [[https://github.com/bitcoin/bitcoin/blob/e9d76a161d30ee3081acf93d70a9ae668a9d6ed1/src/version.h][version]]
    * [[https://en.bitcoin.it/wiki/Protocol_documentation#sendheaders][constants]]
@@ -19,13 +38,15 @@ use constant {
 	,NAMECOIN => 0xFEB4BEF9
 	,REGNET => 0xFABFB5DA
 	
+	,CHAIN_LEGACY => 0
+	,CHAIN_UAHF => 1
+	
 	,BIP32_MAINNET_PUBLIC => 0x0488B21E
 	,BIP32_MAINNET_PRIVATE => 0x0488ADE4
 	,BIP32_TESTNET_PUBLIC => 0x043587CF
 	,BIP32_TESTNET_PRIVATE => 0x04358394
 	,BIP32_REGNET_PUBLIC => 0x043587CF
 	,BIP32_REGNET_PRIVATE => 0x04358394
-		
 	
 	,SPV_PROTOCOL_VERSION => 70014
 	,SPV_INIT_PROTO_VERSION => 209
@@ -42,28 +63,11 @@ use constant {
 };
 
 
-
-
-=head1 NAME
-
-CBitcoin - A wrapper for the Picocoin C Library
-
-=head1 SEE INSTEAD?
-
-The module L<CBitcoin> serves as a bootstrapping point for other modules to compile.
-Also, it is used to set the network to do computations off of (MAINNET, TESTNET, etc).
-
-=head1 VERSION
-
-Version 0.2
-
-=cut
-
 require Exporter;
 *import = \&Exporter::import;
 require DynaLoader;
 
-$CBitcoin::VERSION = '0.2';
+$CBitcoin::VERSION = '0.6';
 
 DynaLoader::bootstrap CBitcoin $CBitcoin::VERSION;
 
@@ -81,26 +85,20 @@ Don't worry about this.
 sub dl_load_flags {0} # Prevent DynaLoader from complaining and croaking
 
 
-
-
-
-sub hello {
-	return "hello!";
-}
-
-
 =item network_bytes
 
 Set network bytes with the $network_bytes global variable.
 
 =cut
 
-our $network_bytes = 0xD9B4BEF9;
+our $network_bytes = MAINNET;
+our $chain = CHAIN_LEGACY;
+
 
 
 =head1 AUTHOR
 
-Joel De Jesus, C<< <dejesus.joel at e-flamingo.jp> >>
+Joel De Jesus, C<< <dejesus.joel at e-flamingo.net> >>
 
 
 
@@ -111,7 +109,7 @@ Joel De Jesus, C<< <dejesus.joel at e-flamingo.jp> >>
 
 
     CBitcoin perl modules is a wrapper for the Picocoin library written by Jeff Garzik.
-    Copyright (C) 2015  Joel De Jesus
+    Copyright (C) 2015-2017  Joel De Jesus
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

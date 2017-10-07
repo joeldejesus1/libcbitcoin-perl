@@ -54,7 +54,16 @@ sub new {
 		$this->{'value'} = $x->{'value'};
 		$this->{'script'} = $x->{'script'};
 	}
+	elsif(
+		defined $x->{'value'} && $x->{'value'} =~ m/^([0-9]+)$/
+	){
+		#warn "empty script\n";
+		$this->{'value'} = $x->{'value'};
+		$this->{'script'} = '';
+	}
 	else{
+		#require Data::Dumper;
+		#warn "options=".Data::Dumper::Dumper($x);
 		die "no arguments to create Transaction::Output";
 	}
 		

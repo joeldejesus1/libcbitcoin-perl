@@ -15,11 +15,6 @@
 #include <ccoin/cstr.h>
 
 
-// just a dummy function
-int dummy(int arg){
-	return 1;
-}
-
 SV* picocoin_ripemd_hash160(SV* x){
 	STRLEN len; //calculated via SvPV
 	uint8_t * xmsg = (uint8_t*) SvPV(x,len);
@@ -93,10 +88,6 @@ BOOT:
 	
 PROTOTYPES: DISABLED
 
-
-int
-dummy (arg)
-	int	arg
 	
 SV* 
 picocoin_base58_encode(x)

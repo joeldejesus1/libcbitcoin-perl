@@ -252,6 +252,25 @@ sub script_to_address {
 	
 }
 
+=pod
+
+---++ script_to_p2sh
+
+Derive a p2sh script from another script.
+
+=cut
+
+sub script_to_p2sh($){
+	my $long_script = shift;
+	return address_to_script(script_to_address($long_script));
+}
+
+=pod
+
+---++ whatTypeOfScript
+
+=cut
+
 sub whatTypeOfScript {
 	my $x = shift;
 	die "undefined type" unless defined $x && 0 < length($x);
@@ -276,7 +295,7 @@ sub whatTypeOfScript {
 		return 'p2p';
 	}
 	else{
-		die "bad script type";
+		return 'unknown';
 	}
 	
 	
@@ -331,6 +350,8 @@ sub deserialize_scriptSig {
 =pod
 
 ---++ multisig_p2sh_script($m,$n,@pubksy)
+
+Public keys must be in binary form (between 32 and 34 bytes long).
 
 =cut
 

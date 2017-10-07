@@ -41,6 +41,7 @@ $info = {
 	'prevOutHash' => 0x84320230,
 	'prevOutIndex' => 32,
 	'script' => 'OP_HASH160 ...'
+	'input_amount' => 0
 };
 
 =cut
@@ -48,7 +49,8 @@ $info = {
 
 sub new {
 	my $package = shift;
-	my $this = bless({}, $package);
+	my $this = {};
+	bless($this, $package);
 
 	my $x = shift;
 	 
@@ -63,6 +65,16 @@ sub new {
 		$this->{$col} = $x->{$col};
 	}
 	
+	if(defined $x->{'input_amount'} && $x->{'input_amount'} =~ m/^(\d+)$/){
+		$this->{'input_amount'} = $1;
+	}
+	elsif(defined $x->{'input_amount'}){
+		die "bad input amount";
+	}
+	else{
+		$this->{'input_amount'} = 0;
+	}
+	
 	
 	if(defined $this->{'script'}){
 		if($this->type_of_script() eq 'multisig'){
@@ -74,9 +86,11 @@ sub new {
 			die "no valid script" unless defined $x;
 			$this->{'script'} = CBitcoin::Script::address_to_script($x);
 			die "no valid script" unless defined $x;
+			#warn "got multisig\n";
 		}
 		elsif($this->type_of_script() eq 'p2sh'){
 			$this->{'this is a p2sh'} = 1;
+			#warn "got p2sh=".unpack('H*',CBitcoin::Script::serialize_script($this->{'script'}))."\n";
 		}		
 	}
 
@@ -84,11 +98,22 @@ sub new {
 	return $this;
 }
 
+
+=pod
+
+---++ input_amount
+
+=cut
+
+sub input_amount {
+	return shift->{'input_amount'};
+}
+
 =pod
 
 ---++ script
 
-AKA scriptPubKey
+AKA scriptPub
 
 =cut
 
@@ -98,6 +123,42 @@ sub script {
 		$this->{'script'} = $script;
 	}
 	return $this->{'script'};
+}
+
+=pod
+
+---++ redeem_script
+
+The redeem script is for when the scriptPub is of p2sh type.
+
+=cut
+
+sub redeem_script {
+	my ($this,$redeem_script) = @_;
+	if(defined $redeem_script){
+		die "not p2sh" unless CBitcoin::Script::whatTypeOfScript($this->script) eq 'p2sh';
+		
+		# check to see if redeem script matches hash160
+
+		my @s = split(' ',$this->script);
+		# OP_HASH160 0x34432..ff3 OP_EQUAL
+		my $hash160;
+		if($s[1] =~ m/^0x([0-9a-fA-F]+)$/){
+			$hash160 = pack('H*',lc($1));
+		}
+		else{
+			die "bad hash160 for p2sh";
+		}
+		
+		my $hash160_calc = CBitcoin::picocoin_ripemd_hash160(
+			CBitcoin::Script::serialize_script($redeem_script)
+		);
+		
+		die "redeem script does not match" unless $hash160 eq $hash160_calc;
+		
+		$this->{'redeem script'} = $redeem_script;
+	}
+	return $this->{'redeem script'};
 }
 
 =pod
@@ -191,6 +252,7 @@ sub add_cbhdkey {
 }
 
 
+
 =pod
 
 ---+ i/o
@@ -209,12 +271,16 @@ sub serialize {
 	# scriptSig
 	my $script = $this->scriptSig || '';
 	
+	#warn "script in tx_in=[".$script."]\n";
+	
 	if($raw_bool){
+		#warn "script - 2.a\n";
 		return $this->prevOutHash().pack('L',$this->prevOutIndex()).
 			CBitcoin::Utilities::serialize_varint(0).
 			pack('L',$this->sequence());	
 	}
 	else{
+		#warn "script - 2.b\n";
 		return $this->prevOutHash().pack('L',$this->prevOutIndex()).
 			CBitcoin::Utilities::serialize_varint(length($script)).$script.
 			pack('L',$this->sequence());

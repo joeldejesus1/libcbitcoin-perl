@@ -18,13 +18,14 @@ WriteMakefile(
 	,'PL_FILES'            => {}
 	,'PREREQ_PM' => {
 		'Test::More' => 0,
-		'BerkeleyDB' => 0
+		'BerkeleyDB' => 0,
+		'JSON::XS' => 0
 	}
 	,'EXE_FILES' => [
 		'scripts/cbitcoin'	
 	]
 	#,'LDDLFLAGS' => ' -fstack-protector '
-	#,'LDFLAGS' => ' -fstack-protector '
+	#,'LDFLAGS' => ' -fstack-protector -Wint-to-pointer-cast'
 	,'MAKEFILE_OLD' => ''
 	,'dist'                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', }
 	#,'clean'               => { FILES => 'libcbitcoin-perl*' }
