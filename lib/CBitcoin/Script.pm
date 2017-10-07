@@ -252,6 +252,25 @@ sub script_to_address {
 	
 }
 
+=pod
+
+---++ script_to_p2sh
+
+Derive a p2sh script from another script.
+
+=cut
+
+sub script_to_p2sh($){
+	my $long_script = shift;
+	return address_to_script(script_to_address($long_script));
+}
+
+=pod
+
+---++ whatTypeOfScript
+
+=cut
+
 sub whatTypeOfScript {
 	my $x = shift;
 	die "undefined type" unless defined $x && 0 < length($x);

@@ -86,9 +86,11 @@ sub new {
 			die "no valid script" unless defined $x;
 			$this->{'script'} = CBitcoin::Script::address_to_script($x);
 			die "no valid script" unless defined $x;
+			#warn "got multisig\n";
 		}
 		elsif($this->type_of_script() eq 'p2sh'){
 			$this->{'this is a p2sh'} = 1;
+			#warn "got p2sh=".unpack('H*',CBitcoin::Script::serialize_script($this->{'script'}))."\n";
 		}		
 	}
 
@@ -137,7 +139,7 @@ sub redeem_script {
 		die "not p2sh" unless CBitcoin::Script::whatTypeOfScript($this->script) eq 'p2sh';
 		
 		# check to see if redeem script matches hash160
-		my $serialized_redeem_script = CBitcoin::Script::serialize_script($redeem_script);
+
 		my @s = split(' ',$this->script);
 		# OP_HASH160 0x34432..ff3 OP_EQUAL
 		my $hash160;
@@ -147,9 +149,12 @@ sub redeem_script {
 		else{
 			die "bad hash160 for p2sh";
 		}
-		my $hash160_calc = CBitcoin::picocoin_ripemd_hash160($serialized_redeem_script);
 		
-		die "redeem script does not match" unless $hash160 eq $hash160;
+		my $hash160_calc = CBitcoin::picocoin_ripemd_hash160(
+			CBitcoin::Script::serialize_script($redeem_script)
+		);
+		
+		die "redeem script does not match" unless $hash160 eq $hash160_calc;
 		
 		$this->{'redeem script'} = $redeem_script;
 	}
@@ -266,12 +271,16 @@ sub serialize {
 	# scriptSig
 	my $script = $this->scriptSig || '';
 	
+	#warn "script in tx_in=[".$script."]\n";
+	
 	if($raw_bool){
+		#warn "script - 2.a\n";
 		return $this->prevOutHash().pack('L',$this->prevOutIndex()).
 			CBitcoin::Utilities::serialize_varint(0).
 			pack('L',$this->sequence());	
 	}
 	else{
+		#warn "script - 2.b\n";
 		return $this->prevOutHash().pack('L',$this->prevOutIndex()).
 			CBitcoin::Utilities::serialize_varint(length($script)).$script.
 			pack('L',$this->sequence());
