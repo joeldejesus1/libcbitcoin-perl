@@ -623,17 +623,17 @@ sub assemble_multisig_p2sh {
 	
 	# make sure we start ScriptSig with OP_0 
 	$txdata = picocoin_tx_push_p2sh_op_false($i,$txdata);
-	#warn "Script:".$this->input($i)->script()."\n";
-	#warn "Redeem:".$this->input($i)->redeem_script()."\n";
+
 	my $ser_script_pub = CBitcoin::Script::serialize_script($this->input($i)->script());
 	die "no redeem script in transaction input" unless defined $this->input($i)->redeem_script()
 		&& 0 < length($this->input($i)->redeem_script());
 	my $ser_redeem_script = CBitcoin::Script::serialize_script($this->input($i)->redeem_script());
-	#warn "script pub:".unpack('H*',$ser_script_pub)."\n";
+
 	
 	foreach my $key (@keys){
 		# push Sig onto scriptSig.
-		$txdata = picocoin_tx_push_signature(
+		# get back {'sig' => $signature, 'success' => 0/1, 'tx' => $txdata}
+		my $xref = picocoin_tx_push_signature(
 			$key->serialized_private(),
 			$ser_redeem_script,
 			$txdata,
@@ -641,23 +641,21 @@ sub assemble_multisig_p2sh {
 			$this->hash_type(SIGHASH_ALL),
 			$this->input($i)->input_amount
 		);
-		die "bad signature" unless defined $txdata && 0 < length($txdata);
-		#warn "txdata=".unpack('H*',$txdata)."\n";
+		die "bad signature" unless defined $xref && $xref->{'success'};
+		$txdata = $xref->{'tx'};
+		
+		# my $signature = $xref->{'sig'};
 	}
 	
 	$txdata = picocoin_tx_push_redeem_script($i,$txdata,$ser_redeem_script);
-	
-	#warn "finished txdata=".unpack('H*',$txdata)."\n";
-	
-
 	
 	return $txdata;
 }
 
 
-=pod
+=item B<my $txdata = $tx->assemble_p2pkh($i,$key)>
 
----++ assemble_p2pkh($i,$key)
+With a CBHD $key, sign a transaction input.  The serialized transaction including the signature is returned.  This subroutine is for pay to public key hash scripts.
 
 =cut
 
@@ -688,9 +686,9 @@ sub assemble_p2pkh {
 	
 }
 
-=pod
+=item B<my $txdata = $tx->assemble_p2p($i,$key)>
 
----++ assemble_p2p($i,$key)
+With a CBHD $key, sign a transaction input.  The serialized transaction including the signature is returned.  This subroutine is for pay to public key scripts.  P2P scripts are usually found in coinbase transactions.  P2PKH is normally.
 
 =cut
 
@@ -722,15 +720,9 @@ sub assemble_p2p {
 	return $txraw;
 }
 
-=pod
+=header2 Utilities
 
----+ utilities
-
-=cut
-
-=pod
-
----++ push_data($data)->$adddata
+=item B< push_data($data)->$adddata >
 
 
 =cut
@@ -756,20 +748,26 @@ sub push_data{
 }
 
 
-=pod
+=item B< txfee($size)>
 
----++ txfee($size)
+The default is 70 satoshis/byte.
 
-70 satoshis/byte.
+	$CBitcoin::Transaction::tx_fee = 70;
 
 =cut
+
+our $tx_fee;
+
+BEGIN{
+	# set default
+	$tx_fee = 70;
+}
 
 sub txfee{
 	my $size = shift;
 	die "bad size" unless defined $size && $size =~ m/^(\d+)$/ && 0 < $size;
-	my $fee = 70;
 
-	return $size*$fee;
+	return $size*$tx_fee;
 }
 
 
@@ -807,7 +805,7 @@ You can also look for information at: L<https://github.com/favioflamingo/libcbit
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2014 Joel De Jesus.
+Copyright 2014-2017 Joel De Jesus.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of either: the GNU General Public License as published

@@ -73,7 +73,7 @@ picocoin_tx_push_p2sh_op_false(nIndex,tx_data)
 	int nIndex
 	SV* tx_data
 
-SV*
+HV*
 picocoin_tx_push_signature(hdkey_data,fromPubKey_data,txdata,nIndex,nHashType,amount)
 	SV* hdkey_data
 	SV* fromPubKey_data

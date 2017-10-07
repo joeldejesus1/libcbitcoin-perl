@@ -381,16 +381,17 @@ SV*	picocoin_tx_push_p2sh_op_false(int nIndex,SV* tx_data){
 /*
  * Push a signature onto stack
  */
-SV* picocoin_tx_push_signature(
+HV* picocoin_tx_push_signature(
 		SV* hdkey_data, SV* fromPubKey_data
 		,SV* txdata,int nIndex, int nHashType, int amount
 ){
+	HV * rh = (HV *) sv_2mortal ((SV *) newHV ());
 
 	////////////// import hdkey ////////////////////////////
 	STRLEN len_hdkey; //calculated via SvPV
 	uint8_t * hdkey_pointer = (uint8_t*) SvPV(hdkey_data,len_hdkey);
 	if(len_hdkey != 78)
-		return picocoin_returnblankSV();
+		return picocoin_emptytx(rh);
 
 	struct hd_extended_key_serialized hdkeyser;
 
@@ -400,7 +401,7 @@ SV* picocoin_tx_push_signature(
 
 	if(!hd_extended_key_deser(&hdkey, hdkeyser.data,78)){
 		hd_extended_key_free(&hdkey);
-		return picocoin_returnblankSV();
+		return picocoin_emptytx(rh);
 	}
 
 	///////////// import tx //////////////////
@@ -415,12 +416,12 @@ SV* picocoin_tx_push_signature(
 	if(!deser_bp_tx(&tx,&buf)){
 		bp_tx_free(&tx);
 		hd_extended_key_free(&hdkey);
-		return picocoin_returnblankSV();
+		return picocoin_emptytx(rh);
 	}
 	if(!bp_tx_valid(&tx)){
 		bp_tx_free(&tx);
 		hd_extended_key_free(&hdkey);
-		return picocoin_returnblankSV();
+		return picocoin_emptytx(rh);
 	}
 
 	// for convenience reasons, change the name to txTo
@@ -428,7 +429,7 @@ SV* picocoin_tx_push_signature(
 	if (!txTo || !txTo->vin || nIn >= txTo->vin->len){
 		bp_tx_free(&tx);
 		hd_extended_key_free(&hdkey);
-		return picocoin_returnblankSV();
+		return picocoin_emptytx(rh);
 	}
 
 	// import p2sh scriptPub
@@ -451,14 +452,14 @@ SV* picocoin_tx_push_signature(
 	if (!bp_sign(&hdkey.key, &hash, sizeof(*&hash), &sig, &siglen)){
 		bp_tx_free(&tx);
 		hd_extended_key_free(&hdkey);
-		return picocoin_returnblankSV();
+		return picocoin_emptytx(rh);
 	}
 
 	uint8_t ch = (uint8_t) nHashType;
 	sig = realloc(sig, siglen + 1);
 	memcpy(sig + siglen, &ch, 1);
 	siglen++;
-
+	SV* sig_sv = newSVpv(sig,siglen);
 
 	cstring * scriptSig = txin->scriptSig;
 	if(scriptSig == NULL){
@@ -472,15 +473,22 @@ SV* picocoin_tx_push_signature(
 
 	hd_extended_key_free(&hdkey);
 	bp_tx_free(&tx);
-	free(sig);
-	return newSVpv(txanswer->str,txanswer->len);
+
+
+	hv_store( rh, "sig", 3, sig_sv, 0);
+	hv_store( rh, "tx", 2, newSVpv(txanswer->str,txanswer->len), 0);
+	hv_store(rh, "success", 7, newSViv((int) 1), 0);
+
+	//free(sig);
+
+	return rh;
 
 
 }
 
 
 /*
- * Add redeem script to input with p2sh.
+ * Add redeem script to input with p2sh. (Also can be used to push signatures, since bsp_push_data is used).
  */
 
 SV*	picocoin_tx_push_redeem_script(int nIndex,SV* tx_data,SV* redeem_script){
@@ -516,14 +524,9 @@ SV*	picocoin_tx_push_redeem_script(int nIndex,SV* tx_data,SV* redeem_script){
 	if(scriptSig == NULL){
 		scriptSig = cstr_new_sz(64);
 	}
-	else{
-		//fprintf(stderr,"current scriptSig len=%d\nredeem size=%d\n",scriptSig->len,len_redeem_script);
-	}
 
 	// for multisig p2sh, OP_0 needs to go first, then add the redeem scripts
 	bsp_push_data(scriptSig, redeem_script_pointer, len_redeem_script);
-	//fprintf(stderr,"new scriptSig len=%d\n",scriptSig->len);
-
 
 	cstring *txanswer = cstr_new_sz(bp_tx_ser_size(&tx));
 

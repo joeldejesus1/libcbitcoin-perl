@@ -44,7 +44,7 @@ HV* picocoin_returntx(HV * rh, const struct bp_tx *tx);
 HV* picocoin_tx_des(SV* tx_data);
 SV*	picocoin_tx_push_redeem_script(int nIndex,SV* tx_data,SV* redeem_script);
 SV*	picocoin_tx_push_p2sh_op_false(int nIndex,SV* tx_data);
-SV* picocoin_tx_push_signature(
+HV* picocoin_tx_push_signature(
 		SV* hdkey_data, SV* fromPubKey_data, SV* txdata,int nIndex, int nHashType, int amount
 );
 
