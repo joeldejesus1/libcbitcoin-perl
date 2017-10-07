@@ -8,7 +8,7 @@ Build-Depends: libfile-slurp-perl,libcrypt-cbc-perl,
    liblog-log4perl-perl, libmath-bigint-gmp-perl, 
    libgmp-dev,libjson-xs-perl,libconvert-base32-perl, 
    libssl-dev,
-   libccoin-dev, libnet-ip-perl,
+   libccoin-dev (>=0.6), libnet-ip-perl,
    libio-epoll-perl, libev-perl,
    libdata-uuid-perl,
    libimage-png-qrcode-perl
@@ -22,7 +22,7 @@ Depends: libfile-slurp-perl, libcrypt-cbc-perl,
   libcrypt-openssl-aes-perl, 
   libio-socket-socks-perl, liblog-log4perl-perl, 
   libmath-bigint-gmp-perl, libconvert-base32-perl, 
-  libccoin0 (>= 0.5), libdigest-sha-perl,
+  libccoin0 (>= 0.6), libdigest-sha-perl,
   libnet-ip-perl,libdata-uuid-perl, libimage-png-qrcode-perl
   ${misc:Depends}, ${shlibs:Depends}
 Description: Perl modules for cbitcoin.

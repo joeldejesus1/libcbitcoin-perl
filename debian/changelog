@@ -1,10 +1,13 @@
-libcbitcoin-perl (0.5-2~1.gbpb41856) UNRELEASED; urgency=medium
+libcbitcoin-perl (0.6-2) unstable; urgency=medium
 
-  ** SNAPSHOT build @b41856e598cddeff2405c6ac1847eebc283678b0 **
+  [ Joel DeJesus (Work Email) ]
 
-  * UNRELEASED
+  * incrementing version to match picocoin version
+  * tying Message serialization to CBitcoin::network_bytes
+  * got spv to talk to and download all headers from bitcoind (classic)
+  * added UAHF capable transaction functionality
 
- -- Joel Manuel De Jesus (Work Account) <dejesus.joel@e-flamingo.net>  Tue, 18 Apr 2017 00:37:33 +0900
+ -- Joel DeJesus (Work Email) <dejesus.joel@e-flamingo.jp>  Sat, 07 Oct 2017 23:09:26 +0900
 
 libcbitcoin-perl (0.2-1) unstable; urgency=low
 
