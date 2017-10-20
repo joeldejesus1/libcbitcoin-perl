@@ -10,7 +10,7 @@ Build-Depends: libfile-slurp-perl,libcrypt-cbc-perl,
    libssl-dev,
    libccoin-dev (>=0.6), libnet-ip-perl,
    libio-epoll-perl, libev-perl,
-   libdata-uuid-perl,
+   libdata-uuid-perl, libnet-dns-perl (>=1.06),
    libimage-png-qrcode-perl
 Standards-Version: 3.9.6
 Homepage: https://github.com/favioflamingo/libcbitcoin-perl
