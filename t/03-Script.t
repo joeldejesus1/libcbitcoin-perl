@@ -1,6 +1,7 @@
 use strict;
 use warnings;
 
+use CBitcoin;
 use JSON::XS;
 use Data::Dumper;
 

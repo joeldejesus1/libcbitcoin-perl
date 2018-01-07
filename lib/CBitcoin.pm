@@ -1,8 +1,9 @@
 package CBitcoin;
 
+#use utf8;
 use strict;
 use warnings;
-
+use File::ShareDir;
 
 =head1 NAME
 
@@ -95,6 +96,12 @@ our $network_bytes = MAINNET;
 our $chain = CHAIN_LEGACY;
 
 
+
+sub module_directory {
+	
+	
+	return  File::ShareDir::module_dir('CBitcoin');
+}
 
 =head1 AUTHOR
 
