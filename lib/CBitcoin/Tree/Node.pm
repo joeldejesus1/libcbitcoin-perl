@@ -258,8 +258,6 @@ sub hdkey {
 		
 		return $x if defined $bool && !$bool;
 		
-		
-		
 		foreach my $index (keys %{$this->{'next /'}}){
 			$this->{'next /'}->{$index}->hdkey($x->deriveChild(1,$index));
 		}
