@@ -9,6 +9,7 @@ use CBitcoin;
 use Crypt::PBKDF2; # libcrypt-pbkdf2-perl
 use Digest::SHA;
 use Encode qw(decode encode);
+use Unicode::Normalize;
 
 # libjson-xs-perl libfile-sharedir-perl
 #  libgmp-dev libssl-dev
@@ -39,6 +40,7 @@ Copying https://github.com/dark-s/bitcore-bip39/blob/master/lib/bip39/index.js
 =cut
 
 my $content_mapper;
+my $word_index;
 
 my $file_mapper = {
 	'en_us' => 'english'
@@ -82,8 +84,34 @@ sub word_list($){
 	else{
 		die "no language match";
 	}
-
 }
+
+=pod
+
+---++ word_index('en_us')->\%word_index
+
+Return hash. {'word1' => 1}
+
+=cut
+
+sub word_index($){
+	my ($language) = @_;
+	# given en_us or en_gb, get english
+	my $ln = $file_mapper->{$language};
+	die "no language match" unless defined $ln;
+	
+	unless(defined $word_index->{$ln}){
+		load_lang($ln);
+	}
+	
+	if(defined $word_index->{$ln}){
+		return $word_index->{$ln};
+	}
+	else{
+		die "no language match";
+	}
+}
+
 
 =pod
 
@@ -114,11 +142,18 @@ sub load_lang($){
 	
 	die "no language file" unless -f $fp;
 	
+	$word_index = {} unless defined $word_index;
+	$word_index->{$ln} = {} unless defined $word_index->{$ln};
+	
 	$content_mapper->{$ln} = [];
 	open(my $fh,"<:encoding(UTF-8)",$fp) || die "bad read: $!";
+	my $index = 0;
 	while(my $word = <$fh>){
 		chomp($word);
 		push(@{$content_mapper->{$ln}},$word);
+		$word_index->{$ln}->{$word} = $index;
+		
+		$index++;
 	}
 	close($fh);
 	
@@ -152,21 +187,8 @@ sub entropyToMnemonic($$){
 	
 	
 	if($language eq 'ja_jp'){
+		# contains zenkaku space
 		return join('　',@seed_list);
-
-=pod
-		my $d = '';
-		my $i = 0;
-		foreach my $sl (@seed_list){
-			$i++;
-			if($i == scalar(@seed_list)){
-				next;
-			}
-			#$d .= decode('UTF-8',$sl)."　";
-			$d .= $sl."　";		
-		}
-		return $d;
-=cut
 	}
 	else{
 		return join(' ',@seed_list);
@@ -202,10 +224,99 @@ sub generateMnemonic($$){
 		$m += sysread($fh,$entropy,$n - $m, $m);
 	}
 	close($fh);
-	warn "length=".length($entropy);
+#	warn "length=".length($entropy);
 	
 	return CBitcoin::Mnemonic::entropyToMnemonic($language,$entropy);
 }
+
+sub mnemonicSplit($$){
+	my ($mnemonic,$language) = @_;
+	my $wl = word_list($language);
+	my @words;
+	if($language eq 'ja_jp'){
+		@words = split('　',$mnemonic);
+	}
+	else{
+		@words = split(' ',$mnemonic);
+	}
+	
+	unless(scalar(@words) % 3 == 0){
+		die "invalid mnemonic - 1";
+	}
+	
+	return @words;
+}
+
+
+sub mnemonicToEntropy($$){
+	my ($mnemonic, $language) = @_;
+	my @words = mnemonicSplit($mnemonic,$language);
+	
+	my $entropy;
+	my $wi = word_index($language);
+	foreach my $w (@words){
+		my $i = $wi->{$w};
+		die "out of index" unless defined $i;
+		$entropy .= pack('C',$i);
+	}
+	#warn "entropy=".length($entropy);
+	my $dividerIndex = int(length($entropy) / 33) * 32;
+	#warn "di=$dividerIndex\n";
+	my $entropyBits = substr($entropy,0,$dividerIndex );
+	my $checksumBits = substr($entropy,$dividerIndex );
+	
+	#warn "bytes=".length($entropyBits);
+	
+	if(length($entropyBits) < 16 || 32 < length($entropyBits)){
+		die "invalid entropy - 1";
+	}
+	unless(length($entropyBits) % 4 == 0){
+		die "invalid entropy - 2";
+	}
+	
+	my $calcChecksum = deriveChecksumBits($entropyBits);
+		
+	unless($calcChecksum eq $checksumBits){
+		die "bad check sum";
+	}
+	
+	return $entropyBits;
+}
+
+sub mnemonicToSeed($$$){
+	my ($mnemonic,$language,$password) = @_;
+	$password //= '';
+	
+	#my @words = mnemonicSplit($mnemonic,$language);
+	#warn "m=$mnemonic";
+	my $NFKD_string = Unicode::Normalize::NFKD($mnemonic);
+	#warn "p - 1";
+	my $pbkdf2 = Crypt::PBKDF2->new(
+		hash_class => 'HMACSHA2',
+		hash_args => {
+			sha_size => 512,
+		},
+	    iterations => 2048,
+	    salt_len => 10,
+	);
+	#warn "p - 2";
+	
+	return $pbkdf2->PBKDF2(encode('UTF-8',$NFKD_string),salt($password));
+	
+	#warn "p - 3 - h=".length($hash);
+	
+	#return $hash;
+}
+
+
+sub salt($){
+	my $password = shift;
+	$password //= '';
+	return 'mnemonic'.$password;
+}
+
+
+
 
 
 1;
