@@ -18,6 +18,7 @@ DEB_BUILD_HARDENING=1
 
 override_dh_auto_configure:
 	perl Makefile.PL PREFIX=/usr
+	make static
 override_dh_auto_install:
 	make DESTDIR=debian/libcbitcoin-perl pure_install
 
