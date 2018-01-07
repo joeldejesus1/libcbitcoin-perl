@@ -8,7 +8,7 @@ use warnings;
 use CBitcoin;
 use Crypt::PBKDF2; # libcrypt-pbkdf2-perl
 use Digest::SHA;
-
+use Encode qw(decode encode);
 
 # libjson-xs-perl libfile-sharedir-perl
 #  libgmp-dev libssl-dev
@@ -115,9 +115,9 @@ sub load_lang($){
 	die "no language file" unless -f $fp;
 	
 	$content_mapper->{$ln} = [];
-	open(my $fh,'<',$fp) || die "bad read: $!";
+	open(my $fh,"<:encoding(UTF-8)",$fp) || die "bad read: $!";
 	while(my $word = <$fh>){
-		chomp($word); 
+		chomp($word);
 		push(@{$content_mapper->{$ln}},$word);
 	}
 	close($fh);
@@ -129,11 +129,11 @@ sub entropyToMnemonic($$){
 	my ($language,$entropy) = @_;
 	
 	if(length($entropy) < 32 || 64 < length($entropy) ){
-		die "invalid entropy";
+		die "invalid entropy - 1";
 	}
 	
 	if (length($entropy) % 4 != 0){
-		die "invalid entropy";
+		die "invalid entropy - 2";
 	}
 	
 	my $checksumBits = deriveChecksumBits($entropy);
@@ -149,9 +149,29 @@ sub entropyToMnemonic($$){
 		push(@seed_list,$wl->[$ith_byte]);
 	}
 	
-	my $space = ' ';
-	$space = $CONST_JAPANESE_SPACE if $language eq 'ja_jp';
-	return join($space,@seed_list);
+	
+	
+	if($language eq 'ja_jp'){
+		return join('　',@seed_list);
+
+=pod
+		my $d = '';
+		my $i = 0;
+		foreach my $sl (@seed_list){
+			$i++;
+			if($i == scalar(@seed_list)){
+				next;
+			}
+			#$d .= decode('UTF-8',$sl)."　";
+			$d .= $sl."　";		
+		}
+		return $d;
+=cut
+	}
+	else{
+		return join(' ',@seed_list);
+	}
+	
 }
 
 sub deriveChecksumBits($){
@@ -167,7 +187,25 @@ sub deriveChecksumBits($){
 	return substr($hash,0,$CS / 8);
 }
 
-
+# (strength_bits=256,)
+sub generateMnemonic($$){
+	my ($strength,$language) = @_;
+	
+	unless($strength % 32 == 0){
+		die "strength must be multiple of 32";
+	}
+	
+	my $entropy;
+	open(my $fh,'<','/dev/random') || print "Bail out!\n";
+	my ($m,$n) = (0,$strength / 8);
+	while(0 < $n - $m){
+		$m += sysread($fh,$entropy,$n - $m, $m);
+	}
+	close($fh);
+	warn "length=".length($entropy);
+	
+	return CBitcoin::Mnemonic::entropyToMnemonic($language,$entropy);
+}
 
 
 1;
